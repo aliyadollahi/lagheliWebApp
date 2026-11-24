@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="112" fill="#3F523B"/>
+  <!-- Skillet Handle -->
+  <path d="M356 256H442" stroke="#F9F8F4" stroke-width="26" stroke-linecap="round"/>
+  <circle cx="430" cy="256" r="6" fill="#3F523B"/>
+  <!-- Cast-Iron Skillet (Lagheli) -->
+  <circle cx="232" cy="256" r="134" fill="#1C1B18" stroke="#F9F8F4" stroke-width="14"/>
+  <!-- Egg White -->
+  <path d="M168 232C162 198 194 176 232 182C268 188 302 204 298 242C294 278 276 318 232 320C188 322 174 268 168 232Z" fill="#F9F8F4"/>
+  <!-- Golden Egg Yolk -->
+  <circle cx="236" cy="250" r="34" fill="#D4942A"/>
+  <circle cx="224" cy="238" r="9" fill="#F9E2AE" fill-opacity="0.75"/>
+</svg>
