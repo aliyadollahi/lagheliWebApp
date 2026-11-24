@@ -395,3 +395,44 @@ export interface AdminDashboardStats {
   totalUserWalletToman: number;
   totalPartnerWalletToman: number;
 }
+
+export interface DeliveryPricingConfig {
+  freeDeliveryThreshold: number;
+  packagingFee: number;
+  standardDeliveryFee: number;
+}
+
+export interface CustomSubstitutionRule {
+  id: string;
+  ingredient: string;
+  substitute: string;
+  ratio: string;
+  compatibility: number;
+  flavorNote: string;
+  isVegan: boolean;
+}
+
+export interface KitchenConfig {
+  quickFridgeItems: string[];
+  quickSubQueries: string[];
+  customSubstitutions: CustomSubstitutionRule[];
+}
+
+export interface AdminQuestionRow {
+  id: string;
+  recipeId: string;
+  recipeTitle: string;
+  authorName: string;
+  body: string;
+  solved: boolean;
+  createdAt: string;
+  answers: {
+    id: string;
+    authorName: string;
+    body: string;
+    upvotes: number;
+    isBest: boolean;
+    createdAt: string;
+  }[];
+}
+

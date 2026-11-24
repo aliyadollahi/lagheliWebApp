@@ -24,6 +24,7 @@ import {
   Trash2,
   Upload,
   Users,
+  Utensils,
   Wallet,
   X,
   XCircle,
@@ -50,6 +51,7 @@ import type {
   SponsorCampaign,
   WalletTransaction,
 } from '../shared/types.ts';
+import {AdminFrontendOpsPanel} from './AdminFrontendOpsPanel.tsx';
 import {EditorialImage} from './EditorialImage.tsx';
 
 type AdminNavId =
@@ -59,6 +61,7 @@ type AdminNavId =
   | 'users'
   | 'partners'
   | 'campaigns'
+  | 'frontend_ops'
   | 'ecosystem';
 
 interface AdminDashboardProps {
@@ -510,6 +513,7 @@ export function AdminDashboard({
       badge: stats?.pendingPartnersCount || undefined,
     },
     {id: 'campaigns', label: 'اسپانسرها و تبلیغات', icon: Megaphone, badge: stats?.activeCampaignsCount || undefined},
+    {id: 'frontend_ops', label: 'منوی روز، یخچال، جِم و نظرات', icon: Utensils},
     {id: 'ecosystem', label: 'اکوسیستم، سفارش‌ها و مالی', icon: Settings},
   ];
 
@@ -1714,6 +1718,13 @@ export function AdminDashboard({
                 )}
               </div>
             </div>
+          )}
+
+          {/* =========================================================
+              8. DAILY MENU, SMART FRIDGE/KITCHEN, GEM STORE & Q&A MODERATION
+          ========================================================= */}
+          {activeNav === 'frontend_ops' && (
+            <AdminFrontendOpsPanel onRefreshAppConfig={onRefreshAppConfig} onNotify={onNotify} />
           )}
         </div>
       </div>

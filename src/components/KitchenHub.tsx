@@ -1,8 +1,8 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {ArrowLeftRight, Plus, Search, ShoppingBag, Sparkles, X} from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
 import {findNativeSubstitutions, toFaDigits} from '../shared/persianEngine.ts';
-import type {IngredientItem, Recipe, SubstitutionSuggestion} from '../shared/types.ts';
+import type {IngredientItem, KitchenConfig, Recipe, SubstitutionSuggestion} from '../shared/types.ts';
 import {EditorialImage} from './EditorialImage.tsx';
 
 interface KitchenHubProps {
@@ -42,6 +42,10 @@ interface FridgeMatchResult {
 export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) {
   const [mode, setMode] = useState<'fridge' | 'substitute'>('fridge');
 
+  // Admin-managed dynamic chips with offline fallback
+  const [fridgeItems, setFridgeItems] = useState<string[]>(COMMON_FRIDGE_ITEMS);
+  const [subQueries, setSubQueries] = useState<string[]>(QUICK_SUB_QUERIES);
+
   // Fridge matcher state
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>(['پیاز', 'سیر', 'گوجه', 'تخم‌مرغ']);
   const [customIng, setCustomIng] = useState('');
@@ -56,6 +60,26 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
     findNativeSubstitutions('رب انار', 'native')
   );
   const [loadingSub, setLoadingSub] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    apiRequest<{kitchenConfig?: KitchenConfig}>('/api/config')
+      .then((res) => {
+        if (!active || !res.kitchenConfig) return;
+        if (Array.isArray(res.kitchenConfig.quickFridgeItems) && res.kitchenConfig.quickFridgeItems.length > 0) {
+          setFridgeItems(res.kitchenConfig.quickFridgeItems);
+        }
+        if (Array.isArray(res.kitchenConfig.quickSubQueries) && res.kitchenConfig.quickSubQueries.length > 0) {
+          setSubQueries(res.kitchenConfig.quickSubQueries);
+        }
+      })
+      .catch(() => {
+        // Keep offline defaults gracefully
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const toggleIngredient = (ing: string) => {
     setSelectedIngredients((prev) =>
@@ -174,7 +198,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
             <div className="space-y-2">
               <p className="text-xs text-[#615E55] dark:text-[#A9A497]">مواد پرکاربرد آشپزخانه ایرانی:</p>
               <div className="flex flex-wrap gap-2">
-                {COMMON_FRIDGE_ITEMS.map((item) => {
+                {fridgeItems.map((item) => {
                   const selected = selectedIngredients.includes(item);
                   return (
                     <button
@@ -380,7 +404,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
           </form>
 
           <div className="flex flex-wrap gap-2">
-            {QUICK_SUB_QUERIES.map((item) => (
+            {subQueries.map((item) => (
               <button
                 key={item}
                 type="button"

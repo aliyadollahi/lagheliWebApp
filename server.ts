@@ -17,6 +17,12 @@ import {
   saveUploadedRecipeImage,
 } from './src/server/adminAndMediaRoutes.ts';
 import {
+  getDeliveryPricingConfig,
+  getGemStoreOffers,
+  getKitchenConfig,
+  registerAdminExtrasRoutes,
+} from './src/server/adminExtrasRoutes.ts';
+import {
   PANTRY_STAPLES,
   PARTNER_ROLES,
   canonicalizeIngredient,
@@ -280,7 +286,9 @@ app.get('/api/config', (_req, res) => {
   res.json({
     ecosystem: getEcosystemConfig(),
     partnerRoles: PARTNER_ROLES,
-    gemStoreOffers: GEM_STORE_OFFERS,
+    gemStoreOffers: getGemStoreOffers(GEM_STORE_OFFERS),
+    kitchenConfig: getKitchenConfig(),
+    deliveryPricing: getDeliveryPricingConfig(),
   });
 });
 
@@ -945,8 +953,22 @@ app.post('/api/kitchen/fridge-match', (req, res) => {
 app.get('/api/kitchen/substitutions', (req, res) => {
   const ingredient = typeof req.query.ingredient === 'string' ? req.query.ingredient.trim() : '';
   if (!ingredient) return res.json({ingredient: '', suggestions: []});
-  const suggestions = findNativeSubstitutions(ingredient, 'native');
-  res.json({ingredient, suggestions});
+  const normQuery = normalizePersian(ingredient);
+  const customRules = getKitchenConfig()
+    .customSubstitutions.filter((rule) => {
+      const normRule = normalizePersian(rule.ingredient);
+      return normRule.includes(normQuery) || normQuery.includes(normRule);
+    })
+    .map((rule) => ({
+      substitute: rule.substitute,
+      ratio: rule.ratio,
+      compatibility: rule.compatibility,
+      flavorNote: rule.flavorNote,
+      isVegan: rule.isVegan,
+      source: 'native' as const,
+    }));
+  const nativeSuggestions = findNativeSubstitutions(ingredient, 'native');
+  res.json({ingredient, suggestions: [...customRules, ...nativeSuggestions]});
 });
 
 // =========================================================================
@@ -1106,7 +1128,13 @@ app.get('/api/menu', (_req, res) => {
     featured: Number(r.featured) === 1,
     linkedRecipeId: r.linked_recipe_id ? String(r.linked_recipe_id) : null,
   }));
-  res.json({items, freeDeliveryThreshold: 600000, packagingFee: 18000, standardDeliveryFee: 45000});
+  const pricing = getDeliveryPricingConfig();
+  res.json({
+    items,
+    freeDeliveryThreshold: pricing.freeDeliveryThreshold,
+    packagingFee: pricing.packagingFee,
+    standardDeliveryFee: pricing.standardDeliveryFee,
+  });
 });
 
 const createOrderSchema = z.object({
@@ -1162,8 +1190,9 @@ app.post('/api/orders', (req, res) => {
     });
   }
 
-  const packagingFee = 18000;
-  const deliveryFee = subtotal >= 600000 ? 0 : 45000;
+  const pricing = getDeliveryPricingConfig();
+  const packagingFee = pricing.packagingFee;
+  const deliveryFee = subtotal >= pricing.freeDeliveryThreshold ? 0 : pricing.standardDeliveryFee;
   const total = subtotal + packagingFee + deliveryFee;
   const id = `ord-${crypto.randomUUID().slice(0, 8)}`;
   const trackingCode = `LG-${crypto.randomInt(10000, 99999)}`;
@@ -1368,7 +1397,7 @@ app.get('/api/profile/dashboard', (req, res) => {
     badges,
     transactions,
     coupons,
-    gemStoreOffers: GEM_STORE_OFFERS,
+    gemStoreOffers: getGemStoreOffers(GEM_STORE_OFFERS),
   });
 });
 
@@ -1376,7 +1405,7 @@ app.post('/api/gems/redeem', (req, res) => {
   const session = getSession(req);
   if (!session) return res.status(401).json({error: 'برای دریافت کوپن وارد حساب شوید.'});
   const offerId = String(req.body?.offerId || '');
-  const offer = GEM_STORE_OFFERS.find((o) => o.id === offerId);
+  const offer = getGemStoreOffers(GEM_STORE_OFFERS).find((o) => o.id === offerId);
   if (!offer) return res.status(404).json({error: 'پیشنهاد مورد نظر یافت نشد.'});
 
   const user = db.prepare('SELECT gems FROM users WHERE id = ?').get(session.userId) as {gems: number};
@@ -1839,6 +1868,12 @@ registerAdminAndMediaRoutes(app, {
   mapPartnerRow,
   awardXpAndGems,
   checkRateLimit,
+});
+
+registerAdminExtrasRoutes(app, {
+  requireAdmin,
+  isSafeUrl,
+  defaultGemOffers: GEM_STORE_OFFERS,
 });
 
 // =========================================================================
