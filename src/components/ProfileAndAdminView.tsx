@@ -132,10 +132,10 @@ export function ProfileAndAdminView({
   return (
     <div className="max-w-5xl mx-auto space-y-8">
       {/* Calm Header Utilities (PWA Install, Theme, Replay Splash, Desktop Admin Workspace) */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#E5E1D6] dark:border-[#2F2D27] pb-6">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#E6E6E3] dark:border-[#282825] pb-6">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">پروفایل و تنظیمات</h1>
-          <p className="text-xs text-[#615E55] dark:text-[#A9A497] mt-0.5">
+          <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] mt-0.5">
             مدیریت دستورها، کیف پول، کیف جِم و تنظیمات اپلیکیشن لاقلی
           </p>
         </div>
@@ -145,7 +145,7 @@ export function ProfileAndAdminView({
             <button
               type="button"
               onClick={install}
-              className="min-h-[42px] px-4 rounded-full bg-[#111110] text-white dark:bg-[#F4F1EA] dark:text-[#111110] text-xs font-medium inline-flex items-center gap-1.5"
+              className="min-h-[42px] px-4 rounded-full bg-[#111110] text-white dark:bg-[#FAFAFA] dark:text-[#111110] text-xs font-medium inline-flex items-center gap-1.5"
             >
               <Download className="w-4 h-4" />
               <span>نصب وب‌اپ لاقلی</span>
@@ -155,7 +155,7 @@ export function ProfileAndAdminView({
             <button
               type="button"
               onClick={() => setShowIOSGuide(true)}
-              className="min-h-[42px] px-4 rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-medium inline-flex items-center gap-1.5"
+              className="min-h-[42px] px-4 rounded-full border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium inline-flex items-center gap-1.5"
             >
               <Download className="w-4 h-4" />
               <span>نصب روی آیفون</span>
@@ -165,7 +165,7 @@ export function ProfileAndAdminView({
           <button
             type="button"
             onClick={onReplaySplash}
-            className="min-h-[42px] px-3.5 rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-medium inline-flex items-center gap-1.5 hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+            className="min-h-[42px] px-3.5 rounded-full border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium inline-flex items-center gap-1.5 hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
           >
             <PlayCircle className="w-4 h-4" />
             <span>پخش اسپلش لاقلی</span>
@@ -175,7 +175,7 @@ export function ProfileAndAdminView({
             type="button"
             onClick={onToggleTheme}
             aria-label={theme === 'dark' ? 'حالت روشن' : 'حالت تاریک'}
-            className="min-h-[42px] px-3.5 rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-medium inline-flex items-center gap-1.5 hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+            className="min-h-[42px] px-3.5 rounded-full border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium inline-flex items-center gap-1.5 hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             <span>{theme === 'dark' ? 'روشن' : 'تاریک'}</span>
@@ -194,17 +194,17 @@ export function ProfileAndAdminView({
 
       {/* iOS Safari Install Guide */}
       {showIOSGuide && (
-        <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 flex items-start justify-between gap-4">
+        <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 flex items-start justify-between gap-4">
           <div className="space-y-1 text-xs">
             <p className="font-bold text-sm">راهنمای نصب لاقلی روی آیفون (Safari)</p>
-            <p className="text-[#615E55] dark:text-[#A9A497] leading-relaxed">
+            <p className="text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
               ۱. دکمه Share در نوار پایین مرورگر Safari را لمس کنید. ۲. گزینه «Add to Home Screen» را انتخاب و روی Add بزنید.
             </p>
           </div>
           <button
             type="button"
             onClick={() => setShowIOSGuide(false)}
-            className="text-xs text-[#615E55] px-2 py-1"
+            className="text-xs text-[#5C5C58] px-2 py-1"
           >
             بستن
           </button>
@@ -212,15 +212,15 @@ export function ProfileAndAdminView({
       )}
 
       {!user ? (
-        <div className="rounded-3xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-10 text-center space-y-4">
+        <div className="rounded-3xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-10 text-center space-y-4">
           <h2 className="text-2xl font-bold">ورود به حساب آشپزخانه لاقلی</h2>
-          <p className="text-sm text-[#615E55] dark:text-[#A9A497] max-w-md mx-auto leading-relaxed">
+          <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E] max-w-md mx-auto leading-relaxed">
             به عنوان مهمان می‌توانید دستورها را نشانک بزنید و لیست خرید بسازید. با ورود پیامکی، داده‌های شما همگام‌سازی می‌شود و می‌توانید عکس واقعی غذاهای خود را ثبت کرده و جِم هدیه بگیرید.
           </p>
           <button
             type="button"
             onClick={onOpenAuth}
-            className="min-h-[48px] px-7 rounded-full bg-[#111110] hover:bg-[#2A2925] dark:bg-[#F4F1EA] dark:text-[#111110] text-white text-sm font-medium"
+            className="min-h-[48px] px-7 rounded-full bg-[#111110] hover:bg-[#282825] dark:bg-[#FAFAFA] dark:text-[#111110] text-white text-sm font-medium"
           >
             ورود با شماره موبایل (OTP)
           </button>
@@ -228,14 +228,14 @@ export function ProfileAndAdminView({
       ) : (
         <div className="space-y-8">
           {/* Profile Editorial Header */}
-          <div className="rounded-3xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-6 sm:p-7 space-y-6">
+          <div className="rounded-3xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-6 sm:p-7 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <h2 className="text-2xl font-bold">{user.name}</h2>
                   {user.isVerifiedChef && <BadgeCheck className="w-5 h-5 text-[#B54B1F] dark:text-[#E29A6F]" />}
                 </div>
-                <p className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                   {user.levelName} · {user.city}، {user.neighborhood} ·{' '}
                   <span dir="ltr" className="tabular-nums">
                     {toFaDigits(user.phone)}
@@ -248,7 +248,7 @@ export function ProfileAndAdminView({
                   <button
                     type="button"
                     onClick={() => setShowChefForm((v) => !v)}
-                    className="min-h-[42px] px-4 rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-medium"
+                    className="min-h-[42px] px-4 rounded-full border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium"
                   >
                     درخواست نشان سرآشپز
                   </button>
@@ -259,7 +259,7 @@ export function ProfileAndAdminView({
                 <button
                   type="button"
                   onClick={onLogout}
-                  className="min-h-[42px] px-4 rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] text-xs text-[#615E55] inline-flex items-center gap-1.5"
+                  className="min-h-[42px] px-4 rounded-full border border-[#E6E6E3] dark:border-[#282825] text-xs text-[#5C5C58] inline-flex items-center gap-1.5"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span>خروج</span>
@@ -268,29 +268,29 @@ export function ProfileAndAdminView({
             </div>
 
             {/* Clean Tabular Metrics (Wallet Toman + Gems + XP + Followers) */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-5 border-t border-[#E5E1D6] dark:border-[#2F2D27] tabular-nums">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-5 border-t border-[#E6E6E3] dark:border-[#282825] tabular-nums">
               <div>
-                <div className="text-xs text-[#615E55] dark:text-[#A9A497]">موجودی کیف پول</div>
+                <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">موجودی کیف پول</div>
                 <div className="text-lg font-extrabold text-[#B54B1F] dark:text-[#E29A6F] inline-flex items-center gap-1.5 mt-0.5">
                   <Wallet className="w-4 h-4" />
                   <span>{formatToman(user.walletBalance || 0)}</span>
                 </div>
               </div>
               <div>
-                <div className="text-xs text-[#615E55] dark:text-[#A9A497]">موجودی جِم</div>
-                <div className="text-lg font-extrabold text-[#C85A28] dark:text-[#E5925E] inline-flex items-center gap-1 mt-0.5">
+                <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">موجودی جِم</div>
+                <div className="text-lg font-extrabold text-[#B54B1F] dark:text-[#E29A6F] inline-flex items-center gap-1 mt-0.5">
                   <Gem className="w-4 h-4" />
                   <span>{toFaDigits(user.gems)}</span>
                 </div>
               </div>
               <div>
-                <div className="text-xs text-[#615E55] dark:text-[#A9A497]">امتیاز (XP)</div>
+                <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">امتیاز (XP)</div>
                 <div className="text-lg font-bold mt-0.5">
                   {toFaDigits(user.xp)} / {toFaDigits(user.nextLevelXp)}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-[#615E55] dark:text-[#A9A497]">دنبال‌کنندگان</div>
+                <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">دنبال‌کنندگان</div>
                 <div className="text-lg font-bold mt-0.5">{toFaDigits(user.followersCount)}</div>
               </div>
             </div>
@@ -298,7 +298,7 @@ export function ProfileAndAdminView({
             {showChefForm && (
               <form
                 onSubmit={handleRequestChefVerify}
-                className="pt-4 border-t border-[#E5E1D6] dark:border-[#2F2D27] space-y-3"
+                className="pt-4 border-t border-[#E6E6E3] dark:border-[#282825] space-y-3"
               >
                 <p className="text-sm font-semibold">درخواست دریافت نشان «سرآشپز تاییدشده»</p>
                 <input
@@ -307,7 +307,7 @@ export function ProfileAndAdminView({
                   placeholder="تخصص آشپزی شما (مثلاً غذاهای سنتی جنوب، شیرینی خانگی)"
                   value={chefSpecialty}
                   onChange={(e) => setChefSpecialty(e.target.value)}
-                  className="w-full min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3.5 text-sm"
+                  className="w-full min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3.5 text-sm"
                 />
                 <textarea
                   rows={2}
@@ -315,7 +315,7 @@ export function ProfileAndAdminView({
                   placeholder="معرفی کوتاه سوابق و علاقه آشپزی شما..."
                   value={chefBio}
                   onChange={(e) => setChefBio(e.target.value)}
-                  className="w-full rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] p-3 text-sm"
+                  className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] p-3 text-sm"
                 />
                 <button
                   type="submit"
@@ -341,8 +341,8 @@ export function ProfileAndAdminView({
                 onClick={() => setProfileTab(t.id as 'recipes' | 'questions' | 'badges' | 'gems')}
                 className={`min-h-[44px] px-5 rounded-full text-sm font-medium whitespace-nowrap shrink-0 transition-colors ${
                   profileTab === t.id
-                    ? 'bg-[#111110] text-white dark:bg-[#F4F1EA] dark:text-[#111110]'
-                    : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
+                    ? 'bg-[#111110] text-white dark:bg-[#FAFAFA] dark:text-[#111110]'
+                    : 'bg-[#EFEFED] dark:bg-[#20201E] text-[#5C5C58] dark:text-[#A3A39E]'
                 }`}
               >
                 {t.label}
@@ -358,13 +358,13 @@ export function ProfileAndAdminView({
                   <button
                     type="button"
                     onClick={onOpenSubmitRecipe}
-                    className="text-xs font-semibold text-[#111110] dark:text-[#F4F1EA] hover:underline min-h-[40px]"
+                    className="text-xs font-semibold text-[#111110] dark:text-[#FAFAFA] hover:underline min-h-[40px]"
                   >
                     + ثبت دستور جدید
                   </button>
                 </div>
                 {myRecipes.length === 0 ? (
-                  <p className="text-sm text-[#615E55] dark:text-[#A9A497]">
+                  <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E]">
                     هنوز دستوری ثبت نکرده‌اید. با ثبت اولین دستور ۲۰ جِم هدیه بگیرید.
                   </p>
                 ) : (
@@ -374,11 +374,11 @@ export function ProfileAndAdminView({
                         key={r.id}
                         type="button"
                         onClick={() => onOpenRecipe(r)}
-                        className="text-right rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] overflow-hidden"
+                        className="text-right rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] overflow-hidden"
                       >
                         <EditorialImage src={r.imageUrl} alt={r.title} category={r.category} aspectClass="aspect-[4/3]" />
                         <div className="p-4 space-y-1">
-                          <div className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                          <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                             {r.status === 'published' ? 'منتشرشده' : 'در انتظار تایید مدیریت'}
                           </div>
                           <div className="text-sm font-bold">{r.title}</div>
@@ -389,10 +389,10 @@ export function ProfileAndAdminView({
                 )}
               </div>
 
-              <div className="space-y-4 border-t border-[#E5E1D6] dark:border-[#2F2D27] pt-6">
+              <div className="space-y-4 border-t border-[#E6E6E3] dark:border-[#282825] pt-6">
                 <h3 className="text-lg font-bold">دستورهای نشانک‌شده ({toFaDigits(bookmarkedRecipes.length)})</h3>
                 {bookmarkedRecipes.length === 0 ? (
-                  <p className="text-sm text-[#615E55] dark:text-[#A9A497]">هنوز دستوری را نشانک نکرده‌اید.</p>
+                  <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E]">هنوز دستوری را نشانک نکرده‌اید.</p>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                     {bookmarkedRecipes.map((r) => (
@@ -400,11 +400,11 @@ export function ProfileAndAdminView({
                         key={r.id}
                         type="button"
                         onClick={() => onOpenRecipe(r)}
-                        className="text-right rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] overflow-hidden"
+                        className="text-right rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] overflow-hidden"
                       >
                         <EditorialImage src={r.imageUrl} alt={r.title} category={r.category} aspectClass="aspect-[4/3]" />
                         <div className="p-4 space-y-1">
-                          <div className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                          <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                             {r.category} · {toFaDigits(r.prepMinutes + r.cookMinutes)} دقیقه
                           </div>
                           <div className="text-sm font-bold">{r.title}</div>
@@ -419,17 +419,17 @@ export function ProfileAndAdminView({
 
           {profileTab === 'questions' && (
             <div className="space-y-5">
-              <div className="grid grid-cols-3 gap-4 rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 text-center tabular-nums">
+              <div className="grid grid-cols-3 gap-4 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 text-center tabular-nums">
                 <div>
-                  <div className="text-xs text-[#615E55]">سوال‌های من</div>
+                  <div className="text-xs text-[#5C5C58]">سوال‌های من</div>
                   <div className="text-xl font-bold mt-1">{toFaDigits(qaStats.questionsCount)}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-[#615E55]">پاسخ‌های ثبت‌شده</div>
+                  <div className="text-xs text-[#5C5C58]">پاسخ‌های ثبت‌شده</div>
                   <div className="text-xl font-bold mt-1">{toFaDigits(qaStats.answersCount)}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-[#615E55]">بهترین پاسخ‌ها</div>
+                  <div className="text-xs text-[#5C5C58]">بهترین پاسخ‌ها</div>
                   <div className="text-xl font-bold mt-1 text-[#B54B1F] dark:text-[#E29A6F]">
                     {toFaDigits(qaStats.bestAnswersCount)}
                   </div>
@@ -437,15 +437,15 @@ export function ProfileAndAdminView({
               </div>
 
               {myQuestions.length === 0 ? (
-                <p className="text-sm text-[#615E55] dark:text-[#A9A497]">هنوز سوالی زیر دستورهای پخت نپرسیده‌اید.</p>
+                <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E]">هنوز سوالی زیر دستورهای پخت نپرسیده‌اید.</p>
               ) : (
                 <div className="space-y-3">
                   {myQuestions.map((q) => (
                     <div
                       key={q.id}
-                      className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4 space-y-1.5"
+                      className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 space-y-1.5"
                     >
-                      <div className="text-xs text-[#615E55] dark:text-[#A9A497] flex justify-between">
+                      <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E] flex justify-between">
                         <span>زیر دستور: {q.recipeTitle}</span>
                         <span>{q.solved ? 'حل‌شده' : 'در انتظار پاسخ'}</span>
                       </div>
@@ -464,31 +464,31 @@ export function ProfileAndAdminView({
                   key={b.id}
                   className={`rounded-2xl border p-5 space-y-3 ${
                     b.unlocked
-                      ? 'border-[#B54B1F]/40 bg-[#FFFFFF] dark:bg-[#1C1B18]'
-                      : 'border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF]/60 dark:bg-[#1C1B18]/60 opacity-80'
+                      ? 'border-[#B54B1F]/40 bg-[#FFFFFF] dark:bg-[#151514]'
+                      : 'border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF]/60 dark:bg-[#151514]/60 opacity-80'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Award
                         className={`w-5 h-5 ${
-                          b.unlocked ? 'text-[#B54B1F] dark:text-[#E29A6F]' : 'text-[#615E55]'
+                          b.unlocked ? 'text-[#B54B1F] dark:text-[#E29A6F]' : 'text-[#5C5C58]'
                         }`}
                       />
                       <h3 className="text-sm font-bold">{b.title}</h3>
                     </div>
-                    <span className="text-xs text-[#615E55] tabular-nums">
+                    <span className="text-xs text-[#5C5C58] tabular-nums">
                       {b.unlocked ? 'بازشده' : `${toFaDigits(b.progress)} / ${toFaDigits(b.target)}`}
                     </span>
                   </div>
-                  <p className="text-xs text-[#615E55] dark:text-[#A9A497]">{b.description}</p>
-                  <div className="h-1.5 rounded-full bg-[#F1EFE8] dark:bg-[#24231F] overflow-hidden">
+                  <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">{b.description}</p>
+                  <div className="h-1.5 rounded-full bg-[#EFEFED] dark:bg-[#20201E] overflow-hidden">
                     <div
                       className="h-full bg-[#B54B1F] dark:bg-[#E29A6F]"
                       style={{width: `${Math.round((b.progress / Math.max(1, b.target)) * 100)}%`}}
                     />
                   </div>
-                  <p className="text-xs text-[#615E55] dark:text-[#A9A497] tabular-nums">
+                  <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
                     پاداش: +{toFaDigits(b.xpReward)} امتیاز · +{toFaDigits(b.gemReward)} جِم
                   </p>
                 </div>
@@ -504,10 +504,10 @@ export function ProfileAndAdminView({
                   {gemOffers.map((offer) => (
                     <div
                       key={offer.id}
-                      className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 flex flex-col justify-between gap-4"
+                      className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 flex flex-col justify-between gap-4"
                     >
                       <div className="space-y-1">
-                        <div className="text-xs text-[#615E55] dark:text-[#A9A497]">{offer.partnerName}</div>
+                        <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">{offer.partnerName}</div>
                         <h4 className="text-base font-bold">{offer.title}</h4>
                         <p className="text-xs text-[#B54B1F] dark:text-[#E29A6F]">{offer.discountLabel}</p>
                       </div>
@@ -515,7 +515,7 @@ export function ProfileAndAdminView({
                         type="button"
                         disabled={user.gems < offer.gemCost}
                         onClick={() => handleRedeemOffer(offer.id)}
-                        className="min-h-[44px] px-4 rounded-full bg-[#111110] hover:bg-[#2A2925] dark:bg-[#F4F1EA] dark:text-[#111110] text-white text-xs font-medium disabled:opacity-40"
+                        className="min-h-[44px] px-4 rounded-full bg-[#111110] hover:bg-[#282825] dark:bg-[#FAFAFA] dark:text-[#111110] text-white text-xs font-medium disabled:opacity-40"
                       >
                         دریافت کوپن با {toFaDigits(offer.gemCost)} جِم
                       </button>
@@ -525,17 +525,17 @@ export function ProfileAndAdminView({
               </div>
 
               {coupons.length > 0 && (
-                <div className="space-y-3 border-t border-[#E5E1D6] dark:border-[#2F2D27] pt-6">
+                <div className="space-y-3 border-t border-[#E6E6E3] dark:border-[#282825] pt-6">
                   <h3 className="text-base font-bold">کوپن‌های دریافت‌شده من</h3>
                   <div className="space-y-2.5">
                     {coupons.map((c) => (
                       <div
                         key={c.id}
-                        className="rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4 flex items-center justify-between gap-3"
+                        className="rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 flex items-center justify-between gap-3"
                       >
                         <div>
                           <div className="text-sm font-bold">{c.title}</div>
-                          <div className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                          <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                             {c.partnerName} · {c.used ? 'استفاده‌شده' : 'قابل استفاده'}
                           </div>
                         </div>
@@ -545,7 +545,7 @@ export function ProfileAndAdminView({
                             navigator.clipboard.writeText(c.code).catch(() => {});
                             onNotify(`کد ${c.code} کپی شد.`);
                           }}
-                          className="min-h-[40px] px-3.5 rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-mono font-bold inline-flex items-center gap-1.5"
+                          className="min-h-[40px] px-3.5 rounded-full border border-[#E6E6E3] dark:border-[#282825] text-xs font-mono font-bold inline-flex items-center gap-1.5"
                         >
                           <Copy className="w-3.5 h-3.5" />
                           <span dir="ltr">{c.code}</span>
@@ -556,16 +556,16 @@ export function ProfileAndAdminView({
                 </div>
               )}
 
-              <div className="space-y-3 border-t border-[#E5E1D6] dark:border-[#2F2D27] pt-6">
+              <div className="space-y-3 border-t border-[#E6E6E3] dark:border-[#282825] pt-6">
                 <h3 className="text-base font-bold">تاریخچه تراکنش‌های جِم</h3>
-                <div className="divide-y divide-[#E5E1D6]/70 dark:divide-[#2F2D27] rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18]">
+                <div className="divide-y divide-[#E6E6E3]/70 dark:divide-[#282825] rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514]">
                   {transactions.map((tx) => (
                     <div key={tx.id} className="flex items-center justify-between px-4 py-3 text-sm">
                       <span>{tx.reason}</span>
                       <span
                         dir="ltr"
                         className={`font-bold tabular-nums ${
-                          tx.amount >= 0 ? 'text-[#B54B1F] dark:text-[#E29A6F]' : 'text-[#C85A28]'
+                          tx.amount >= 0 ? 'text-[#B54B1F] dark:text-[#E29A6F]' : 'text-[#B54B1F]'
                         }`}
                       >
                         {tx.amount >= 0 ? `+${toFaDigits(tx.amount)}` : toFaDigits(tx.amount)}

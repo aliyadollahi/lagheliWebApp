@@ -75,7 +75,7 @@ export function ChefProfileModal({
       aria-modal="true"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto"
     >
-      <div className="w-full max-w-2xl rounded-2xl bg-[#F9F8F4] dark:bg-[#141412] border border-[#E5E1D6] dark:border-[#2F2D27] p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-2xl rounded-2xl bg-[#F6F6F5] dark:bg-[#0B0B0B] border border-[#E6E6E3] dark:border-[#282825] p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-4">
           {chef ? (
             <div className="space-y-1.5">
@@ -83,7 +83,7 @@ export function ChefProfileModal({
                 <h2 className="text-xl font-bold">{chef.name}</h2>
                 {chef.isVerifiedChef && <BadgeCheck className="w-5 h-5 text-[#B54B1F] dark:text-[#E29A6F]" />}
               </div>
-              <div className="text-xs text-[#615E55] dark:text-[#A9A497] flex items-center gap-2">
+              <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E] flex items-center gap-2">
                 <span className="inline-flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5" /> {chef.city}
                 </span>
@@ -94,13 +94,13 @@ export function ChefProfileModal({
               </div>
             </div>
           ) : (
-            <div className="text-sm text-[#615E55]">در حال بارگذاری...</div>
+            <div className="text-sm text-[#5C5C58]">در حال بارگذاری...</div>
           )}
           <button
             type="button"
             aria-label="بستن"
             onClick={onClose}
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
           >
             <X className="w-5 h-5" />
           </button>
@@ -108,9 +108,9 @@ export function ChefProfileModal({
 
         {!loading && chef && (
           <>
-            {chef.bio && <p className="text-sm text-[#615E55] dark:text-[#A9A497] leading-relaxed">{chef.bio}</p>}
+            {chef.bio && <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">{chef.bio}</p>}
 
-            <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-[#E5E1D6] dark:border-[#2F2D27]">
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-[#E6E6E3] dark:border-[#282825]">
               <div className="flex items-center gap-5 text-xs tabular-nums">
                 <span>
                   <strong className="text-sm">{toFaDigits(chef.recipesCount)}</strong> دستور
@@ -130,7 +130,7 @@ export function ChefProfileModal({
                   className={`min-h-[44px] px-5 rounded-xl text-sm font-medium transition-colors ${
                     chef.isFollowing
                       ? 'border border-[#B54B1F] text-[#B54B1F] dark:border-[#E29A6F] dark:text-[#E29A6F]'
-                      : 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
+                      : 'bg-[#B54B1F] text-[#FAFAFA] dark:bg-[#E29A6F] dark:text-[#0B0B0B]'
                   }`}
                 >
                   {chef.isFollowing ? 'لغو دنبال کردن' : 'دنبال کردن'}
@@ -139,7 +139,7 @@ export function ChefProfileModal({
             </div>
 
             {/* 3 Public Chef Tabs */}
-            <div className="inline-flex p-1 rounded-xl bg-[#F1EFE8] dark:bg-[#24231F]">
+            <div className="inline-flex p-1 rounded-xl bg-[#EFEFED] dark:bg-[#20201E]">
               {[
                 {id: 'recipes', label: `دستورها (${toFaDigits(recipes.length)})`},
                 {id: 'followers', label: `دنبال‌کنندگان (${toFaDigits(followers.length)})`},
@@ -151,8 +151,8 @@ export function ChefProfileModal({
                   onClick={() => setTab(t.id as 'recipes' | 'followers' | 'following')}
                   className={`min-h-[40px] px-4 rounded-lg text-xs font-medium transition-colors ${
                     tab === t.id
-                      ? 'bg-[#FFFFFF] dark:bg-[#1C1B18] text-[#1C1B18] dark:text-[#F4F1EA]'
-                      : 'text-[#615E55] dark:text-[#A9A497]'
+                      ? 'bg-[#FFFFFF] dark:bg-[#151514] text-[#0D0D0D] dark:text-[#FAFAFA]'
+                      : 'text-[#5C5C58] dark:text-[#A3A39E]'
                   }`}
                 >
                   {t.label}
@@ -170,11 +170,11 @@ export function ChefProfileModal({
                       onClose();
                       onOpenRecipe(rec);
                     }}
-                    className="text-right rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] overflow-hidden"
+                    className="text-right rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] overflow-hidden"
                   >
                     <EditorialImage src={rec.imageUrl} alt={rec.title} aspectClass="aspect-[4/3]" />
                     <div className="p-3.5 space-y-1">
-                      <div className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                      <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                         {rec.category} · {toFaDigits(rec.prepMinutes + rec.cookMinutes)} دقیقه
                       </div>
                       <div className="text-sm font-bold line-clamp-1">{rec.title}</div>
@@ -185,16 +185,16 @@ export function ChefProfileModal({
             )}
 
             {(tab === 'followers' || tab === 'following') && (
-              <div className="divide-y divide-[#E5E1D6]/70 dark:divide-[#2F2D27] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18]">
+              <div className="divide-y divide-[#E6E6E3]/70 dark:divide-[#282825] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514]">
                 {(tab === 'followers' ? followers : following).length === 0 ? (
-                  <p className="p-6 text-center text-xs text-[#615E55]">هنوز کاربری در این فهرست وجود ندارد.</p>
+                  <p className="p-6 text-center text-xs text-[#5C5C58]">هنوز کاربری در این فهرست وجود ندارد.</p>
                 ) : (
                   (tab === 'followers' ? followers : following).map((person) => (
                     <button
                       key={person.id}
                       type="button"
                       onClick={() => onSelectChef(person.id)}
-                      className="w-full flex items-center justify-between px-4 py-3 text-right hover:bg-[#F9F8F4] dark:hover:bg-[#24231F]"
+                      className="w-full flex items-center justify-between px-4 py-3 text-right hover:bg-[#F6F6F5] dark:hover:bg-[#20201E]"
                     >
                       <div>
                         <div className="text-sm font-semibold flex items-center gap-1.5">
@@ -203,7 +203,7 @@ export function ChefProfileModal({
                             <BadgeCheck className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
                           )}
                         </div>
-                        <div className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                        <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                           {person.city} · {person.specialty}
                         </div>
                       </div>

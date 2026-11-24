@@ -121,13 +121,13 @@ export function AuthModal({
       aria-labelledby="auth-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4"
     >
-      <div className="w-full max-w-md rounded-2xl bg-[#FFFFFF] dark:bg-[#1C1B18] border border-[#E5E1D6] dark:border-[#2F2D27] p-6 sm:p-8">
+      <div className="w-full max-w-md rounded-2xl bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] p-6 sm:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 id="auth-modal-title" className="text-xl font-bold text-[#1C1B18] dark:text-[#F4F1EA]">
+            <h2 id="auth-modal-title" className="text-xl font-bold text-[#0D0D0D] dark:text-[#FAFAFA]">
               ورود به لاقلی
             </h2>
-            <p className="mt-1 text-sm text-[#615E55] dark:text-[#A9A497]">
+            <p className="mt-1 text-sm text-[#5C5C58] dark:text-[#A3A39E]">
               احراز هویت بومی با شماره موبایل و همگام‌سازی خودکار نشانک‌ها و لیست خرید شما
             </p>
           </div>
@@ -135,7 +135,7 @@ export function AuthModal({
             type="button"
             onClick={onClose}
             aria-label="بستن"
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#615E55] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#5C5C58] hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
           >
             <X className="w-5 h-5" />
           </button>
@@ -181,7 +181,7 @@ export function AuthModal({
                 placeholder="09123456789"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full min-h-[48px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-4 text-left tabular-nums text-base"
+                className="w-full min-h-[48px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-4 text-left tabular-nums text-base"
               />
             </div>
 
@@ -196,7 +196,7 @@ export function AuthModal({
                   placeholder="مثلاً علی"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full min-h-[48px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-sm"
+                  className="w-full min-h-[48px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-sm"
                 />
               </div>
               <div>
@@ -207,7 +207,7 @@ export function AuthModal({
                   id="auth-city"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  className="w-full min-h-[48px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-sm"
+                  className="w-full min-h-[48px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-sm"
                 >
                   <option value="تهران">تهران</option>
                   <option value="رشت">رشت</option>
@@ -221,7 +221,7 @@ export function AuthModal({
             <button
               type="submit"
               disabled={loading}
-              className="w-full min-h-[48px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:hover:bg-[#ECA982] text-[#F9F8F4] dark:text-[#141412] font-medium text-sm transition-colors disabled:opacity-50"
+              className="w-full min-h-[48px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:hover:bg-[#ECA982] text-[#FAFAFA] dark:text-[#0B0B0B] font-medium text-sm transition-colors disabled:opacity-50"
             >
               {loading ? 'در حال ارسال کد...' : 'دریافت کد تایید پیامکی'}
             </button>
@@ -229,10 +229,10 @@ export function AuthModal({
         ) : (
           <form onSubmit={handleVerifyOtp} className="mt-6 space-y-4">
             {devCode && (
-              <div className="rounded-xl border border-[#B54B1F]/25 bg-[#F1EFE8] dark:bg-[#24231F] p-3.5 text-sm flex items-start gap-2.5">
+              <div className="rounded-xl border border-[#B54B1F]/25 bg-[#EFEFED] dark:bg-[#20201E] p-3.5 text-sm flex items-start gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F] shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-[#1C1B18] dark:text-[#F4F1EA]">
+                  <p className="text-[#0D0D0D] dark:text-[#FAFAFA]">
                     کد آزمایشی برای شماره <span dir="ltr" className="tabular-nums font-medium">{toFaDigits(phone)}</span>:
                   </p>
                   <p dir="ltr" className="mt-1 text-lg font-bold tracking-widest text-[#B54B1F] dark:text-[#E29A6F] tabular-nums">
@@ -256,7 +256,7 @@ export function AuthModal({
                 placeholder="123456"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="w-full min-h-[48px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-4 text-center tracking-[0.35em] text-lg tabular-nums"
+                className="w-full min-h-[48px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-4 text-center tracking-[0.35em] text-lg tabular-nums"
               />
             </div>
 
@@ -267,14 +267,14 @@ export function AuthModal({
                   setStep('phone');
                   setError(null);
                 }}
-                className="min-h-[48px] px-4 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] text-sm font-medium"
+                className="min-h-[48px] px-4 rounded-xl border border-[#E6E6E3] dark:border-[#282825] text-sm font-medium"
               >
                 اصلاح شماره
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 min-h-[48px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:hover:bg-[#ECA982] text-[#F9F8F4] dark:text-[#141412] font-medium text-sm transition-colors disabled:opacity-50"
+                className="flex-1 min-h-[48px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:hover:bg-[#ECA982] text-[#FAFAFA] dark:text-[#0B0B0B] font-medium text-sm transition-colors disabled:opacity-50"
               >
                 {loading ? 'در حال بررسی...' : 'تایید و ورود'}
               </button>

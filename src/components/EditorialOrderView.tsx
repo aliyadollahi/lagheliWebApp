@@ -183,14 +183,14 @@ export function EditorialOrderView({
   return (
     <div className="space-y-10 pb-20">
       {/* Calm Header & Neighborhood Selector */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#E5E1D6] dark:border-[#2F2D27] pb-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#E6E6E3] dark:border-[#282825] pb-6">
         <div className="space-y-1.5">
-          <p className="text-xs text-[#615E55] dark:text-[#A9A497]">سفره ادیتوریال لاقلی</p>
+          <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">سفره ادیتوریال لاقلی</p>
           <h1 className="text-2xl sm:text-3xl font-bold">منوی دست‌ساز امروز</h1>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="inline-flex items-center gap-1.5 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] px-3 min-h-[44px] text-xs">
+          <div className="inline-flex items-center gap-1.5 rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] px-3 min-h-[44px] text-xs">
             <MapPin className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
             <select
               aria-label="شهر تحویل"
@@ -218,7 +218,7 @@ export function EditorialOrderView({
             <button
               type="button"
               onClick={() => setShowHistory((v) => !v)}
-              className="min-h-[44px] px-4 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-medium hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+              className="min-h-[44px] px-4 rounded-xl border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
             >
               {showHistory ? 'بازگشت به منو' : `سفارش‌های من (${toFaDigits(orderHistory.length)})`}
             </button>
@@ -232,10 +232,10 @@ export function EditorialOrderView({
           {orderHistory.map((ord) => (
             <div
               key={ord.id}
-              className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-3"
+              className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-3"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#615E55] dark:text-[#A9A497]">
-                <span dir="ltr" className="font-mono font-semibold text-[#1C1B18] dark:text-[#F4F1EA]">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
+                <span dir="ltr" className="font-mono font-semibold text-[#0D0D0D] dark:text-[#FAFAFA]">
                   {ord.trackingCode}
                 </span>
                 <span className="text-[#B54B1F] dark:text-[#E29A6F] font-medium">
@@ -252,9 +252,9 @@ export function EditorialOrderView({
                   </div>
                 ))}
               </div>
-              <div className="flex items-center justify-between pt-2 border-t border-[#E5E1D6] dark:border-[#2F2D27] text-xs text-[#615E55] dark:text-[#A9A497]">
+              <div className="flex items-center justify-between pt-2 border-t border-[#E6E6E3] dark:border-[#282825] text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                 <span>بازه تحویل: {ord.deliverySlot}</span>
-                <span className="font-bold text-[#1C1B18] dark:text-[#F4F1EA] tabular-nums">
+                <span className="font-bold text-[#0D0D0D] dark:text-[#FAFAFA] tabular-nums">
                   مجموع: {formatToman(ord.total)}
                 </span>
               </div>
@@ -282,13 +282,13 @@ export function EditorialOrderView({
               ))}
             </div>
             <div className="relative sm:w-64">
-              <Search className="w-4 h-4 text-[#615E55] absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search className="w-4 h-4 text-[#5C5C58] absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="جست‌وجو در منوی روز..."
-                className="w-full min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] pr-10 pl-3 text-sm"
+                className="w-full min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] pr-10 pl-3 text-sm"
               />
             </div>
           </div>
@@ -299,13 +299,13 @@ export function EditorialOrderView({
             <>
           {/* Featured Chef's Dish of the Day */}
           {featuredDish && category === 'همه' && !query && (
-            <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-stretch border-b border-[#E5E1D6] dark:border-[#2F2D27] pb-10">
-              <div className="lg:col-span-7 rounded-2xl overflow-hidden border border-[#E5E1D6] dark:border-[#2F2D27]">
+            <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-stretch border-b border-[#E6E6E3] dark:border-[#282825] pb-10">
+              <div className="lg:col-span-7 rounded-2xl overflow-hidden border border-[#E6E6E3] dark:border-[#282825]">
                 <EditorialImage src={featuredDish.imageUrl} alt={featuredDish.title} aspectClass="aspect-[16/10] lg:h-full" priority />
               </div>
               <div className="lg:col-span-5 flex flex-col justify-between gap-6 py-1">
                 <div className="space-y-3.5">
-                  <div className="text-xs text-[#615E55] dark:text-[#A9A497] flex items-center gap-2">
+                  <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E] flex items-center gap-2">
                     <span>پیشنهاد ویژه سرآشپز امروز</span>
                     <span aria-hidden="true">·</span>
                     <span className="tabular-nums">{toFaDigits(featuredDish.prepMinutes)} دقیقه</span>
@@ -313,8 +313,8 @@ export function EditorialOrderView({
                     <span className="tabular-nums">{toFaDigits(featuredDish.calories)} کالری</span>
                   </div>
                   <h2 className="text-2xl sm:text-3xl font-bold leading-snug">{featuredDish.title}</h2>
-                  <p className="text-sm text-[#615E55] dark:text-[#A9A497] leading-relaxed">{featuredDish.story}</p>
-                  <div className="inline-flex items-center gap-1.5 text-xs text-[#615E55] dark:text-[#A9A497]">
+                  <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">{featuredDish.story}</p>
+                  <div className="inline-flex items-center gap-1.5 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                     <span>{featuredDish.chefName}</span>
                     {featuredDish.chefVerified && <BadgeCheck className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />}
                   </div>
@@ -359,20 +359,20 @@ export function EditorialOrderView({
             {listDishes.map((dish) => (
               <article
                 key={dish.id}
-                className="grid grid-cols-1 sm:grid-cols-12 gap-5 sm:gap-8 pb-8 border-b border-[#E5E1D6]/80 dark:border-[#2F2D27] items-center"
+                className="grid grid-cols-1 sm:grid-cols-12 gap-5 sm:gap-8 pb-8 border-b border-[#E6E6E3]/80 dark:border-[#282825] items-center"
               >
                 <div
                   onClick={() => {
                     setSelectedDish(dish);
                     setPortion('single');
                   }}
-                  className="sm:col-span-5 rounded-2xl overflow-hidden cursor-pointer border border-[#E5E1D6]/70 dark:border-[#2F2D27]"
+                  className="sm:col-span-5 rounded-2xl overflow-hidden cursor-pointer border border-[#E6E6E3]/70 dark:border-[#282825]"
                 >
                   <EditorialImage src={dish.imageUrl} alt={dish.title} aspectClass="aspect-[4/3]" />
                 </div>
 
                 <div className="sm:col-span-7 space-y-3">
-                  <div className="flex items-center gap-2 text-xs text-[#615E55] dark:text-[#A9A497]">
+                  <div className="flex items-center gap-2 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                     <span>{dish.category}</span>
                     <span aria-hidden="true">·</span>
                     <span className="inline-flex items-center gap-1 tabular-nums">
@@ -383,7 +383,7 @@ export function EditorialOrderView({
                   </div>
 
                   <h3 className="text-xl font-bold">{dish.title}</h3>
-                  <p className="text-sm text-[#615E55] dark:text-[#A9A497] leading-relaxed">{dish.subtitle}</p>
+                  <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">{dish.subtitle}</p>
 
                   <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
                     <div className="text-base font-bold tabular-nums">{formatToman(dish.singlePrice)}</div>
@@ -394,7 +394,7 @@ export function EditorialOrderView({
                           onMouseEnter={() => prefetchRecipeDetail(dish.linkedRecipeId!, city, {priority: 'high'})}
                           onTouchStart={() => prefetchRecipeDetail(dish.linkedRecipeId!, city, {priority: 'high'})}
                           onClick={() => onOpenLinkedRecipe(dish.linkedRecipeId!)}
-                          className="min-h-[44px] px-3.5 rounded-xl text-xs text-[#615E55] dark:text-[#A9A497] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA]"
+                          className="min-h-[44px] px-3.5 rounded-xl text-xs text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]"
                         >
                           دستور پخت
                         </button>
@@ -450,25 +450,25 @@ export function EditorialOrderView({
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4"
         >
-          <div className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl bg-[#FFFFFF] dark:bg-[#1C1B18] border border-[#E5E1D6] dark:border-[#2F2D27] p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] p-6 space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs text-[#615E55] dark:text-[#A9A497]">{selectedDish.chefName}</p>
+                <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">{selectedDish.chefName}</p>
                 <h3 className="text-xl font-bold mt-0.5">{selectedDish.title}</h3>
               </div>
               <button
                 type="button"
                 aria-label="بستن"
                 onClick={() => setSelectedDish(null)}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-sm text-[#615E55] dark:text-[#A9A497] leading-relaxed">{selectedDish.story}</p>
+            <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">{selectedDish.story}</p>
 
-            <div className="text-xs text-[#615E55] dark:text-[#A9A497]">
+            <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
               مواد منتخب: {selectedDish.keyIngredients.join(' · ')}
             </div>
 
@@ -481,11 +481,11 @@ export function EditorialOrderView({
                   className={`min-h-[56px] p-3 rounded-xl border text-right transition-colors ${
                     portion === 'single'
                       ? 'border-[#B54B1F] bg-[#B54B1F]/8 dark:border-[#E29A6F]'
-                      : 'border-[#E5E1D6] dark:border-[#2F2D27]'
+                      : 'border-[#E6E6E3] dark:border-[#282825]'
                   }`}
                 >
                   <div className="text-sm font-semibold">پرس تک‌نفره</div>
-                  <div className="text-xs text-[#615E55] dark:text-[#A9A497] tabular-nums mt-0.5">
+                  <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E] tabular-nums mt-0.5">
                     {formatToman(selectedDish.singlePrice)}
                   </div>
                 </button>
@@ -495,11 +495,11 @@ export function EditorialOrderView({
                   className={`min-h-[56px] p-3 rounded-xl border text-right transition-colors ${
                     portion === 'double'
                       ? 'border-[#B54B1F] bg-[#B54B1F]/8 dark:border-[#E29A6F]'
-                      : 'border-[#E5E1D6] dark:border-[#2F2D27]'
+                      : 'border-[#E6E6E3] dark:border-[#282825]'
                   }`}
                 >
                   <div className="text-sm font-semibold">پرس دونفره</div>
-                  <div className="text-xs text-[#615E55] dark:text-[#A9A497] tabular-nums mt-0.5">
+                  <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E] tabular-nums mt-0.5">
                     {formatToman(selectedDish.doublePrice)}
                   </div>
                 </button>
@@ -516,14 +516,14 @@ export function EditorialOrderView({
                 value={kitchenNote}
                 onChange={(e) => setKitchenNote(e.target.value)}
                 placeholder="مثلاً بدون پیازداغ، یا کشک جداگانه..."
-                className="w-full min-h-[46px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3.5 text-sm"
+                className="w-full min-h-[46px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3.5 text-sm"
               />
             </div>
 
             <button
               type="button"
               onClick={() => addToCart(selectedDish, portion, kitchenNote)}
-              className="w-full min-h-[48px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium tabular-nums"
+              className="w-full min-h-[48px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] text-sm font-medium tabular-nums"
             >
               افزودن به سبد — {formatToman(portion === 'double' ? selectedDish.doublePrice : selectedDish.singlePrice)}
             </button>
@@ -538,48 +538,48 @@ export function EditorialOrderView({
           aria-modal="true"
           className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs"
         >
-          <div className="w-full max-w-lg bg-[#F9F8F4] dark:bg-[#141412] h-full overflow-y-auto p-6 space-y-6 border-r border-[#E5E1D6] dark:border-[#2F2D27]">
+          <div className="w-full max-w-lg bg-[#F6F6F5] dark:bg-[#0B0B0B] h-full overflow-y-auto p-6 space-y-6 border-r border-[#E6E6E3] dark:border-[#282825]">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold">{confirmedOrder ? 'سفارش شما ثبت شد' : 'تکمیل سفارش'}</h2>
               <button
                 type="button"
                 aria-label="بستن"
                 onClick={() => setCheckoutOpen(false)}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {confirmedOrder ? (
-              <div className="rounded-2xl border border-[#B54B1F]/30 bg-[#FFFFFF] dark:bg-[#1C1B18] p-6 space-y-4">
+              <div className="rounded-2xl border border-[#B54B1F]/30 bg-[#FFFFFF] dark:bg-[#151514] p-6 space-y-4">
                 <CheckCircle2 className="w-10 h-10 text-[#B54B1F] dark:text-[#E29A6F]" />
                 <div className="space-y-1">
                   <h3 className="text-lg font-bold">سفارش با موفقیت تایید شد</h3>
-                  <p className="text-sm text-[#615E55] dark:text-[#A9A497]">
+                  <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E]">
                     آشپزخانه لاقلی آماده‌سازی غذای شما را آغاز کرده است.
                   </p>
                 </div>
-                <div className="border-t border-[#E5E1D6] dark:border-[#2F2D27] pt-4 space-y-2 text-sm">
+                <div className="border-t border-[#E6E6E3] dark:border-[#282825] pt-4 space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-[#615E55] dark:text-[#A9A497]">کد پیگیری</span>
+                    <span className="text-[#5C5C58] dark:text-[#A3A39E]">کد پیگیری</span>
                     <span dir="ltr" className="font-mono font-bold">
                       {confirmedOrder.trackingCode}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#615E55] dark:text-[#A9A497]">بازه تحویل</span>
+                    <span className="text-[#5C5C58] dark:text-[#A3A39E]">بازه تحویل</span>
                     <span>{confirmedOrder.deliverySlot}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#615E55] dark:text-[#A9A497]">مبلغ نهایی</span>
+                    <span className="text-[#5C5C58] dark:text-[#A3A39E]">مبلغ نهایی</span>
                     <span className="font-bold tabular-nums">{formatToman(confirmedOrder.total)}</span>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setCheckoutOpen(false)}
-                  className="w-full min-h-[48px] rounded-xl bg-[#B54B1F] text-[#F9F8F4] text-sm font-medium"
+                  className="w-full min-h-[48px] rounded-xl bg-[#B54B1F] text-[#FAFAFA] text-sm font-medium"
                 >
                   بازگشت به منو
                 </button>
@@ -587,15 +587,15 @@ export function EditorialOrderView({
             ) : (
               <form onSubmit={handlePlaceOrder} className="space-y-6">
                 {/* Cart Lines */}
-                <div className="space-y-3 rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4">
+                <div className="space-y-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                   {cart.map((item, idx) => (
                     <div
                       key={`${item.dish.id}-${item.portion}`}
-                      className="flex items-center justify-between gap-3 py-2 border-b last:border-b-0 border-[#E5E1D6]/70 dark:border-[#2F2D27]"
+                      className="flex items-center justify-between gap-3 py-2 border-b last:border-b-0 border-[#E6E6E3]/70 dark:border-[#282825]"
                     >
                       <div className="min-w-0">
                         <div className="text-sm font-semibold truncate">{item.dish.title}</div>
-                        <div className="text-xs text-[#615E55] dark:text-[#A9A497] tabular-nums">
+                        <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
                           {item.portion === 'double' ? 'دونفره' : 'تک‌نفره'} ·{' '}
                           {formatToman(item.portion === 'double' ? item.dish.doublePrice : item.dish.singlePrice)}
                         </div>
@@ -605,7 +605,7 @@ export function EditorialOrderView({
                           type="button"
                           aria-label="کاهش تعداد"
                           onClick={() => updateCartQty(idx, -1)}
-                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg border border-[#E5E1D6] dark:border-[#2F2D27]"
+                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg border border-[#E6E6E3] dark:border-[#282825]"
                         >
                           <Minus className="w-3.5 h-3.5" />
                         </button>
@@ -614,7 +614,7 @@ export function EditorialOrderView({
                           type="button"
                           aria-label="افزایش تعداد"
                           onClick={() => updateCartQty(idx, 1)}
-                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg border border-[#E5E1D6] dark:border-[#2F2D27]"
+                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg border border-[#E6E6E3] dark:border-[#282825]"
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </button>
@@ -633,7 +633,7 @@ export function EditorialOrderView({
                       id="ord-slot"
                       value={deliverySlot}
                       onChange={(e) => setDeliverySlot(e.target.value)}
-                      className="w-full min-h-[48px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] px-3.5 text-sm"
+                      className="w-full min-h-[48px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] px-3.5 text-sm"
                     >
                       {DELIVERY_SLOTS.map((s) => (
                         <option key={s} value={s}>
@@ -655,7 +655,7 @@ export function EditorialOrderView({
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="09123456789"
-                      className="w-full min-h-[48px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] px-4 text-left text-sm tabular-nums"
+                      className="w-full min-h-[48px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] px-4 text-left text-sm tabular-nums"
                     />
                   </div>
 
@@ -670,7 +670,7 @@ export function EditorialOrderView({
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                       placeholder="خیابان، کوچه، پلاک، طبقه و واحد..."
-                      className="w-full rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-3.5 text-sm"
+                      className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-3.5 text-sm"
                     />
                   </div>
                 </div>
@@ -686,24 +686,24 @@ export function EditorialOrderView({
                 )}
 
                 {/* Transparent Invoice Breakdown */}
-                <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4 space-y-2.5 text-sm tabular-nums">
+                <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 space-y-2.5 text-sm tabular-nums">
                   <div className="flex justify-between">
-                    <span className="text-[#615E55] dark:text-[#A9A497]">جمع غذاها</span>
+                    <span className="text-[#5C5C58] dark:text-[#A3A39E]">جمع غذاها</span>
                     <span>{formatToman(subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#615E55] dark:text-[#A9A497]">بسته‌بندی گرم‌نگه‌دار</span>
+                    <span className="text-[#5C5C58] dark:text-[#A3A39E]">بسته‌بندی گرم‌نگه‌دار</span>
                     <span>{formatToman(packagingFee)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#615E55] dark:text-[#A9A497]">
+                    <span className="text-[#5C5C58] dark:text-[#A3A39E]">
                       هزینه ارسال (رایگان بالای {formatToman(freeThreshold)})
                     </span>
                     <span className={deliveryFee === 0 ? 'text-[#B54B1F] dark:text-[#E29A6F] font-medium' : ''}>
                       {deliveryFee === 0 ? 'رایگان' : formatToman(deliveryFee)}
                     </span>
                   </div>
-                  <div className="flex justify-between pt-3 border-t border-[#E5E1D6] dark:border-[#2F2D27] text-base font-bold">
+                  <div className="flex justify-between pt-3 border-t border-[#E6E6E3] dark:border-[#282825] text-base font-bold">
                     <span>مبلغ قابل پرداخت</span>
                     <span>{formatToman(total)}</span>
                   </div>
@@ -712,7 +712,7 @@ export function EditorialOrderView({
                 <button
                   type="submit"
                   disabled={submitting || cart.length === 0}
-                  className="w-full min-h-[50px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium disabled:opacity-40"
+                  className="w-full min-h-[50px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] text-sm font-medium disabled:opacity-40"
                 >
                   {submitting ? 'در حال ثبت سفارش...' : `تایید و ثبت سفارش (${formatToman(total)})`}
                 </button>

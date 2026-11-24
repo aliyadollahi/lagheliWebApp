@@ -24,7 +24,7 @@ export function SplashScreen({visible, onComplete}: SplashScreenProps) {
           initial={{opacity: 1}}
           exit={{opacity: 0, transition: {duration: 0.45, ease: [0.16, 1, 0.3, 1]}}}
           onClick={onComplete}
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#F9F8F4] dark:bg-[#141412] px-6 select-none cursor-pointer"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#F6F6F5] dark:bg-[#0B0B0B] px-6 select-none cursor-pointer"
         >
           <div className="flex flex-col items-center max-w-sm text-center">
             {/* Choreographed Cast-Iron Skillet (Lagheli) + Rotating Handle + Cracking Egg + Saffron Steam */}
@@ -66,7 +66,7 @@ export function SplashScreen({visible, onComplete}: SplashScreenProps) {
                   {/* Skillet Handle with Brass Rivet Detail */}
                   <path
                     d="M192 146 L260 146"
-                    className="stroke-[#1C1B18] dark:stroke-[#E5E1D6]"
+                    className="stroke-[#1C1B18] dark:stroke-[#E6E6E3]"
                     strokeWidth="15"
                     strokeLinecap="round"
                   />
@@ -74,14 +74,14 @@ export function SplashScreen({visible, onComplete}: SplashScreenProps) {
                     cx="206"
                     cy="146"
                     r="2.4"
-                    fill="#D4942A"
+                    fill="#D8A85B"
                     fillOpacity="0.85"
                   />
                   <circle
                     cx="252"
                     cy="146"
                     r="3.6"
-                    className="fill-[#F9F8F4] dark:fill-[#141412]"
+                    className="fill-[#F6F6F5] dark:fill-[#0B0B0B]"
                   />
 
                   {/* Cast-Iron Frying Pan Outer Rim & Inner Base */}
@@ -89,20 +89,20 @@ export function SplashScreen({visible, onComplete}: SplashScreenProps) {
                     cx="126"
                     cy="146"
                     r="72"
-                    className="fill-[#1C1B18] dark:fill-[#262521] stroke-[#B54B1F] dark:stroke-[#E29A6F]"
+                    className="fill-[#1C1B18] dark:fill-[#242422] stroke-[#B54B1F] dark:stroke-[#E29A6F]"
                     strokeWidth="3"
                   />
                   <circle
                     cx="126"
                     cy="146"
                     r="62"
-                    className="fill-[#252420] dark:fill-[#181715]"
+                    className="fill-[#20201E] dark:fill-[#151514]"
                   />
                   <circle
                     cx="126"
                     cy="146"
                     r="58"
-                    stroke="#F9F8F4"
+                    stroke="#F6F6F5"
                     strokeOpacity="0.1"
                     strokeWidth="1.2"
                     fill="none"
@@ -115,7 +115,7 @@ export function SplashScreen({visible, onComplete}: SplashScreenProps) {
                   cy="146"
                   r="42"
                   fill="none"
-                  stroke="#D4942A"
+                  stroke="#D8A85B"
                   strokeWidth="1.6"
                   initial={{scale: 0.35, opacity: 0}}
                   animate={{scale: [0.35, 1.12, 1.28], opacity: [0, 0.45, 0]}}
@@ -126,8 +126,8 @@ export function SplashScreen({visible, onComplete}: SplashScreenProps) {
                 {/* Egg White blooming gently inside the hot pan after crack */}
                 <motion.path
                   d="M90 132 C86 108, 108 94, 130 98 C154 102, 174 114, 171 140 C168 166, 155 188, 127 189 C99 190, 94 156, 90 132 Z"
-                  fill="#FAF8F2"
-                  stroke="#E8E2D4"
+                  fill="#F6F6F5"
+                  stroke="#E6E6E3"
                   strokeWidth="1.5"
                   initial={{scale: 0.15, opacity: 0}}
                   animate={{scale: [0.15, 1.04, 1], opacity: [0, 1, 1]}}
@@ -142,9 +142,9 @@ export function SplashScreen({visible, onComplete}: SplashScreenProps) {
                   transition={{duration: 0.55, delay: 1.05, ease: [0.16, 1, 0.3, 1]}}
                   style={{transformOrigin: '130px 143px'}}
                 >
-                  <circle cx="130" cy="143" r="20" fill="#D4942A" />
-                  <circle cx="130" cy="143" r="16" fill="#E3A73C" />
-                  <circle cx="123" cy="136" r="4.5" fill="#FDF3DC" fillOpacity="0.88" />
+                  <circle cx="130" cy="143" r="20" fill="#D8A85B" />
+                  <circle cx="130" cy="143" r="16" fill="#D8A85B" />
+                  <circle cx="123" cy="136" r="4.5" fill="#F6F6F5" fillOpacity="0.88" />
                 </motion.g>
 
                 {/* Editorial Cracking Egg Shells (descend above pan, split neatly, lift & fade) */}
@@ -161,8 +161,8 @@ export function SplashScreen({visible, onComplete}: SplashScreenProps) {
                   {/* Left Shell Half */}
                   <motion.path
                     d="M128 84 C112 85, 102 100, 102 115 C102 128, 113 136, 128 136 L124 122 L130 111 L125 99 Z"
-                    fill="#F3EDE0"
-                    stroke="#CBBFA8"
+                    fill="#EFEFED"
+                    stroke="#D8D8D4"
                     strokeWidth="1.6"
                     strokeLinejoin="round"
                     initial={{x: 0, rotate: 0}}
@@ -179,8 +179,8 @@ export function SplashScreen({visible, onComplete}: SplashScreenProps) {
                   {/* Right Shell Half */}
                   <motion.path
                     d="M128 84 C144 85, 154 100, 154 115 C154 128, 143 136, 128 136 L124 122 L130 111 L125 99 Z"
-                    fill="#ECE4D3"
-                    stroke="#CBBFA8"
+                    fill="#E6E6E3"
+                    stroke="#D8D8D4"
                     strokeWidth="1.6"
                     strokeLinejoin="round"
                     initial={{x: 0, rotate: 0}}
@@ -249,16 +249,16 @@ export function SplashScreen({visible, onComplete}: SplashScreenProps) {
               transition={{duration: 0.55, delay: 0.85, ease: [0.16, 1, 0.3, 1]}}
               className="mt-2 space-y-2"
             >
-              <h1 className="text-4xl font-bold tracking-tight text-[#1C1B18] dark:text-[#F4F1EA]">
+              <h1 className="text-4xl font-bold tracking-tight text-[#0D0D0D] dark:text-[#FAFAFA]">
                 لاقلی
               </h1>
-              <p className="text-sm text-[#615E55] dark:text-[#A9A497] leading-relaxed">
+              <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
                 سادگیِ اصیل، در هر وعده
               </p>
             </motion.div>
 
             {/* Subtle editorial progress hairline */}
-            <div className="mt-8 w-28 h-[2px] bg-[#E5E1D6] dark:bg-[#2F2D27] overflow-hidden rounded-full">
+            <div className="mt-8 w-28 h-[2px] bg-[#E6E6E3] dark:bg-[#282825] overflow-hidden rounded-full">
               <motion.div
                 initial={{scaleX: 0}}
                 animate={{scaleX: 1}}
@@ -271,7 +271,7 @@ export function SplashScreen({visible, onComplete}: SplashScreenProps) {
             <button
               type="button"
               onClick={onComplete}
-              className="mt-6 text-xs text-[#615E55] dark:text-[#A9A497] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA] transition-colors min-h-[44px] px-4"
+              className="mt-6 text-xs text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA] transition-colors min-h-[44px] px-4"
             >
               ورود به لاقلی
             </button>

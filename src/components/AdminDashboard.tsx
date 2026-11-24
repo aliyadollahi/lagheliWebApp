@@ -477,7 +477,7 @@ export function AdminDashboard({
       <div className="min-h-[70vh] flex items-center justify-center px-4">
         <form
           onSubmit={handleAdminLogin}
-          className="w-full max-w-md rounded-3xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-8 space-y-5 shadow-[0_20px_50px_-30px_rgba(28,27,24,0.2)]"
+          className="w-full max-w-md rounded-3xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-8 space-y-5 shadow-[0_20px_50px_-30px_rgba(28,27,24,0.2)]"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -488,12 +488,12 @@ export function AdminDashboard({
                 <h1 className="text-lg font-bold">
                   {adminConfigured ? 'ورود به میز کار مدیریت لاقلی' : 'راه‌اندازی اولیه رمز مدیریت لاقلی'}
                 </h1>
-                <p className="text-xs text-[#615E55] dark:text-[#A9A497]">نسخه دسکتاپ و ریسپانسیو</p>
+                <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">نسخه دسکتاپ و ریسپانسیو</p>
               </div>
             </div>
           </div>
 
-          <p className="text-xs text-[#615E55] dark:text-[#A9A497] leading-relaxed">
+          <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
             {adminConfigured
               ? 'برای مدیریت دستورهای پخت و ورود دسته‌ای، تایید عکس‌های واقعی کاربران، شارژ کیف پول کاربری و تجاری، اسپانسرها و کنترل اکوسیستم وارد شوید.'
               : 'هنوز رمز مدیریت تعریف نشده است. یک رمز امن (حداقل ۶ کاراکتر) تعیین کنید تا دسترسی پنل مدیریت جامع فعال شود.'}
@@ -518,20 +518,20 @@ export function AdminDashboard({
             placeholder="رمز عبور مدیریت"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full min-h-[48px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-4 text-sm"
+            className="w-full min-h-[48px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-4 text-sm"
           />
 
           <div className="flex items-center gap-2.5">
             <button
               type="submit"
-              className="flex-1 min-h-[48px] rounded-full bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-semibold"
+              className="flex-1 min-h-[48px] rounded-full bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] text-sm font-semibold"
             >
               {adminConfigured ? 'ورود با رمز مدیریت' : 'ثبت رمز و فعال‌سازی پنل'}
             </button>
             <button
               type="button"
               onClick={onBackToApp}
-              className="min-h-[48px] px-4 rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-medium"
+              className="min-h-[48px] px-4 rounded-full border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium"
             >
               بازگشت
             </button>
@@ -594,18 +594,18 @@ export function AdminDashboard({
   return (
     <div className="max-w-[1440px] mx-auto w-full">
       {/* Desktop-First Command Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-6 mb-6 border-b border-[#E5E1D6] dark:border-[#2F2D27]">
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-6 mb-6 border-b border-[#E6E6E3] dark:border-[#282825]">
         <div className="flex items-center gap-3">
           <button
             type="button"
             aria-label="منوی مدیریت"
             onClick={() => setMobileMenuOpen((v) => !v)}
-            className="lg:hidden min-h-[42px] min-w-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] flex items-center justify-center"
+            className="lg:hidden min-h-[42px] min-w-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] flex items-center justify-center"
           >
             <Menu className="w-5 h-5" />
           </button>
           <div>
-            <div className="flex items-center gap-2 text-xs text-[#615E55] dark:text-[#A9A497]">
+            <div className="flex items-center gap-2 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
               <span>میز کار جامع مدیریت لاقلی</span>
               <span aria-hidden="true">·</span>
               <span>کنترل محتوا، عکس کاربران، مالی و اسپانسرها</span>
@@ -620,7 +620,7 @@ export function AdminDashboard({
           <button
             type="button"
             onClick={loadAllAdminData}
-            className="min-h-[42px] px-3.5 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-medium inline-flex items-center gap-1.5 hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+            className="min-h-[42px] px-3.5 rounded-xl border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium inline-flex items-center gap-1.5 hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>بروزرسانی</span>
@@ -628,7 +628,7 @@ export function AdminDashboard({
           <button
             type="button"
             onClick={onBackToApp}
-            className="min-h-[42px] px-4 rounded-xl bg-[#F1EFE8] dark:bg-[#24231F] text-xs font-medium"
+            className="min-h-[42px] px-4 rounded-xl bg-[#EFEFED] dark:bg-[#20201E] text-xs font-medium"
           >
             نمایش وب‌اپ کاربران
           </button>
@@ -640,7 +640,7 @@ export function AdminDashboard({
               setAdminAuthed(false);
               onNotify('از پنل مدیریت خارج شدید.');
             }}
-            className="min-h-[42px] px-3.5 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] text-xs text-[#615E55] inline-flex items-center gap-1.5"
+            className="min-h-[42px] px-3.5 rounded-xl border border-[#E6E6E3] dark:border-[#282825] text-xs text-[#5C5C58] inline-flex items-center gap-1.5"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">خروج مدیر</span>
@@ -654,7 +654,7 @@ export function AdminDashboard({
         <aside
           className={`${
             mobileMenuOpen ? 'block' : 'hidden'
-          } lg:block lg:col-span-3 xl:col-span-2 lg:sticky lg:top-20 rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-2.5 space-y-1`}
+          } lg:block lg:col-span-3 xl:col-span-2 lg:sticky lg:top-20 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-2.5 space-y-1`}
         >
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -669,8 +669,8 @@ export function AdminDashboard({
                 }}
                 className={`w-full min-h-[44px] px-3 rounded-xl text-xs font-medium flex items-center justify-between gap-2 transition-colors ${
                   active
-                    ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
-                    : 'text-[#615E55] dark:text-[#A9A497] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA]'
+                    ? 'bg-[#B54B1F] text-[#FAFAFA] dark:bg-[#E29A6F] dark:text-[#0B0B0B]'
+                    : 'text-[#5C5C58] dark:text-[#A3A39E] hover:bg-[#EFEFED] dark:hover:bg-[#20201E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
                 }`}
               >
                 <span className="inline-flex items-center gap-2 truncate">
@@ -681,7 +681,7 @@ export function AdminDashboard({
                   <span
                     className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums shrink-0 ${
                       active
-                        ? 'bg-white/20 text-white dark:bg-black/20 dark:text-[#141412]'
+                        ? 'bg-white/20 text-white dark:bg-black/20 dark:text-[#0B0B0B]'
                         : 'bg-[#A97222]/15 text-[#A97222] dark:text-[#D8A85B]'
                     }`}
                   >
@@ -750,7 +750,7 @@ export function AdminDashboard({
 
               {/* Actionable Quick Queues */}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-4">
+                <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-base font-bold">اقدامات فوری مدیریت</h2>
                     <button
@@ -799,13 +799,13 @@ export function AdminDashboard({
                 </div>
 
                 {/* Pending Chef Verifications & Partner Analytics */}
-                <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-4">
+                <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
                   <h2 className="text-base font-bold">عملکرد اصناف و اسپانسرها</h2>
                   {analytics && analytics.byPartner.length > 0 ? (
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs text-right tabular-nums">
                         <thead>
-                          <tr className="border-b border-[#E5E1D6] dark:border-[#2F2D27] text-[#615E55]">
+                          <tr className="border-b border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58]">
                             <th className="py-2 font-medium">نام همکار</th>
                             <th className="py-2 font-medium">نمایش</th>
                             <th className="py-2 font-medium">بازدید</th>
@@ -813,7 +813,7 @@ export function AdminDashboard({
                             <th className="py-2 font-medium">کلیک خرید</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#E5E1D6]/60 dark:divide-[#2F2D27]">
+                        <tbody className="divide-y divide-[#E6E6E3]/60 dark:divide-[#282825]">
                           {analytics.byPartner.slice(0, 6).map((row) => (
                             <tr key={row.partnerId}>
                               <td className="py-2.5 font-medium">{row.partnerName}</td>
@@ -827,11 +827,11 @@ export function AdminDashboard({
                       </table>
                     </div>
                   ) : (
-                    <p className="text-xs text-[#615E55]">داده‌ای ثبت نشده است.</p>
+                    <p className="text-xs text-[#5C5C58]">داده‌ای ثبت نشده است.</p>
                   )}
 
                   {pendingChefs.length > 0 && (
-                    <div className="pt-3 border-t border-[#E5E1D6] dark:border-[#2F2D27] space-y-2">
+                    <div className="pt-3 border-t border-[#E6E6E3] dark:border-[#282825] space-y-2">
                       <p className="text-xs font-semibold text-[#A97222]">درخواست‌های نشان سرآشپز تاییدشده</p>
                       {pendingChefs.map((c) => (
                         <div key={c.id} className="flex items-center justify-between gap-2 text-xs">
@@ -864,22 +864,22 @@ export function AdminDashboard({
           {activeNav === 'recipes' && (
             <div className="space-y-5">
               {/* Top Toolbar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                 <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0 w-full sm:w-auto">
                   <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
-                    <Search className="w-4 h-4 text-[#615E55] absolute right-3 top-1/2 -translate-y-1/2" />
+                    <Search className="w-4 h-4 text-[#5C5C58] absolute right-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="search"
                       value={recipeSearch}
                       onChange={(e) => setRecipeSearch(e.target.value)}
                       placeholder="جست‌وجو در عنوان، دسته، شهر یا نویسنده..."
-                      className="w-full min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] pr-9 pl-3 text-xs"
+                      className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] pr-9 pl-3 text-xs"
                     />
                   </div>
                   <select
                     value={recipeStatusFilter}
                     onChange={(e) => setRecipeStatusFilter(e.target.value as 'all' | 'published' | 'pending')}
-                    className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                    className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
                   >
                     <option value="all">همه وضعیت‌ها</option>
                     <option value="published">منتشرشده</option>
@@ -888,7 +888,7 @@ export function AdminDashboard({
                   <select
                     value={recipePhotoFilter}
                     onChange={(e) => setRecipePhotoFilter(e.target.value as 'all' | 'without' | 'with')}
-                    className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                    className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
                   >
                     <option value="all">همه (با عکس و بدون عکس)</option>
                     <option value="without">فقط بدون عکس (نیازمند عکس کاربران)</option>
@@ -908,7 +908,7 @@ export function AdminDashboard({
                   <button
                     type="button"
                     onClick={() => setEditingRecipe('new')}
-                    className="min-h-[42px] px-4 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-xs font-semibold inline-flex items-center gap-1.5"
+                    className="min-h-[42px] px-4 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] text-xs font-semibold inline-flex items-center gap-1.5"
                   >
                     <Plus className="w-4 h-4" />
                     <span>تولید دستور جدید</span>
@@ -917,10 +917,10 @@ export function AdminDashboard({
               </div>
 
               {/* Desktop Recipes Table */}
-              <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] overflow-hidden">
+              <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-right">
-                    <thead className="bg-[#F9F8F4] dark:bg-[#141412] border-b border-[#E5E1D6] dark:border-[#2F2D27] text-[#615E55] dark:text-[#A9A497]">
+                    <thead className="bg-[#F6F6F5] dark:bg-[#0B0B0B] border-b border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58] dark:text-[#A3A39E]">
                       <tr>
                         <th className="py-3.5 px-4 font-medium">تصویر و عنوان دستور</th>
                         <th className="py-3.5 px-3 font-medium">دسته / منطقه</th>
@@ -930,17 +930,17 @@ export function AdminDashboard({
                         <th className="py-3.5 px-4 font-medium text-left">عملیات</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#E5E1D6]/70 dark:divide-[#2F2D27]">
+                    <tbody className="divide-y divide-[#E6E6E3]/70 dark:divide-[#282825]">
                       {filteredRecipes.map((rec) => {
                         const hasPhoto = Boolean(rec.imageUrl && rec.imageUrl.trim().length > 0);
                         return (
                           <tr
                             key={rec.id}
-                            className="hover:bg-[#F9F8F4]/70 dark:hover:bg-[#141412]/50 transition-colors"
+                            className="hover:bg-[#F6F6F5]/70 dark:hover:bg-[#0B0B0B]/50 transition-colors"
                           >
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-3 min-w-[240px]">
-                                <div className="w-14 h-11 rounded-lg overflow-hidden border border-[#E5E1D6] dark:border-[#2F2D27] shrink-0">
+                                <div className="w-14 h-11 rounded-lg overflow-hidden border border-[#E6E6E3] dark:border-[#282825] shrink-0">
                                   <EditorialImage
                                     src={rec.imageUrl}
                                     alt={rec.title}
@@ -950,7 +950,7 @@ export function AdminDashboard({
                                 </div>
                                 <div className="min-w-0">
                                   <div className="font-bold text-sm truncate max-w-[280px]">{rec.title}</div>
-                                  <div className="text-[11px] text-[#615E55] dark:text-[#A9A497] tabular-nums">
+                                  <div className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
                                     {toFaDigits(rec.ingredients.length)} ماده · {toFaDigits(rec.steps.length)} مرحله
                                     {rec.isVip ? ` · ویژه (${toFaDigits(rec.vipGemCost)} جِم)` : ''}
                                   </div>
@@ -959,7 +959,7 @@ export function AdminDashboard({
                             </td>
                             <td className="py-3 px-3 whitespace-nowrap">
                               <div>{rec.category}</div>
-                              <div className="text-[11px] text-[#615E55]">{rec.region}</div>
+                              <div className="text-[11px] text-[#5C5C58]">{rec.region}</div>
                             </td>
                             <td className="py-3 px-3 whitespace-nowrap">{rec.authorName}</td>
                             <td className="py-3 px-3 whitespace-nowrap">
@@ -1007,7 +1007,7 @@ export function AdminDashboard({
                                   type="button"
                                   aria-label="ویرایش دستور"
                                   onClick={() => setEditingRecipe(rec)}
-                                  className="p-2 rounded-lg border border-[#E5E1D6] dark:border-[#2F2D27] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+                                  className="p-2 rounded-lg border border-[#E6E6E3] dark:border-[#282825] hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
                                 >
                                   <Pencil className="w-3.5 h-3.5" />
                                 </button>
@@ -1023,7 +1023,7 @@ export function AdminDashboard({
                                     onRefreshAppRecipes();
                                     loadAllAdminData();
                                   }}
-                                  className="p-2 rounded-lg border border-[#E5E1D6] dark:border-[#2F2D27] text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                  className="p-2 rounded-lg border border-[#E6E6E3] dark:border-[#282825] text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -1044,10 +1044,10 @@ export function AdminDashboard({
           ========================================================= */}
           {activeNav === 'photos' && (
             <div className="space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                 <div className="space-y-0.5">
                   <p className="text-sm font-bold">تایید عکس‌های واقعی غذای پخته‌شده توسط کاربران</p>
-                  <p className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                  <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                     با یک کلیک عکس واقعی کاربر را به‌عنوان تصویر اصلی دستور پخت تنظیم کنید تا نام او درج شود و پاداش جِم بگیرد.
                   </p>
                 </div>
@@ -1066,8 +1066,8 @@ export function AdminDashboard({
                       onClick={() => setPhotoStatusFilter(tab.id)}
                       className={`min-h-[38px] px-3.5 rounded-xl text-xs font-medium ${
                         photoStatusFilter === tab.id
-                          ? 'bg-[#B54B1F] text-white dark:bg-[#E29A6F] dark:text-[#141412]'
-                          : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55]'
+                          ? 'bg-[#B54B1F] text-white dark:bg-[#E29A6F] dark:text-[#0B0B0B]'
+                          : 'bg-[#EFEFED] dark:bg-[#20201E] text-[#5C5C58]'
                       }`}
                     >
                       {tab.label}
@@ -1077,10 +1077,10 @@ export function AdminDashboard({
               </div>
 
               {filteredPhotos.length === 0 ? (
-                <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-12 text-center space-y-2">
-                  <ImageIcon className="w-8 h-8 mx-auto text-[#615E55]/50" />
+                <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-12 text-center space-y-2">
+                  <ImageIcon className="w-8 h-8 mx-auto text-[#5C5C58]/50" />
                   <p className="text-sm font-medium">در این فیلتر عکسی برای نمایش وجود ندارد.</p>
-                  <p className="text-xs text-[#615E55]">
+                  <p className="text-xs text-[#5C5C58]">
                     وقتی کاربران از صفحه دستور پخت عکس واقعی غذای خود را آپلود کنند، اینجا نمایش داده می‌شود.
                   </p>
                 </div>
@@ -1089,10 +1089,10 @@ export function AdminDashboard({
                   {filteredPhotos.map((ph) => (
                     <div
                       key={ph.id}
-                      className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] overflow-hidden flex flex-col justify-between"
+                      className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] overflow-hidden flex flex-col justify-between"
                     >
                       <div>
-                        <div className="aspect-[4/3] bg-[#F1EFE8] dark:bg-[#24231F] relative">
+                        <div className="aspect-[4/3] bg-[#EFEFED] dark:bg-[#20201E] relative">
                           <img
                             src={ph.imageUrl}
                             alt={ph.recipeTitle || 'عکس ارسالی کاربر'}
@@ -1111,7 +1111,7 @@ export function AdminDashboard({
                         </div>
 
                         <div className="p-4 space-y-2">
-                          <div className="flex items-center justify-between text-xs text-[#615E55]">
+                          <div className="flex items-center justify-between text-xs text-[#5C5C58]">
                             <span>ارسالی از: {ph.userName}</span>
                             <span className="font-medium">
                               {ph.status === 'pending'
@@ -1123,7 +1123,7 @@ export function AdminDashboard({
                           </div>
                           <h3 className="text-sm font-bold">{ph.recipeTitle || ph.recipeId}</h3>
                           {ph.caption && (
-                            <p className="text-xs text-[#615E55] dark:text-[#A9A497] leading-relaxed">{ph.caption}</p>
+                            <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">{ph.caption}</p>
                           )}
                         </div>
                       </div>
@@ -1132,7 +1132,7 @@ export function AdminDashboard({
                         <button
                           type="button"
                           onClick={() => handleModeratePhoto(ph.id, 'approve_cover')}
-                          className="w-full min-h-[40px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-xs font-medium inline-flex items-center justify-center gap-1.5"
+                          className="w-full min-h-[40px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] text-xs font-medium inline-flex items-center justify-center gap-1.5"
                         >
                           <CheckCircle2 className="w-4 h-4" />
                           <span>تایید و انتخاب به‌عنوان تصویر اصلی دستور</span>
@@ -1141,7 +1141,7 @@ export function AdminDashboard({
                           <button
                             type="button"
                             onClick={() => handleModeratePhoto(ph.id, 'approve')}
-                            className="min-h-[38px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-medium hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+                            className="min-h-[38px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
                           >
                             فقط تایید گالری
                           </button>
@@ -1167,26 +1167,26 @@ export function AdminDashboard({
           ========================================================= */}
           {activeNav === 'users' && (
             <div className="space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="w-4 h-4 text-[#615E55] absolute right-3 top-1/2 -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-[#5C5C58] absolute right-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="search"
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
                     placeholder="جست‌وجوی کاربر با نام، شماره موبایل یا شهر..."
-                    className="w-full min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] pr-9 pl-3 text-xs"
+                    className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] pr-9 pl-3 text-xs"
                   />
                 </div>
-                <div className="text-xs text-[#615E55] tabular-nums">
+                <div className="text-xs text-[#5C5C58] tabular-nums">
                   مجموع کاربران: {toFaDigits(filteredUsers.length)} نفر
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] overflow-hidden">
+              <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-right tabular-nums">
-                    <thead className="bg-[#F9F8F4] dark:bg-[#141412] border-b border-[#E5E1D6] dark:border-[#2F2D27] text-[#615E55]">
+                    <thead className="bg-[#F6F6F5] dark:bg-[#0B0B0B] border-b border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58]">
                       <tr>
                         <th className="py-3.5 px-4 font-medium">کاربر و موبایل</th>
                         <th className="py-3.5 px-3 font-medium">نقش و نشان</th>
@@ -1196,7 +1196,7 @@ export function AdminDashboard({
                         <th className="py-3.5 px-4 font-medium text-left">مدیریت و شارژ</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#E5E1D6]/70 dark:divide-[#2F2D27]">
+                    <tbody className="divide-y divide-[#E6E6E3]/70 dark:divide-[#282825]">
                       {filteredUsers.map((u) => (
                         <tr key={u.id} className={u.isSuspended ? 'opacity-55' : ''}>
                           <td className="py-3.5 px-4">
@@ -1206,7 +1206,7 @@ export function AdminDashboard({
                                 <BadgeCheck className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
                               )}
                             </div>
-                            <div className="text-[11px] text-[#615E55]" dir="ltr">
+                            <div className="text-[11px] text-[#5C5C58]" dir="ltr">
                               {toFaDigits(u.phone)} · {u.city}
                             </div>
                           </td>
@@ -1222,7 +1222,7 @@ export function AdminDashboard({
                                 onNotify(`نقش ${u.name} به‌روزرسانی شد.`);
                                 loadAllAdminData();
                               }}
-                              className="min-h-[34px] rounded-lg border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-2 text-xs"
+                              className="min-h-[34px] rounded-lg border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-2 text-xs"
                             >
                               <option value="user">کاربر عادی</option>
                               <option value="chef">سرآشپز</option>
@@ -1236,7 +1236,7 @@ export function AdminDashboard({
                           <td className="py-3.5 px-3 font-bold text-[#A97222] dark:text-[#D8A85B]">
                             {toFaDigits(u.gems)} جِم
                           </td>
-                          <td className="py-3.5 px-3 text-[#615E55]">
+                          <td className="py-3.5 px-3 text-[#5C5C58]">
                             {toFaDigits(u.recipesCount)} دستور · {toFaDigits(u.photosCount)} عکس
                           </td>
                           <td className="py-3.5 px-4 text-left whitespace-nowrap">
@@ -1271,7 +1271,7 @@ export function AdminDashboard({
                                   onNotify('وضعیت نشان سرآشپز تغییر یافت.');
                                   loadAllAdminData();
                                 }}
-                                className="px-2.5 py-1.5 rounded-lg border border-[#E5E1D6] dark:border-[#2F2D27] text-[11px]"
+                                className="px-2.5 py-1.5 rounded-lg border border-[#E6E6E3] dark:border-[#282825] text-[11px]"
                               >
                                 {u.isVerifiedChef ? 'لغو نشان' : 'تایید سرآشپز'}
                               </button>
@@ -1286,7 +1286,7 @@ export function AdminDashboard({
                                   onNotify(u.isSuspended ? 'حساب کاربری فعال شد.' : 'حساب کاربری مسدود شد.');
                                   loadAllAdminData();
                                 }}
-                                className="px-2.5 py-1.5 rounded-lg border border-[#E5E1D6] dark:border-[#2F2D27] text-[11px] text-red-600"
+                                className="px-2.5 py-1.5 rounded-lg border border-[#E6E6E3] dark:border-[#282825] text-[11px] text-red-600"
                               >
                                 {u.isSuspended ? 'رفع مسدودی' : 'مسدود'}
                               </button>
@@ -1306,10 +1306,10 @@ export function AdminDashboard({
           ========================================================= */}
           {activeNav === 'partners' && (
             <div className="space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                 <div>
                   <h2 className="text-sm font-bold">مدیریت حساب‌های تجاری، اصناف و شارژ اعتبار تبلیغاتی</h2>
-                  <p className="text-xs text-[#615E55]">
+                  <p className="text-xs text-[#5C5C58]">
                     کنترل ۱۰ رسته صنعت غذا، ارتقا به اسپانسر، تایید درخواست مالکیت و شارژ کیف پول تجاری (تومان)
                   </p>
                 </div>
@@ -1323,10 +1323,10 @@ export function AdminDashboard({
                 </button>
               </div>
 
-              <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] overflow-hidden">
+              <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-right tabular-nums">
-                    <thead className="bg-[#F9F8F4] dark:bg-[#141412] border-b border-[#E5E1D6] dark:border-[#2F2D27] text-[#615E55]">
+                    <thead className="bg-[#F6F6F5] dark:bg-[#0B0B0B] border-b border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58]">
                       <tr>
                         <th className="py-3.5 px-4 font-medium">نام کسب‌وکار</th>
                         <th className="py-3.5 px-3 font-medium">رسته صنفی / شهر</th>
@@ -1336,7 +1336,7 @@ export function AdminDashboard({
                         <th className="py-3.5 px-4 font-medium text-left">عملیات</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#E5E1D6]/70 dark:divide-[#2F2D27]">
+                    <tbody className="divide-y divide-[#E6E6E3]/70 dark:divide-[#282825]">
                       {partners.map((p) => (
                         <tr key={p.id}>
                           <td className="py-3.5 px-4">
@@ -1344,13 +1344,13 @@ export function AdminDashboard({
                               <span>{p.name}</span>
                               {p.verified && <BadgeCheck className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />}
                             </div>
-                            <div className="text-[11px] text-[#615E55]">
+                            <div className="text-[11px] text-[#5C5C58]">
                               {p.promoCode ? `کد تخفیف: ${p.promoCode}` : p.phone}
                             </div>
                           </td>
                           <td className="py-3.5 px-3">
                             <div>{PARTNER_ROLE_LABELS[p.roleType]}</div>
-                            <div className="text-[11px] text-[#615E55]">{p.city}</div>
+                            <div className="text-[11px] text-[#5C5C58]">{p.city}</div>
                           </td>
                           <td className="py-3.5 px-3">
                             <select
@@ -1365,7 +1365,7 @@ export function AdminDashboard({
                                 onRefreshAppConfig();
                                 loadAllAdminData();
                               }}
-                              className="min-h-[34px] rounded-lg border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-2 text-xs"
+                              className="min-h-[34px] rounded-lg border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-2 text-xs"
                             >
                               <option value="free">رایگان (پایه)</option>
                               <option value="featured">برگزیده (Featured)</option>
@@ -1434,10 +1434,10 @@ export function AdminDashboard({
           ========================================================= */}
           {activeNav === 'campaigns' && (
             <div className="space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                 <div>
                   <h2 className="text-sm font-bold">مدیریت اسپانسرها، جایگاه‌های تبلیغاتی و کمپین‌ها</h2>
-                  <p className="text-xs text-[#615E55]">
+                  <p className="text-xs text-[#5C5C58]">
                     کمپین‌های فعال به‌صورت ادیتوریال و بدون شلوغی در جایگاه تعیین‌شده وب‌اپ نمایش داده می‌شوند.
                   </p>
                 </div>
@@ -1455,42 +1455,42 @@ export function AdminDashboard({
                 {campaigns.map((camp) => (
                   <div
                     key={camp.id}
-                    className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-4"
+                    className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-xs text-[#615E55]">
+                        <div className="flex items-center gap-2 text-xs text-[#5C5C58]">
                           <span className="font-semibold text-[#B54B1F] dark:text-[#E29A6F]">{camp.partnerName}</span>
                           <span>·</span>
                           <span>{PLACEMENT_LABELS[camp.placement]}</span>
                         </div>
                         <h3 className="text-base font-bold">{camp.title}</h3>
-                        {camp.subtitle && <p className="text-xs text-[#615E55]">{camp.subtitle}</p>}
+                        {camp.subtitle && <p className="text-xs text-[#5C5C58]">{camp.subtitle}</p>}
                       </div>
                       <span
                         className={`text-xs font-semibold shrink-0 ${
                           camp.status === 'active'
                             ? 'text-[#B54B1F] dark:text-[#E29A6F]'
-                            : 'text-[#615E55]'
+                            : 'text-[#5C5C58]'
                         }`}
                       >
                         {camp.status === 'active' ? 'فعال' : camp.status === 'paused' ? 'متوقف' : 'پایان‌یافته'}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3 py-3 border-y border-[#E5E1D6]/70 dark:border-[#2F2D27] text-xs tabular-nums">
+                    <div className="grid grid-cols-3 gap-3 py-3 border-y border-[#E6E6E3]/70 dark:border-[#282825] text-xs tabular-nums">
                       <div>
-                        <div className="text-[#615E55]">بودجه کل</div>
+                        <div className="text-[#5C5C58]">بودجه کل</div>
                         <div className="font-bold mt-0.5">{formatToman(camp.budgetToman)}</div>
                       </div>
                       <div>
-                        <div className="text-[#615E55]">نمایش / کلیک</div>
+                        <div className="text-[#5C5C58]">نمایش / کلیک</div>
                         <div className="font-bold mt-0.5">
                           {toFaDigits(camp.impressions)} / {toFaDigits(camp.clicks)}
                         </div>
                       </div>
                       <div>
-                        <div className="text-[#615E55]">کد تخفیف</div>
+                        <div className="text-[#5C5C58]">کد تخفیف</div>
                         <div className="font-bold font-mono mt-0.5" dir="ltr">
                           {camp.promoCode || '—'}
                         </div>
@@ -1498,7 +1498,7 @@ export function AdminDashboard({
                     </div>
 
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] text-[#615E55]">
+                      <span className="text-[11px] text-[#5C5C58]">
                         بازه: {camp.startsAt || '—'} تا {camp.endsAt || '—'}
                       </span>
                       <div className="flex items-center gap-2">
@@ -1515,7 +1515,7 @@ export function AdminDashboard({
                             onRefreshAppConfig();
                             loadAllAdminData();
                           }}
-                          className="px-3 py-1.5 rounded-lg border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-medium"
+                          className="px-3 py-1.5 rounded-lg border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium"
                         >
                           {camp.status === 'active' ? 'توقف موقت' : 'فعال‌سازی'}
                         </button>
@@ -1548,11 +1548,11 @@ export function AdminDashboard({
           {activeNav === 'ecosystem' && config && (
             <div className="space-y-6">
               {/* Programmable Controls */}
-              <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-6 space-y-5">
+              <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-6 space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h2 className="text-base font-bold">کنترل برنامه‌پذیر جایگاه‌ها و ۱۰ نقش صنعت غذا</h2>
-                    <p className="text-xs text-[#615E55]">اعمال زنده بدون نیاز به تغییر کد</p>
+                    <p className="text-xs text-[#5C5C58]">اعمال زنده بدون نیاز به تغییر کد</p>
                   </div>
                   <button
                     type="button"
@@ -1564,7 +1564,7 @@ export function AdminDashboard({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                  <label className="flex items-center justify-between rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] p-3.5 cursor-pointer">
+                  <label className="flex items-center justify-between rounded-xl border border-[#E6E6E3] dark:border-[#282825] p-3.5 cursor-pointer">
                     <span>نمایش تب مستقل بازارچه و اصناف</span>
                     <input
                       type="checkbox"
@@ -1573,7 +1573,7 @@ export function AdminDashboard({
                       className="w-4 h-4 accent-[#B54B1F]"
                     />
                   </label>
-                  <label className="flex items-center justify-between rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] p-3.5 cursor-pointer">
+                  <label className="flex items-center justify-between rounded-xl border border-[#E6E6E3] dark:border-[#282825] p-3.5 cursor-pointer">
                     <span>ویترین همکاران و کمپین در صفحه کاوش</span>
                     <input
                       type="checkbox"
@@ -1582,7 +1582,7 @@ export function AdminDashboard({
                       className="w-4 h-4 accent-[#B54B1F]"
                     />
                   </label>
-                  <label className="flex items-center justify-between rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] p-3.5 cursor-pointer">
+                  <label className="flex items-center justify-between rounded-xl border border-[#E6E6E3] dark:border-[#282825] p-3.5 cursor-pointer">
                     <span>پیوند زمینه‌ای مواد و تجهیزات در دستور پخت</span>
                     <input
                       type="checkbox"
@@ -1591,7 +1591,7 @@ export function AdminDashboard({
                       className="w-4 h-4 accent-[#B54B1F]"
                     />
                   </label>
-                  <label className="flex items-center justify-between rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] p-3.5 cursor-pointer">
+                  <label className="flex items-center justify-between rounded-xl border border-[#E6E6E3] dark:border-[#282825] p-3.5 cursor-pointer">
                     <span>کارت سرویس ارسال فوری در لیست خرید</span>
                     <input
                       type="checkbox"
@@ -1604,29 +1604,29 @@ export function AdminDashboard({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs text-[#615E55] mb-1">عنوان تب بازارچه</label>
+                    <label className="block text-xs text-[#5C5C58] mb-1">عنوان تب بازارچه</label>
                     <input
                       type="text"
                       value={config.marketplaceTitle}
                       onChange={(e) => setConfig({...config, marketplaceTitle: e.target.value})}
-                      className="w-full min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                      className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-[#615E55] mb-1">عنوان کمپین فعال کاوش</label>
+                    <label className="block text-xs text-[#5C5C58] mb-1">عنوان کمپین فعال کاوش</label>
                     <input
                       type="text"
                       value={config.activeCampaignTitle}
                       onChange={(e) => setConfig({...config, activeCampaignTitle: e.target.value})}
-                      className="w-full min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                      className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-[#615E55] mb-1">سقف کارت همکار در هر دستور</label>
+                    <label className="block text-xs text-[#5C5C58] mb-1">سقف کارت همکار در هر دستور</label>
                     <select
                       value={config.maxPartnerCardsPerRecipe}
                       onChange={(e) => setConfig({...config, maxPartnerCardsPerRecipe: Number(e.target.value)})}
-                      className="w-full min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                      className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
                     >
                       <option value={0}>۰ (خاموش)</option>
                       <option value={1}>۱ کارت (مینیمال پیشنهادی)</option>
@@ -1654,7 +1654,7 @@ export function AdminDashboard({
                         className={`min-h-[40px] px-3 rounded-xl border text-[11px] flex items-center justify-between gap-1.5 ${
                           enabled
                             ? 'border-[#B54B1F] bg-[#B54B1F]/8 font-medium'
-                            : 'border-[#E5E1D6] dark:border-[#2F2D27] opacity-55'
+                            : 'border-[#E6E6E3] dark:border-[#282825] opacity-55'
                         }`}
                       >
                         <span className="truncate">{r.shortLabel}</span>
@@ -1666,17 +1666,17 @@ export function AdminDashboard({
               </div>
 
               {/* Daily Food Orders Management */}
-              <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-4">
+              <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
                 <h2 className="text-base font-bold inline-flex items-center gap-2">
                   <ShoppingBag className="w-4 h-4 text-[#B54B1F]" />
                   <span>مدیریت سفارش‌های غذای روز ({toFaDigits(orders.length)})</span>
                 </h2>
                 {orders.length === 0 ? (
-                  <p className="text-xs text-[#615E55]">هنوز سفارشی ثبت نشده است.</p>
+                  <p className="text-xs text-[#5C5C58]">هنوز سفارشی ثبت نشده است.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs text-right tabular-nums">
-                      <thead className="border-b border-[#E5E1D6] dark:border-[#2F2D27] text-[#615E55]">
+                      <thead className="border-b border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58]">
                         <tr>
                           <th className="py-2 font-medium">کد پیگیری</th>
                           <th className="py-2 font-medium">مقصد / تلفن</th>
@@ -1684,7 +1684,7 @@ export function AdminDashboard({
                           <th className="py-2 font-medium">وضعیت سفارش</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[#E5E1D6]/60 dark:divide-[#2F2D27]">
+                      <tbody className="divide-y divide-[#E6E6E3]/60 dark:divide-[#282825]">
                         {orders.map((ord) => (
                           <tr key={ord.id}>
                             <td className="py-2.5 font-mono font-bold" dir="ltr">
@@ -1706,7 +1706,7 @@ export function AdminDashboard({
                                   onNotify('وضعیت سفارش به‌روزرسانی شد.');
                                   loadAllAdminData();
                                 }}
-                                className="min-h-[34px] rounded-lg border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-2 text-xs"
+                                className="min-h-[34px] rounded-lg border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-2 text-xs"
                               >
                                 {(Object.keys(ORDER_STATUS_LABELS) as OrderRecord['status'][]).map((st) => (
                                   <option key={st} value={st}>
@@ -1724,17 +1724,17 @@ export function AdminDashboard({
               </div>
 
               {/* Financial Ledger (User + Commercial Top-ups) */}
-              <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-4">
+              <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
                 <h2 className="text-base font-bold inline-flex items-center gap-2">
                   <Layers className="w-4 h-4 text-[#B54B1F]" />
                   <span>دفتر کل تراکنش‌های شارژ کاربری و تجاری ({toFaDigits(transactions.length)})</span>
                 </h2>
                 {transactions.length === 0 ? (
-                  <p className="text-xs text-[#615E55]">هنوز تراکنش شارژ دستی توسط مدیریت ثبت نشده است.</p>
+                  <p className="text-xs text-[#5C5C58]">هنوز تراکنش شارژ دستی توسط مدیریت ثبت نشده است.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs text-right tabular-nums">
-                      <thead className="border-b border-[#E5E1D6] dark:border-[#2F2D27] text-[#615E55]">
+                      <thead className="border-b border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58]">
                         <tr>
                           <th className="py-2 font-medium">نوع حساب</th>
                           <th className="py-2 font-medium">نام صاحب حساب</th>
@@ -1743,12 +1743,12 @@ export function AdminDashboard({
                           <th className="py-2 font-medium">مانده پس از تراکنش</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[#E5E1D6]/60 dark:divide-[#2F2D27]">
+                      <tbody className="divide-y divide-[#E6E6E3]/60 dark:divide-[#282825]">
                         {transactions.map((tx) => (
                           <tr key={tx.id}>
                             <td className="py-2.5">{tx.accountType === 'partner' ? 'حساب تجاری' : 'کاربر'}</td>
                             <td className="py-2.5 font-medium">{tx.accountName}</td>
-                            <td className="py-2.5 text-[#615E55]">{tx.reason}</td>
+                            <td className="py-2.5 text-[#5C5C58]">{tx.reason}</td>
                             <td
                               dir="ltr"
                               className={`py-2.5 font-bold ${
@@ -1807,11 +1807,11 @@ export function AdminDashboard({
           aria-modal="true"
           className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
         >
-          <div className="w-full max-w-3xl rounded-2xl bg-[#FFFFFF] dark:bg-[#1C1B18] border border-[#E5E1D6] dark:border-[#2F2D27] p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-3xl rounded-2xl bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] p-6 space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-bold">ورود دسته‌ای هزاران دستور پخت (بدون نیاز به عکس)</h2>
-                <p className="text-xs text-[#615E55] mt-0.5">
+                <p className="text-xs text-[#5C5C58] mt-0.5">
                   فایل JSON خود را بارگذاری یا جای‌گذاری کنید (تا ۲٬۰۰۰ دستور در هر نوبت). دستورهای بدون عکس با طراحی تایپوگرافی ادیتوریال نمایش داده شده و منتظر ثبت عکس واقعی کاربران می‌مانند.
                 </p>
               </div>
@@ -1821,7 +1821,7 @@ export function AdminDashboard({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <label className="min-h-[40px] px-4 rounded-xl border border-dashed border-[#B54B1F]/50 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]">
+              <label className="min-h-[40px] px-4 rounded-xl border border-dashed border-[#B54B1F]/50 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer hover:bg-[#EFEFED] dark:hover:bg-[#20201E]">
                 <Upload className="w-4 h-4 text-[#B54B1F]" />
                 <span>انتخاب فایل JSON از سیستم</span>
                 <input
@@ -1839,7 +1839,7 @@ export function AdminDashboard({
               <button
                 type="button"
                 onClick={() => setBulkJson(SAMPLE_BULK_JSON)}
-                className="min-h-[40px] px-3.5 rounded-xl bg-[#F1EFE8] dark:bg-[#24231F] text-xs"
+                className="min-h-[40px] px-3.5 rounded-xl bg-[#EFEFED] dark:bg-[#20201E] text-xs"
               >
                 بارگذاری نمونه استاندارد (۲ دستور بدون عکس)
               </button>
@@ -1850,14 +1850,14 @@ export function AdminDashboard({
               dir="ltr"
               value={bulkJson}
               onChange={(e) => setBulkJson(e.target.value)}
-              className="w-full rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] p-3.5 text-xs font-mono"
+              className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] p-3.5 text-xs font-mono"
             />
 
             <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setBulkOpen(false)}
-                className="min-h-[44px] px-4 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] text-xs"
+                className="min-h-[44px] px-4 rounded-xl border border-[#E6E6E3] dark:border-[#282825] text-xs"
               >
                 انصراف
               </button>
@@ -1885,21 +1885,21 @@ export function AdminDashboard({
         >
           <form
             onSubmit={handleWalletSubmit}
-            className="w-full max-w-md rounded-2xl bg-[#FFFFFF] dark:bg-[#1C1B18] border border-[#E5E1D6] dark:border-[#2F2D27] p-6 space-y-4"
+            className="w-full max-w-md rounded-2xl bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] p-6 space-y-4"
           >
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-base font-bold">
                   {walletTarget.type === 'user' ? 'شارژ / تعدیل حساب کاربری' : 'شارژ / تعدیل حساب تجاری'}
                 </h2>
-                <p className="text-xs text-[#615E55] mt-0.5">{walletTarget.name}</p>
+                <p className="text-xs text-[#5C5C58] mt-0.5">{walletTarget.name}</p>
               </div>
               <button type="button" onClick={() => setWalletTarget(null)} className="p-1.5">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="rounded-xl bg-[#F9F8F4] dark:bg-[#141412] p-3 text-xs flex items-center justify-between tabular-nums">
+            <div className="rounded-xl bg-[#F6F6F5] dark:bg-[#0B0B0B] p-3 text-xs flex items-center justify-between tabular-nums">
               <span>موجودی فعلی:</span>
               <span className="font-bold">
                 {walletTarget.type === 'user'
@@ -1916,7 +1916,7 @@ export function AdminDashboard({
                   className={`min-h-[40px] rounded-xl text-xs font-medium ${
                     walletCurrency === 'toman'
                       ? 'bg-[#B54B1F] text-white'
-                      : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55]'
+                      : 'bg-[#EFEFED] dark:bg-[#20201E] text-[#5C5C58]'
                   }`}
                 >
                   کیف پول (تومان)
@@ -1927,7 +1927,7 @@ export function AdminDashboard({
                   className={`min-h-[40px] rounded-xl text-xs font-medium ${
                     walletCurrency === 'gem'
                       ? 'bg-[#A97222] text-white'
-                      : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55]'
+                      : 'bg-[#EFEFED] dark:bg-[#20201E] text-[#5C5C58]'
                   }`}
                 >
                   اعتبار جِم (Gem)
@@ -1936,7 +1936,7 @@ export function AdminDashboard({
             )}
 
             <div>
-              <label className="block text-xs text-[#615E55] mb-1">
+              <label className="block text-xs text-[#5C5C58] mb-1">
                 مبلغ ({walletTarget.type === 'partner' || walletCurrency === 'toman' ? 'تومان' : 'جِم'} — برای کسر علامت منفی بزنید)
               </label>
               <input
@@ -1944,12 +1944,12 @@ export function AdminDashboard({
                 required
                 value={walletAmount}
                 onChange={(e) => setWalletAmount(e.target.value)}
-                className="w-full min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-sm tabular-nums"
+                className="w-full min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-sm tabular-nums"
               />
             </div>
 
             <div>
-              <label className="block text-xs text-[#615E55] mb-1">شرح سند و علت تراکنش</label>
+              <label className="block text-xs text-[#5C5C58] mb-1">شرح سند و علت تراکنش</label>
               <input
                 type="text"
                 required
@@ -1957,7 +1957,7 @@ export function AdminDashboard({
                 value={walletReason}
                 onChange={(e) => setWalletReason(e.target.value)}
                 placeholder="مثلاً واریز کارت‌به‌کارت بابت شارژ کمپین..."
-                className="w-full min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="w-full min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
             </div>
 
@@ -1982,7 +1982,7 @@ export function AdminDashboard({
         >
           <form
             onSubmit={handleCreatePartner}
-            className="w-full max-w-lg rounded-2xl bg-[#FFFFFF] dark:bg-[#1C1B18] border border-[#E5E1D6] dark:border-[#2F2D27] p-6 space-y-4 my-6"
+            className="w-full max-w-lg rounded-2xl bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] p-6 space-y-4 my-6"
           >
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold">ثبت حساب تجاری / صنف جدید</h2>
@@ -1997,12 +1997,12 @@ export function AdminDashboard({
                 placeholder="نام برند یا کسب‌وکار"
                 value={newPartner.name}
                 onChange={(e) => setNewPartner({...newPartner, name: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
               <select
                 value={newPartner.roleType}
                 onChange={(e) => setNewPartner({...newPartner, roleType: e.target.value as PartnerRoleId})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               >
                 {PARTNER_ROLES.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -2016,7 +2016,7 @@ export function AdminDashboard({
                 placeholder="شهر"
                 value={newPartner.city}
                 onChange={(e) => setNewPartner({...newPartner, city: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
               <input
                 type="text"
@@ -2024,12 +2024,12 @@ export function AdminDashboard({
                 placeholder="شماره تماس"
                 value={newPartner.phone}
                 onChange={(e) => setNewPartner({...newPartner, phone: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
               <select
                 value={newPartner.tier}
                 onChange={(e) => setNewPartner({...newPartner, tier: e.target.value as 'free' | 'featured' | 'sponsor'})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               >
                 <option value="free">سطح رایگان</option>
                 <option value="featured">برگزیده</option>
@@ -2041,7 +2041,7 @@ export function AdminDashboard({
                 placeholder="شارژ اولیه حساب تجاری (تومان)"
                 value={newPartner.initialBalance || ''}
                 onChange={(e) => setNewPartner({...newPartner, initialBalance: Number(e.target.value) || 0})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs tabular-nums"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
               />
             </div>
             <input
@@ -2050,7 +2050,7 @@ export function AdminDashboard({
               placeholder="نشانی کامل"
               value={newPartner.address}
               onChange={(e) => setNewPartner({...newPartner, address: e.target.value})}
-              className="w-full min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+              className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
             />
             <textarea
               rows={2}
@@ -2058,7 +2058,7 @@ export function AdminDashboard({
               placeholder="معرفی کسب‌وکار..."
               value={newPartner.description}
               onChange={(e) => setNewPartner({...newPartner, description: e.target.value})}
-              className="w-full rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] p-3 text-xs"
+              className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] p-3 text-xs"
             />
             <div className="grid grid-cols-2 gap-3">
               <input
@@ -2066,14 +2066,14 @@ export function AdminDashboard({
                 placeholder="کد تخفیف (اختیاری)"
                 value={newPartner.promoCode}
                 onChange={(e) => setNewPartner({...newPartner, promoCode: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
               <input
                 type="text"
                 placeholder="عنوان تخفیف (مثلاً ۱۵٪ تخفیف)"
                 value={newPartner.promoLabel}
                 onChange={(e) => setNewPartner({...newPartner, promoLabel: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
             </div>
             <button type="submit" className="w-full min-h-[46px] rounded-xl bg-[#B54B1F] text-white text-sm font-semibold">
@@ -2094,7 +2094,7 @@ export function AdminDashboard({
         >
           <form
             onSubmit={handleCreateCampaign}
-            className="w-full max-w-lg rounded-2xl bg-[#FFFFFF] dark:bg-[#1C1B18] border border-[#E5E1D6] dark:border-[#2F2D27] p-6 space-y-4"
+            className="w-full max-w-lg rounded-2xl bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] p-6 space-y-4"
           >
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold">ساخت کمپین اسپانسری و تبلیغاتی جدید</h2>
@@ -2107,7 +2107,7 @@ export function AdminDashboard({
               required
               value={newCampaign.partnerId}
               onChange={(e) => setNewCampaign({...newCampaign, partnerId: e.target.value})}
-              className="w-full min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+              className="w-full min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
             >
               {partners.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -2122,7 +2122,7 @@ export function AdminDashboard({
               placeholder="تیتر ادیتوریال کمپین"
               value={newCampaign.title}
               onChange={(e) => setNewCampaign({...newCampaign, title: e.target.value})}
-              className="w-full min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+              className="w-full min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
             />
 
             <input
@@ -2130,14 +2130,14 @@ export function AdminDashboard({
               placeholder="توضیح کوتاه کمپین"
               value={newCampaign.subtitle}
               onChange={(e) => setNewCampaign({...newCampaign, subtitle: e.target.value})}
-              className="w-full min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+              className="w-full min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
             />
 
             <div className="grid grid-cols-2 gap-3">
               <select
                 value={newCampaign.placement}
                 onChange={(e) => setNewCampaign({...newCampaign, placement: e.target.value as CampaignPlacement})}
-                className="min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               >
                 {(Object.keys(PLACEMENT_LABELS) as CampaignPlacement[]).map((pl) => (
                   <option key={pl} value={pl}>
@@ -2151,7 +2151,7 @@ export function AdminDashboard({
                 placeholder="بودجه کمپین (تومان)"
                 value={newCampaign.budgetToman}
                 onChange={(e) => setNewCampaign({...newCampaign, budgetToman: Number(e.target.value) || 0})}
-                className="min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs tabular-nums"
+                className="min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
               />
             </div>
 
@@ -2161,14 +2161,14 @@ export function AdminDashboard({
                 placeholder="کد تخفیف (اختیاری)"
                 value={newCampaign.promoCode}
                 onChange={(e) => setNewCampaign({...newCampaign, promoCode: e.target.value})}
-                className="min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
               <input
                 type="text"
                 placeholder="متن دکمه فراخوان (CTA)"
                 value={newCampaign.ctaLabel}
                 onChange={(e) => setNewCampaign({...newCampaign, ctaLabel: e.target.value})}
-                className="min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
             </div>
 
@@ -2187,16 +2187,16 @@ export function AdminDashboard({
 // =========================================================================
 function KpiCard({label, value, hint, accent}: {label: string; value: string; hint: string; accent?: boolean}) {
   return (
-    <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4 space-y-1">
-      <div className="text-xs text-[#615E55] dark:text-[#A9A497]">{label}</div>
+    <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 space-y-1">
+      <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">{label}</div>
       <div
         className={`text-xl sm:text-2xl font-extrabold ${
-          accent ? 'text-[#A97222] dark:text-[#D8A85B]' : 'text-[#1C1B18] dark:text-[#F4F1EA]'
+          accent ? 'text-[#A97222] dark:text-[#D8A85B]' : 'text-[#0D0D0D] dark:text-[#FAFAFA]'
         }`}
       >
         {value}
       </div>
-      <div className="text-[11px] text-[#615E55] dark:text-[#A9A497]">{hint}</div>
+      <div className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E]">{hint}</div>
     </div>
   );
 }
@@ -2213,7 +2213,7 @@ function QuickRow({
   onClick: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-2 border-b last:border-b-0 border-[#E5E1D6]/70 dark:border-[#2F2D27]">
+    <div className="flex items-center justify-between gap-3 py-2 border-b last:border-b-0 border-[#E6E6E3]/70 dark:border-[#282825]">
       <div className="flex items-center gap-2 min-w-0">
         <span className="font-bold tabular-nums text-[#B54B1F] dark:text-[#E29A6F] min-w-[2rem]">
           {toFaDigits(count)}
@@ -2339,7 +2339,7 @@ function AdminRecipeEditorModal({
     >
       <form
         onSubmit={handleSave}
-        className="w-full max-w-3xl rounded-2xl bg-[#FFFFFF] dark:bg-[#1C1B18] border border-[#E5E1D6] dark:border-[#2F2D27] p-6 space-y-4 my-6 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-3xl rounded-2xl bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] p-6 space-y-4 my-6 max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold">
@@ -2357,14 +2357,14 @@ function AdminRecipeEditorModal({
             placeholder="عنوان دستور پخت"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+            className="min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
           />
           <input
             type="text"
             placeholder="زیرعنوان ادیتوریال"
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
-            className="min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+            className="min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
           />
         </div>
 
@@ -2373,14 +2373,14 @@ function AdminRecipeEditorModal({
           placeholder="توضیح کامل غذا..."
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="w-full rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] p-3 text-xs"
+          className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] p-3 text-xs"
         />
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
           >
             <option value="ناهار و شام">ناهار و شام</option>
             <option value="پیش‌غذا و عصرانه">پیش‌غذا و عصرانه</option>
@@ -2394,12 +2394,12 @@ function AdminRecipeEditorModal({
             value={region}
             onChange={(e) => setRegion(e.target.value)}
             placeholder="منطقه"
-            className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
           />
           <select
             value={season}
             onChange={(e) => setSeason(e.target.value)}
-            className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
           >
             <option value="چهارفصل">چهارفصل</option>
             <option value="بهار">بهار</option>
@@ -2410,7 +2410,7 @@ function AdminRecipeEditorModal({
           <select
             value={difficulty}
             onChange={(e) => setDifficulty(e.target.value as 'آسان' | 'متوسط' | 'حرفه‌ای')}
-            className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
           >
             <option value="آسان">آسان</option>
             <option value="متوسط">متوسط</option>
@@ -2425,7 +2425,7 @@ function AdminRecipeEditorModal({
             value={prepMinutes}
             onChange={(e) => setPrepMinutes(Number(e.target.value))}
             placeholder="آماده‌سازی"
-            className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs tabular-nums"
+            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
           />
           <input
             type="number"
@@ -2433,7 +2433,7 @@ function AdminRecipeEditorModal({
             value={cookMinutes}
             onChange={(e) => setCookMinutes(Number(e.target.value))}
             placeholder="زمان پخت"
-            className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs tabular-nums"
+            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
           />
           <input
             type="number"
@@ -2441,12 +2441,12 @@ function AdminRecipeEditorModal({
             value={servings}
             onChange={(e) => setServings(Number(e.target.value))}
             placeholder="نفرات"
-            className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs tabular-nums"
+            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
           />
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as 'published' | 'pending')}
-            className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
           >
             <option value="published">منتشرشده</option>
             <option value="pending">پیش‌نویس / در انتظار</option>
@@ -2469,12 +2469,12 @@ function AdminRecipeEditorModal({
             value={vipGemCost}
             onChange={(e) => setVipGemCost(Number(e.target.value))}
             placeholder="هزینه بازگشایی (جِم)"
-            className="w-48 min-h-[40px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs tabular-nums"
+            className="w-48 min-h-[40px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
           />
         )}
 
         {/* Optional Cover Image (Leave Blank for Community Photos!) */}
-        <div className="rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] p-3.5 space-y-2">
+        <div className="rounded-xl border border-[#E6E6E3] dark:border-[#282825] p-3.5 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-medium">
               تصویر اصلی (اختیاری — خالی بگذارید تا کاربران عکس واقعی غذای پخته‌شده را ارسال کنند)
@@ -2514,14 +2514,14 @@ function AdminRecipeEditorModal({
             <img
               src={imageDataUrl || imageUrl}
               alt="پیش‌نمایش"
-              className="w-36 h-24 object-cover rounded-lg border border-[#E5E1D6]"
+              className="w-36 h-24 object-cover rounded-lg border border-[#E6E6E3]"
             />
           )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs text-[#615E55] mb-1">
+            <label className="block text-xs text-[#5C5C58] mb-1">
               مواد اولیه (هر خط: نام ماده | مقدار | واحد)
             </label>
             <textarea
@@ -2529,17 +2529,17 @@ function AdminRecipeEditorModal({
               required
               value={ingredientsText}
               onChange={(e) => setIngredientsText(e.target.value)}
-              className="w-full rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] p-3 text-xs leading-relaxed"
+              className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] p-3 text-xs leading-relaxed"
             />
           </div>
           <div>
-            <label className="block text-xs text-[#615E55] mb-1">مراحل پخت (هر مرحله در یک خط)</label>
+            <label className="block text-xs text-[#5C5C58] mb-1">مراحل پخت (هر مرحله در یک خط)</label>
             <textarea
               rows={6}
               required
               value={stepsText}
               onChange={(e) => setStepsText(e.target.value)}
-              className="w-full rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] p-3 text-xs leading-relaxed"
+              className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] p-3 text-xs leading-relaxed"
             />
           </div>
         </div>
@@ -2548,7 +2548,7 @@ function AdminRecipeEditorModal({
           <button
             type="button"
             onClick={onClose}
-            className="min-h-[44px] px-4 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] text-xs"
+            className="min-h-[44px] px-4 rounded-xl border border-[#E6E6E3] dark:border-[#282825] text-xs"
           >
             انصراف
           </button>

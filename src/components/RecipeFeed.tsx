@@ -195,12 +195,12 @@ export function RecipeFeed({
           initial={{opacity: 0, y: 12}}
           animate={{opacity: 1, y: 0}}
           transition={{duration: 0.55, ease: [0.16, 1, 0.3, 1]}}
-          className="space-y-6 pb-12 border-b border-[#E5E1D6] dark:border-[#2F2D27]"
+          className="space-y-6 pb-12 border-b border-[#E6E6E3] dark:border-[#282825]"
         >
           {/* Architectural Editorial Masthead Strip */}
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#615E55] dark:text-[#A9A497] pb-3 border-b border-[#E5E1D6]/70 dark:border-[#2F2D27]">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#5C5C58] dark:text-[#A3A39E] pb-3 border-b border-[#E6E6E3]/70 dark:border-[#282825]">
             <div className="flex items-center gap-2.5">
-              <span className="font-semibold text-[#1C1B18] dark:text-[#F4F1EA]">
+              <span className="font-semibold text-[#0D0D0D] dark:text-[#FAFAFA]">
                 آرشیو مرجع آشپزی لاقلی
               </span>
               <span aria-hidden="true">·</span>
@@ -221,7 +221,7 @@ export function RecipeFeed({
                 <button
                   type="button"
                   onClick={onJumpToKitchen}
-                  className="hidden sm:inline-flex items-center gap-1 hover:text-[#1C1B18] dark:hover:text-[#F4F1EA] min-h-[36px]"
+                  className="hidden sm:inline-flex items-center gap-1 hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA] min-h-[36px]"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-[#A97222]" />
                   <span>با مواد یخچال چی بپزم؟</span>
@@ -239,7 +239,7 @@ export function RecipeFeed({
               onTouchStart={() =>
                 prefetchRecipeDetail(heroRecipe.id, city, {priority: 'high', imageUrl: heroRecipe.imageUrl})
               }
-              className="lg:col-span-7 group cursor-pointer rounded-3xl overflow-hidden border border-[#E5E1D6]/80 dark:border-[#2F2D27] shadow-[0_12px_40px_-24px_rgba(28,27,24,0.22)]"
+              className="lg:col-span-7 group cursor-pointer rounded-3xl overflow-hidden border border-[#E6E6E3]/80 dark:border-[#282825] shadow-[0_12px_40px_-24px_rgba(28,27,24,0.22)]"
             >
               <EditorialImage
                 src={heroRecipe.imageUrl}
@@ -253,7 +253,7 @@ export function RecipeFeed({
 
             <div className="lg:col-span-5 flex flex-col justify-between gap-8 py-1">
               <div className="space-y-5">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-[#615E55] dark:text-[#A9A497]">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                   <span className="font-semibold text-[#B54B1F] dark:text-[#E29A6F]">منتخب سردبیر امروز</span>
                   <span aria-hidden="true">·</span>
                   <span>{heroRecipe.region}</span>
@@ -261,32 +261,32 @@ export function RecipeFeed({
                   <span>سختی {heroRecipe.difficulty}</span>
                 </div>
 
-                <h1 className="text-3xl sm:text-[2.35rem] font-extrabold leading-[1.3] tracking-tight text-[#1C1B18] dark:text-[#F4F1EA]">
+                <h1 className="text-3xl sm:text-[2.35rem] font-extrabold leading-[1.3] tracking-tight text-[#0D0D0D] dark:text-[#FAFAFA]">
                   {heroRecipe.title}
                 </h1>
 
-                <p className="text-sm sm:text-base text-[#615E55] dark:text-[#A9A497] leading-[1.85]">
+                <p className="text-sm sm:text-base text-[#5C5C58] dark:text-[#A3A39E] leading-[1.85]">
                   {heroRecipe.description}
                 </p>
 
                 {/* Architectural Tabular Metrics Strip (Zero Pills) */}
-                <div className="grid grid-cols-3 gap-4 py-4 border-y border-[#E5E1D6]/80 dark:border-[#2F2D27] tabular-nums">
+                <div className="grid grid-cols-3 gap-4 py-4 border-y border-[#E6E6E3]/80 dark:border-[#282825] tabular-nums">
                   <div>
-                    <div className="text-[11px] text-[#615E55] dark:text-[#A9A497]">زمان کل</div>
+                    <div className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E]">زمان کل</div>
                     <div className="text-sm font-bold mt-0.5 inline-flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
                       <span>{toFaDigits(heroRecipe.prepMinutes + heroRecipe.cookMinutes)} دقیقه</span>
                     </div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-[#615E55] dark:text-[#A9A497]">انرژی هر پرس</div>
+                    <div className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E]">انرژی هر پرس</div>
                     <div className="text-sm font-bold mt-0.5 inline-flex items-center gap-1">
                       <Flame className="w-3.5 h-3.5 text-[#A97222]" />
                       <span>{toFaDigits(heroRecipe.nutrition.calories)} کالری</span>
                     </div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-[#615E55] dark:text-[#A9A497]">تعداد نفرات</div>
+                    <div className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E]">تعداد نفرات</div>
                     <div className="text-sm font-bold mt-0.5">{toFaDigits(heroRecipe.servings)} نفر</div>
                   </div>
                 </div>
@@ -294,7 +294,7 @@ export function RecipeFeed({
                 <button
                   type="button"
                   onClick={() => onOpenChef(heroRecipe.authorId)}
-                  className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1C1B18] dark:text-[#F4F1EA] hover:text-[#B54B1F] dark:hover:text-[#E29A6F] transition-colors min-h-[40px]"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-[#0D0D0D] dark:text-[#FAFAFA] hover:text-[#B54B1F] dark:hover:text-[#E29A6F] transition-colors min-h-[40px]"
                 >
                   <span>{heroRecipe.authorName}</span>
                   {heroRecipe.authorVerified && (
@@ -331,7 +331,7 @@ export function RecipeFeed({
       <section aria-label="جست‌وجو و فیلتر دستورها" className="space-y-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-[#615E55] dark:text-[#A9A497] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-[#5C5C58] dark:text-[#A3A39E] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="search"
               value={filters.q}
@@ -403,13 +403,13 @@ export function RecipeFeed({
 
         {/* Expandable Faceted OR/AND Filter Drawer */}
         {showAdvanced && (
-          <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 sm:p-6 space-y-5">
+          <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 sm:p-6 space-y-5">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold">فیلتر چندوجهی (ترکیب دقیق)</p>
               <button
                 type="button"
                 onClick={clearAllFilters}
-                className="text-xs text-[#615E55] hover:text-[#1C1B18] dark:text-[#A9A497] inline-flex items-center gap-1 min-h-[40px] px-2"
+                className="text-xs text-[#5C5C58] hover:text-[#0D0D0D] dark:text-[#A3A39E] inline-flex items-center gap-1 min-h-[40px] px-2"
               >
                 <X className="w-3.5 h-3.5" />
                 <span>پاک‌کردن همه فیلترها</span>
@@ -418,7 +418,7 @@ export function RecipeFeed({
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div>
-                <p className="text-xs text-[#615E55] dark:text-[#A9A497] mb-2">فصل مناسب</p>
+                <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] mb-2">فصل مناسب</p>
                 <div className="flex flex-wrap gap-1.5">
                   {SEASONS.map((s) => (
                     <button
@@ -427,8 +427,8 @@ export function RecipeFeed({
                       onClick={() => toggleMulti('seasons', s)}
                       className={`min-h-[40px] px-3 rounded-lg text-xs transition-colors ${
                         filters.seasons.includes(s)
-                          ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
-                          : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
+                          ? 'bg-[#B54B1F] text-[#FAFAFA] dark:bg-[#E29A6F] dark:text-[#0B0B0B]'
+                          : 'bg-[#EFEFED] dark:bg-[#20201E] text-[#5C5C58] dark:text-[#A3A39E]'
                       }`}
                     >
                       {s}
@@ -438,7 +438,7 @@ export function RecipeFeed({
               </div>
 
               <div>
-                <p className="text-xs text-[#615E55] dark:text-[#A9A497] mb-2">منطقه و اصالت</p>
+                <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] mb-2">منطقه و اصالت</p>
                 <div className="flex flex-wrap gap-1.5">
                   {REGIONS.map((r) => (
                     <button
@@ -447,8 +447,8 @@ export function RecipeFeed({
                       onClick={() => toggleMulti('regions', r)}
                       className={`min-h-[40px] px-3 rounded-lg text-xs transition-colors ${
                         filters.regions.includes(r)
-                          ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
-                          : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
+                          ? 'bg-[#B54B1F] text-[#FAFAFA] dark:bg-[#E29A6F] dark:text-[#0B0B0B]'
+                          : 'bg-[#EFEFED] dark:bg-[#20201E] text-[#5C5C58] dark:text-[#A3A39E]'
                       }`}
                     >
                       {r}
@@ -458,7 +458,7 @@ export function RecipeFeed({
               </div>
 
               <div>
-                <p className="text-xs text-[#615E55] dark:text-[#A9A497] mb-2">سبک تغذیه و رژیم</p>
+                <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] mb-2">سبک تغذیه و رژیم</p>
                 <div className="flex flex-wrap gap-1.5">
                   {DIETS.map((d) => (
                     <button
@@ -467,8 +467,8 @@ export function RecipeFeed({
                       onClick={() => toggleMulti('diets', d)}
                       className={`min-h-[40px] px-3 rounded-lg text-xs transition-colors ${
                         filters.diets.includes(d)
-                          ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
-                          : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
+                          ? 'bg-[#B54B1F] text-[#FAFAFA] dark:bg-[#E29A6F] dark:text-[#0B0B0B]'
+                          : 'bg-[#EFEFED] dark:bg-[#20201E] text-[#5C5C58] dark:text-[#A3A39E]'
                       }`}
                     >
                       {d}
@@ -478,7 +478,7 @@ export function RecipeFeed({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-[#E5E1D6] dark:border-[#2F2D27] text-sm">
+            <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-[#E6E6E3] dark:border-[#282825] text-sm">
               <label className="inline-flex items-center gap-2 min-h-[44px] cursor-pointer">
                 <input
                   type="checkbox"
@@ -523,7 +523,7 @@ export function RecipeFeed({
       {/* Minimalist Editorial Recipe Cards Grid */}
       <section aria-label="فهرست دستورهای پخت" className="space-y-6">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1C1B18] dark:text-[#F4F1EA]">
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#0D0D0D] dark:text-[#FAFAFA]">
             {filters.needsPhotoOnly
               ? `دستورهای در انتظار عکس واقعی شما (${toFaDigits(displayedRecipes.length)})`
               : filters.q || filters.categories.length > 0 || activeFilterCount > 0
@@ -544,15 +544,15 @@ export function RecipeFeed({
         {loading ? (
           <RecipeFeedSkeleton includeHero={isCleanHome && !heroRecipe} />
         ) : gridRecipes.length === 0 ? (
-          <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-12 text-center space-y-3">
+          <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-12 text-center space-y-3">
             <p className="text-base font-medium">دستور پختی با این فیلترها پیدا نشد.</p>
-            <p className="text-sm text-[#615E55] dark:text-[#A9A497]">
+            <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E]">
               فیلترها را ساده‌تر کنید یا عبارت دیگری جست‌وجو نمایید.
             </p>
             <button
               type="button"
               onClick={clearAllFilters}
-              className="min-h-[44px] px-5 rounded-xl bg-[#B54B1F] text-[#F9F8F4] text-sm font-medium mt-2"
+              className="min-h-[44px] px-5 rounded-xl bg-[#B54B1F] text-[#FAFAFA] text-sm font-medium mt-2"
             >
               پاک‌کردن فیلترها
             </button>
@@ -579,7 +579,7 @@ export function RecipeFeed({
                 >
                   <div className="space-y-4">
                     {/* Clean Photography OR Kinfolk Typographic Cover for Photo-less Recipes */}
-                    <div className="rounded-2xl overflow-hidden border border-[#E5E1D6]/80 dark:border-[#2F2D27] shadow-[0_8px_28px_-22px_rgba(28,27,24,0.28)] transition-shadow duration-300 group-hover:shadow-[0_14px_34px_-20px_rgba(28,27,24,0.34)]">
+                    <div className="rounded-2xl overflow-hidden border border-[#E6E6E3]/80 dark:border-[#282825] shadow-[0_8px_28px_-22px_rgba(28,27,24,0.28)] transition-shadow duration-300 group-hover:shadow-[0_14px_34px_-20px_rgba(28,27,24,0.34)]">
                       <EditorialImage
                         src={recipe.imageUrl}
                         alt={recipe.title}
@@ -590,7 +590,7 @@ export function RecipeFeed({
                     </div>
 
                     {/* Unboxed Clean Metadata Line */}
-                    <div className="flex items-center justify-between text-xs text-[#615E55] dark:text-[#A9A497]">
+                    <div className="flex items-center justify-between text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                       <div className="flex items-center gap-1.5 truncate">
                         <span>{recipe.category}</span>
                         <span aria-hidden="true">·</span>
@@ -612,24 +612,24 @@ export function RecipeFeed({
 
                     {/* Title & Short Editorial Subtitle */}
                     <div className="space-y-1.5">
-                      <h3 className="text-lg font-bold leading-snug text-[#1C1B18] dark:text-[#F4F1EA] group-hover:text-[#B54B1F] dark:group-hover:text-[#E29A6F] transition-colors">
+                      <h3 className="text-lg font-bold leading-snug text-[#0D0D0D] dark:text-[#FAFAFA] group-hover:text-[#B54B1F] dark:group-hover:text-[#E29A6F] transition-colors">
                         {recipe.title}
                       </h3>
-                      <p className="text-sm text-[#615E55] dark:text-[#A9A497] line-clamp-2 leading-relaxed">
+                      <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E] line-clamp-2 leading-relaxed">
                         {recipe.subtitle}
                       </p>
                     </div>
                   </div>
 
                   {/* Calm Footer: Chef & Actions (Bookmark Only — Quiet Luxury) */}
-                  <div className="flex items-center justify-between pt-3 border-t border-[#E5E1D6]/70 dark:border-[#2F2D27]">
+                  <div className="flex items-center justify-between pt-3 border-t border-[#E6E6E3]/70 dark:border-[#282825]">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         onOpenChef(recipe.authorId);
                       }}
-                      className="inline-flex items-center gap-1 text-xs text-[#615E55] dark:text-[#A9A497] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA] min-h-[44px] truncate"
+                      className="inline-flex items-center gap-1 text-xs text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA] min-h-[44px] truncate"
                     >
                       <span className="truncate">{recipe.authorName}</span>
                       {recipe.authorVerified && (
@@ -645,7 +645,7 @@ export function RecipeFeed({
                           e.stopPropagation();
                           onQuickAddShopping(recipe);
                         }}
-                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#615E55] hover:text-[#B54B1F] dark:text-[#A9A497] dark:hover:text-[#E29A6F] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F] transition-colors"
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#5C5C58] hover:text-[#B54B1F] dark:text-[#A3A39E] dark:hover:text-[#E29A6F] hover:bg-[#EFEFED] dark:hover:bg-[#20201E] transition-colors"
                       >
                         <ShoppingBag className="w-4 h-4" />
                       </button>
@@ -653,7 +653,7 @@ export function RecipeFeed({
                         type="button"
                         aria-label="اشتراک‌گذاری دستور پخت"
                         onClick={(e) => handleShare(recipe, e)}
-                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#615E55] hover:text-[#B54B1F] dark:text-[#A9A497] dark:hover:text-[#E29A6F] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F] transition-colors"
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#5C5C58] hover:text-[#B54B1F] dark:text-[#A3A39E] dark:hover:text-[#E29A6F] hover:bg-[#EFEFED] dark:hover:bg-[#20201E] transition-colors"
                       >
                         <Share2 className="w-4 h-4" />
                       </button>
@@ -668,7 +668,7 @@ export function RecipeFeed({
                         className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-colors ${
                           isBookmarked
                             ? 'text-[#B54B1F] dark:text-[#E29A6F]'
-                            : 'text-[#615E55] dark:text-[#A9A497] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]'
+                            : 'text-[#5C5C58] dark:text-[#A3A39E] hover:bg-[#EFEFED] dark:hover:bg-[#20201E]'
                         }`}
                       >
                         <Bookmark className="w-4 h-4" fill={isBookmarked ? 'currentColor' : 'none'} />
@@ -686,17 +686,17 @@ export function RecipeFeed({
       {ecosystemConfig.exploreShowcaseEnabled && exploreCampaign && (
         <section
           aria-label="کمپین اسپانسر منتخب"
-          className="rounded-3xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-gradient-to-l from-[#FFFFFF] via-[#FAF8F2] to-[#F3EFE4] dark:from-[#1C1B18] dark:via-[#1A1916] dark:to-[#161512] p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6"
+          className="rounded-3xl border border-[#E6E6E3] dark:border-[#282825] bg-gradient-to-l from-[#FFFFFF] via-[#F6F6F5] to-[#EFEFED] dark:from-[#1C1B18] dark:via-[#151514] dark:to-[#0B0B0B] p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6"
         >
           <div className="space-y-2 max-w-2xl">
-            <div className="flex items-center gap-2 text-xs text-[#615E55] dark:text-[#A9A497]">
+            <div className="flex items-center gap-2 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
               <span>پیشنهاد اسپانسر منتخب</span>
               <span aria-hidden="true">·</span>
               <span className="font-semibold text-[#B54B1F] dark:text-[#E29A6F]">{exploreCampaign.partnerName}</span>
             </div>
-            <h3 className="text-xl font-bold text-[#1C1B18] dark:text-[#F4F1EA]">{exploreCampaign.title}</h3>
+            <h3 className="text-xl font-bold text-[#0D0D0D] dark:text-[#FAFAFA]">{exploreCampaign.title}</h3>
             {exploreCampaign.subtitle && (
-              <p className="text-sm text-[#615E55] dark:text-[#A9A497] leading-relaxed">{exploreCampaign.subtitle}</p>
+              <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">{exploreCampaign.subtitle}</p>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
@@ -711,7 +711,7 @@ export function RecipeFeed({
                   }).catch(() => {});
                   onNotify(`کد تخفیف ${exploreCampaign.promoCode} کپی شد.`);
                 }}
-                className="min-h-[46px] px-4 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] text-xs font-mono font-bold inline-flex items-center gap-1.5"
+                className="min-h-[46px] px-4 rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] text-xs font-mono font-bold inline-flex items-center gap-1.5"
               >
                 <Copy className="w-3.5 h-3.5" />
                 <span dir="ltr">{exploreCampaign.promoCode}</span>
@@ -727,7 +727,7 @@ export function RecipeFeed({
                 const partner = showcasePartners.find((p) => p.id === exploreCampaign.partnerId);
                 if (partner) onOpenPartner(partner);
               }}
-              className="min-h-[46px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-xs font-medium"
+              className="min-h-[46px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] text-xs font-medium"
             >
               {exploreCampaign.ctaLabel}
             </button>
@@ -739,11 +739,11 @@ export function RecipeFeed({
       {ecosystemConfig.exploreShowcaseEnabled && showcasePartners.length > 0 && (
         <section
           aria-label="همکاران منتخب صنعت غذا"
-          className="border-t border-[#E5E1D6] dark:border-[#2F2D27] pt-10 space-y-5"
+          className="border-t border-[#E6E6E3] dark:border-[#282825] pt-10 space-y-5"
         >
           <div className="flex items-baseline justify-between gap-4">
             <div>
-              <p className="text-xs text-[#615E55] dark:text-[#A9A497]">اکوسیستم اصناف لاقلی</p>
+              <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">اکوسیستم اصناف لاقلی</p>
               <h2 className="text-lg font-bold mt-0.5">
                 {ecosystemConfig.activeCampaignTitle || 'همکاران منتخب آشپزخانه'}
               </h2>
@@ -756,19 +756,19 @@ export function RecipeFeed({
                 key={partner.id}
                 type="button"
                 onClick={() => onOpenPartner(partner)}
-                className="text-right rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 hover:border-[#B54B1F]/50 dark:hover:border-[#E29A6F]/50 transition-colors space-y-2"
+                className="text-right rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 hover:border-[#B54B1F]/50 dark:hover:border-[#E29A6F]/50 transition-colors space-y-2"
               >
-                <div className="flex items-center justify-between gap-2 text-xs text-[#615E55] dark:text-[#A9A497]">
+                <div className="flex items-center justify-between gap-2 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                   <span>{PARTNER_ROLE_LABELS[partner.roleType]}</span>
                   <span>{partner.city}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <h3 className="text-base font-bold text-[#1C1B18] dark:text-[#F4F1EA]">{partner.name}</h3>
+                  <h3 className="text-base font-bold text-[#0D0D0D] dark:text-[#FAFAFA]">{partner.name}</h3>
                   {partner.verified && (
                     <BadgeCheck className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F] shrink-0" />
                   )}
                 </div>
-                <p className="text-xs text-[#615E55] dark:text-[#A9A497] line-clamp-2 leading-relaxed">
+                <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] line-clamp-2 leading-relaxed">
                   {partner.description}
                 </p>
                 {partner.promoLabel && (

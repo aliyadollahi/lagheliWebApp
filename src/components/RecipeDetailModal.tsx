@@ -510,9 +510,9 @@ export function RecipeDetailModal({
       className="fixed inset-0 z-50 bg-black/45 overflow-y-auto"
     >
       <div className="min-h-screen flex items-start justify-center p-0 sm:p-6 lg:p-10">
-        <div className="w-full max-w-[1020px] bg-[#FFFFFF]/84 dark:bg-[#141412]/78 backdrop-blur-[12px] backdrop-saturate-150 sm:rounded-[32px] border border-[rgba(255,255,255,0.1)] shadow-[0_32px_90px_-28px_rgba(17,17,16,0.38),inset_0_1px_0_rgba(255,255,255,0.35)] dark:shadow-[0_32px_90px_-28px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.1)] overflow-hidden my-0 sm:my-4">
+        <div className="w-full max-w-[1020px] bg-[#FFFFFF]/84 dark:bg-[#0B0B0B]/78 backdrop-blur-[12px] backdrop-saturate-150 sm:rounded-[32px] border border-[rgba(255,255,255,0.1)] shadow-[0_32px_90px_-28px_rgba(17,17,16,0.38),inset_0_1px_0_rgba(255,255,255,0.35)] dark:shadow-[0_32px_90px_-28px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.1)] overflow-hidden my-0 sm:my-4">
           {/* Sticky Frosted Glass Reading Bar */}
-          <div className="sticky top-0 z-20 flex items-center justify-between gap-4 px-5 sm:px-10 h-16 bg-[#FFFFFF]/72 dark:bg-[#141412]/72 backdrop-blur-[12px] backdrop-saturate-150 border-b border-[rgba(255,255,255,0.1)] shadow-[0_1px_0_rgba(17,17,16,0.05)] dark:shadow-none">
+          <div className="sticky top-0 z-20 flex items-center justify-between gap-4 px-5 sm:px-10 h-16 bg-[#FFFFFF]/72 dark:bg-[#0B0B0B]/72 backdrop-blur-[12px] backdrop-saturate-150 border-b border-[rgba(255,255,255,0.1)] shadow-[0_1px_0_rgba(17,17,16,0.05)] dark:shadow-none">
             <button
               type="button"
               onClick={onClose}
@@ -523,7 +523,7 @@ export function RecipeDetailModal({
             </button>
 
             {recipe && (
-              <span className="hidden md:block text-xs font-medium text-[#615E55] dark:text-[#A9A497] truncate max-w-md">
+              <span className="hidden md:block text-xs font-medium text-[#5C5C58] dark:text-[#A3A39E] truncate max-w-md">
                 {recipe.title}
               </span>
             )}
@@ -563,7 +563,7 @@ export function RecipeDetailModal({
             <div className="px-5 sm:px-10 lg:px-14 pt-6 sm:pt-10 pb-14 sm:pb-20 space-y-14 sm:space-y-16">
               {/* Hero Photograph + Overlapping Glassmorphism Primary Dish Info Panel */}
               <div className="relative">
-                <div className="rounded-[26px] overflow-hidden border border-[rgba(255,255,255,0.1)] bg-[#F5F3EE] dark:bg-[#1C1B18]">
+                <div className="rounded-[26px] overflow-hidden border border-[rgba(255,255,255,0.1)] bg-[#EFEFED] dark:bg-[#151514]">
                   <EditorialImage
                     src={recipe.imageUrl}
                     alt={recipe.title}
@@ -575,9 +575,9 @@ export function RecipeDetailModal({
                 </div>
 
                 {/* Glassmorphism Primary Dish Information Panel — Elevated over Hero Edge for Visual Depth */}
-                <div className="relative z-10 -mt-10 sm:-mt-16 mx-2 sm:mx-6 lg:mx-8 rounded-[28px] bg-[#FFFFFF]/74 dark:bg-[#1A1916]/72 backdrop-blur-[12px] backdrop-saturate-150 border border-[rgba(255,255,255,0.1)] shadow-[0_24px_60px_-24px_rgba(17,17,16,0.24),inset_0_1px_0_rgba(255,255,255,0.4)] dark:shadow-[0_28px_70px_-24px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.1)] p-6 sm:p-9 lg:p-10 space-y-6">
+                <div className="relative z-10 -mt-10 sm:-mt-16 mx-2 sm:mx-6 lg:mx-8 rounded-[28px] bg-[#FFFFFF]/74 dark:bg-[#151514]/72 backdrop-blur-[12px] backdrop-saturate-150 border border-[rgba(255,255,255,0.1)] shadow-[0_24px_60px_-24px_rgba(17,17,16,0.24),inset_0_1px_0_rgba(255,255,255,0.4)] dark:shadow-[0_28px_70px_-24px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.1)] p-6 sm:p-9 lg:p-10 space-y-6">
                   {/* Quiet Unboxed Editorial Metadata Line */}
-                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[#615E55] dark:text-[#B8B3A6]">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                     <span>{recipe.category}</span>
                     <span aria-hidden="true">·</span>
                     <span>{recipe.region}</span>
@@ -595,10 +595,10 @@ export function RecipeDetailModal({
 
                   {/* Display Headline & Editorial Deck with Generous Measure */}
                   <div className="space-y-4">
-                    <h1 className="text-2xl sm:text-3xl lg:text-[2.15rem] font-bold leading-[1.35] text-balance text-[#111110] dark:text-[#F4F1EA]">
+                    <h1 className="text-2xl sm:text-3xl lg:text-[2.15rem] font-bold leading-[1.35] text-balance text-[#111110] dark:text-[#FAFAFA]">
                       {recipe.title}
                     </h1>
-                    <p className="text-sm sm:text-base text-[#4F4C44] dark:text-[#C4BFB2] leading-[1.95] max-w-[62ch]">
+                    <p className="text-sm sm:text-base text-[#5C5C58] dark:text-[#A3A39E] leading-[1.95] max-w-[62ch]">
                       {recipe.description}
                     </p>
                   </div>
@@ -608,7 +608,7 @@ export function RecipeDetailModal({
                     <button
                       type="button"
                       onClick={() => onOpenChef(recipe.authorId)}
-                      className="inline-flex items-center gap-1.5 text-sm font-medium min-h-[44px] text-[#111110] dark:text-[#F4F1EA] hover:text-[#B54B1F] dark:hover:text-[#E29A6F] transition-colors"
+                      className="inline-flex items-center gap-1.5 text-sm font-medium min-h-[44px] text-[#111110] dark:text-[#FAFAFA] hover:text-[#B54B1F] dark:hover:text-[#E29A6F] transition-colors"
                     >
                       <span>{recipe.authorName}</span>
                       {recipe.authorVerified && (
@@ -616,9 +616,9 @@ export function RecipeDetailModal({
                       )}
                     </button>
 
-                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-[#59564E] dark:text-[#B8B3A6] tabular-nums">
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
                       <span className="inline-flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-[#C85A28] dark:text-[#E29A6F]" />
+                        <Clock className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
                         آماده‌سازی: {toFaDigits(recipe.prepMinutes)} دقیقه
                       </span>
                       <span>پخت: {toFaDigits(recipe.cookMinutes)} دقیقه</span>
@@ -641,7 +641,7 @@ export function RecipeDetailModal({
                       <button
                         type="button"
                         onClick={() => setCookMode(true)}
-                        className="w-full sm:w-auto justify-center min-h-[50px] px-6 sm:px-7 rounded-full bg-[#111110] hover:bg-[#292825] dark:bg-[#F4F1EA] dark:hover:bg-[#E5E1D6] dark:text-[#111110] text-[#FFFFFF] text-sm font-semibold inline-flex items-center gap-2 transition-colors whitespace-nowrap"
+                        className="w-full sm:w-auto justify-center min-h-[50px] px-6 sm:px-7 rounded-full bg-[#111110] hover:bg-[#282825] dark:bg-[#FAFAFA] dark:hover:bg-[#E6E6E3] dark:text-[#111110] text-[#FFFFFF] text-sm font-semibold inline-flex items-center gap-2 transition-colors whitespace-nowrap"
                       >
                         <ChefHat className="w-4 h-4 shrink-0" />
                         <span>شروع حالت آشپزی (گام‌به‌گام)</span>
@@ -655,7 +655,7 @@ export function RecipeDetailModal({
                           onClose();
                           onJumpToOrder(recipe.linkedMenuDishId!);
                         }}
-                        className="w-full sm:w-auto justify-center min-h-[48px] px-5 sm:px-6 rounded-full border border-[#111110]/15 dark:border-white/15 bg-[#FFFFFF]/60 dark:bg-white/[0.04] hover:bg-[#F5F3EE] dark:hover:bg-white/[0.08] text-sm font-medium inline-flex items-center transition-colors whitespace-nowrap"
+                        className="w-full sm:w-auto justify-center min-h-[48px] px-5 sm:px-6 rounded-full border border-[#111110]/15 dark:border-white/15 bg-[#FFFFFF]/60 dark:bg-white/[0.04] hover:bg-[#EFEFED] dark:hover:bg-white/[0.08] text-sm font-medium inline-flex items-center transition-colors whitespace-nowrap"
                       >
                         حوصله پخت نداری؟ آماده سفارش بده
                       </button>
@@ -664,7 +664,7 @@ export function RecipeDetailModal({
                     <button
                       type="button"
                       onClick={handleShareText}
-                      className="w-full sm:w-auto justify-center min-h-[48px] px-5 rounded-full border border-[#111110]/15 dark:border-white/15 bg-[#FFFFFF]/60 dark:bg-white/[0.04] hover:bg-[#F5F3EE] dark:hover:bg-white/[0.08] text-sm font-medium inline-flex items-center gap-2 transition-colors whitespace-nowrap"
+                      className="w-full sm:w-auto justify-center min-h-[48px] px-5 rounded-full border border-[#111110]/15 dark:border-white/15 bg-[#FFFFFF]/60 dark:bg-white/[0.04] hover:bg-[#EFEFED] dark:hover:bg-white/[0.08] text-sm font-medium inline-flex items-center gap-2 transition-colors whitespace-nowrap"
                     >
                       <Share2 className="w-4 h-4 shrink-0" />
                       <span>اشتراک‌گذاری دستور</span>
@@ -674,12 +674,12 @@ export function RecipeDetailModal({
 
                 {/* Callout for Photo-less Recipes: Invite First Real User Dish Photo */}
                 {(!recipe.imageUrl || recipe.imageUrl.trim().length === 0) && (
-                  <div className="mt-8 mx-2 sm:mx-6 lg:mx-8 rounded-2xl border border-[#B54B1F]/20 dark:border-[#E29A6F]/25 bg-[#F9F8F4] dark:bg-[#1B1A17] p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="mt-8 mx-2 sm:mx-6 lg:mx-8 rounded-2xl border border-[#B54B1F]/20 dark:border-[#E29A6F]/25 bg-[#F6F6F5] dark:bg-[#151514] p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="space-y-1.5">
-                      <p className="text-sm font-bold text-[#1C1B18] dark:text-[#F4F1EA]">
+                      <p className="text-sm font-bold text-[#0D0D0D] dark:text-[#FAFAFA]">
                         این دستور هنوز عکس واقعی ندارد — اولین عکاس آن باشید
                       </p>
-                      <p className="text-xs text-[#615E55] dark:text-[#A9A497] leading-[1.85] max-w-xl">
+                      <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] leading-[1.85] max-w-xl">
                         پس از پخت، عکس واقعی غذای خود را ثبت کنید تا با نام شما تصویر اصلی این دستور شود و ۴۰ جِم هدیه بگیرید.
                       </p>
                     </div>
@@ -692,7 +692,7 @@ export function RecipeDetailModal({
                         }
                         setPhotoFormOpen(true);
                       }}
-                      className="w-full sm:w-auto min-h-[44px] px-5 rounded-full bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-xs font-medium inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 transition-colors"
+                      className="w-full sm:w-auto min-h-[44px] px-5 rounded-full bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] text-xs font-medium inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 transition-colors"
                     >
                       <Camera className="w-4 h-4" />
                       <span>ارسال عکس واقعی (+۴۰ جِم)</span>
@@ -705,32 +705,32 @@ export function RecipeDetailModal({
               <div className="mx-2 sm:mx-6 lg:mx-8 border-y border-[#111110]/[0.07] dark:border-white/[0.08] py-6 sm:py-7">
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-y-5 gap-x-4 sm:gap-6 text-center tabular-nums">
                   <div className="space-y-1">
-                    <div className="text-xs text-[#6E6A60] dark:text-[#A9A497]">کالری</div>
-                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#F4F1EA]">
+                    <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">کالری</div>
+                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#FAFAFA]">
                       {toFaDigits(recipe.nutrition.calories)}
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-xs text-[#6E6A60] dark:text-[#A9A497]">پروتئین</div>
-                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#F4F1EA]">
+                    <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">پروتئین</div>
+                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#FAFAFA]">
                       {toFaDigits(recipe.nutrition.protein)} گ
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-xs text-[#6E6A60] dark:text-[#A9A497]">کربوهیدرات</div>
-                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#F4F1EA]">
+                    <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">کربوهیدرات</div>
+                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#FAFAFA]">
                       {toFaDigits(recipe.nutrition.carbs)} گ
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-xs text-[#6E6A60] dark:text-[#A9A497]">چربی</div>
-                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#F4F1EA]">
+                    <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">چربی</div>
+                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#FAFAFA]">
                       {toFaDigits(recipe.nutrition.fat)} گ
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-xs text-[#6E6A60] dark:text-[#A9A497]">فیبر</div>
-                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#F4F1EA]">
+                    <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">فیبر</div>
+                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#FAFAFA]">
                       {toFaDigits(recipe.nutrition.fiber)} گ
                     </div>
                   </div>
@@ -739,16 +739,16 @@ export function RecipeDetailModal({
 
               {/* VIP Lock Curtain or Full Content */}
               {recipe.isVip && !recipe.isUnlocked ? (
-                <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-8 text-center space-y-3">
+                <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-8 text-center space-y-3">
                   <Lock className="w-7 h-7 mx-auto text-[#A97222]" />
                   <h3 className="text-lg font-bold">دستور تخصصی و ویژه سرآشپز</h3>
-                  <p className="text-sm text-[#615E55] dark:text-[#A9A497] max-w-md mx-auto">
+                  <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E] max-w-md mx-auto">
                     مقادیر دقیق، نکات طلایی پخت و مراحل کامل این دستور با خرج {toFaDigits(recipe.vipGemCost)} جِم از کیف جِم شما برای همیشه بازگشایی می‌شود.
                   </p>
                   <button
                     type="button"
                     onClick={handleUnlockVip}
-                    className="min-h-[48px] px-6 rounded-xl bg-[#B54B1F] text-[#F9F8F4] text-sm font-medium mt-2"
+                    className="min-h-[48px] px-6 rounded-xl bg-[#B54B1F] text-[#FAFAFA] text-sm font-medium mt-2"
                   >
                     بازگشایی با {toFaDigits(recipe.vipGemCost)} جِم
                   </button>
@@ -760,17 +760,17 @@ export function RecipeDetailModal({
                     <div className="space-y-4">
                       <div className="flex items-center justify-between gap-3">
                         <div className="space-y-1">
-                          <span className="text-[11px] font-medium text-[#847F73] dark:text-[#969083] block">
+                          <span className="text-[11px] font-medium text-[#847F73] dark:text-[#8C8C86] block">
                             فصل اول · فهرست تدارک
                           </span>
-                          <h2 className="text-xl font-bold text-[#111110] dark:text-[#F4F1EA]">مواد اولیه</h2>
+                          <h2 className="text-xl font-bold text-[#111110] dark:text-[#FAFAFA]">مواد اولیه</h2>
                         </div>
-                        <div className="inline-flex items-center gap-1.5 rounded-full border border-[#111110]/[0.1] dark:border-white/[0.12] bg-[#F9F8F4] dark:bg-[#1C1B18] p-1">
+                        <div className="inline-flex items-center gap-1.5 rounded-full border border-[#111110]/[0.1] dark:border-white/[0.12] bg-[#F6F6F5] dark:bg-[#151514] p-1">
                           <button
                             type="button"
                             aria-label="کاهش تعداد نفرات"
                             onClick={() => setServings((s) => Math.max(1, s - 1))}
-                            className="min-h-[34px] min-w-[34px] flex items-center justify-center rounded-full hover:bg-[#ECE8DE] dark:hover:bg-[#24231F] transition-colors"
+                            className="min-h-[34px] min-w-[34px] flex items-center justify-center rounded-full hover:bg-[#EFEFED] dark:hover:bg-[#20201E] transition-colors"
                           >
                             <Minus className="w-3.5 h-3.5" />
                           </button>
@@ -781,7 +781,7 @@ export function RecipeDetailModal({
                             type="button"
                             aria-label="افزایش تعداد نفرات"
                             onClick={() => setServings((s) => Math.min(20, s + 1))}
-                            className="min-h-[34px] min-w-[34px] flex items-center justify-center rounded-full bg-[#111110] dark:bg-[#F4F1EA] text-[#FFFFFF] dark:text-[#111110] transition-colors"
+                            className="min-h-[34px] min-w-[34px] flex items-center justify-center rounded-full bg-[#111110] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#111110] transition-colors"
                           >
                             <Plus className="w-3.5 h-3.5" />
                           </button>
@@ -799,8 +799,8 @@ export function RecipeDetailModal({
                               onClick={() => setServings(preset)}
                               className={`min-h-[38px] px-4 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
                                 active
-                                  ? 'bg-[#111110] text-[#FFFFFF] dark:bg-[#F4F1EA] dark:text-[#111110]'
-                                  : 'bg-[#F5F3EE] dark:bg-[#1C1B18] text-[#615E55] dark:text-[#A9A497] hover:text-[#111110] dark:hover:text-[#F4F1EA]'
+                                  ? 'bg-[#111110] text-[#FFFFFF] dark:bg-[#FAFAFA] dark:text-[#111110]'
+                                  : 'bg-[#EFEFED] dark:bg-[#151514] text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#111110] dark:hover:text-[#FAFAFA]'
                               }`}
                             >
                               {toFaDigits(preset)} نفره
@@ -810,7 +810,7 @@ export function RecipeDetailModal({
                       </div>
                     </div>
 
-                    <p className="text-xs text-[#6E6A60] dark:text-[#A9A497] leading-[1.85]">
+                    <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] leading-[1.85]">
                       موادی که در خانه دارید را تیک بزنید تا فقط کمبودها با یک کلیک به لیست خرید اضافه شوند.
                     </p>
 
@@ -834,15 +834,15 @@ export function RecipeDetailModal({
                               <span
                                 className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
                                   checked
-                                    ? 'bg-[#B54B1F] border-[#B54B1F] text-white dark:bg-[#E29A6F] dark:border-[#E29A6F] dark:text-[#141412]'
-                                    : 'border-[#615E55]/35'
+                                    ? 'bg-[#B54B1F] border-[#B54B1F] text-white dark:bg-[#E29A6F] dark:border-[#E29A6F] dark:text-[#0B0B0B]'
+                                    : 'border-[#5C5C58]/35'
                                 }`}
                               >
                                 {checked && <Check className="w-3.5 h-3.5" />}
                               </span>
                               <span
                                 className={`text-sm leading-relaxed ${
-                                  checked ? 'line-through opacity-45' : 'text-[#1C1B18] dark:text-[#F4F1EA]'
+                                  checked ? 'line-through opacity-45' : 'text-[#0D0D0D] dark:text-[#FAFAFA]'
                                 }`}
                               >
                                 {ing.name}
@@ -850,7 +850,7 @@ export function RecipeDetailModal({
                             </button>
 
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-xs font-semibold text-[#524F47] dark:text-[#C4BFB2] tabular-nums">
+                              <span className="text-xs font-semibold text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
                                 {formatQuantity(ing.amount * scale)} {ing.unit}
                               </span>
                               <button
@@ -858,7 +858,7 @@ export function RecipeDetailModal({
                                 aria-label={`یافتن جایگزین برای ${ing.name}`}
                                 title="یافتن جایگزین"
                                 onClick={() => handleFindSubstitute(ing.name)}
-                                className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-full text-[#6E6A60] hover:text-[#111110] hover:bg-[#F5F3EE] dark:hover:text-[#F4F1EA] dark:hover:bg-[#24231F] transition-colors"
+                                className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-full text-[#5C5C58] hover:text-[#111110] hover:bg-[#EFEFED] dark:hover:text-[#FAFAFA] dark:hover:bg-[#20201E] transition-colors"
                               >
                                 <ArrowLeftRight className="w-3.5 h-3.5" />
                               </button>
@@ -871,7 +871,7 @@ export function RecipeDetailModal({
                     <button
                       type="button"
                       onClick={handleAddMissing}
-                      className="w-full min-h-[50px] rounded-full bg-[#111110] hover:bg-[#292825] dark:bg-[#F4F1EA] dark:hover:bg-[#E5E1D6] dark:text-[#111110] text-[#FFFFFF] text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
+                      className="w-full min-h-[50px] rounded-full bg-[#111110] hover:bg-[#282825] dark:bg-[#FAFAFA] dark:hover:bg-[#E6E6E3] dark:text-[#111110] text-[#FFFFFF] text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
                     >
                       <ShoppingBag className="w-4 h-4" />
                       <span>
@@ -881,13 +881,13 @@ export function RecipeDetailModal({
 
                     {/* Frosted Inline Substitution Layer */}
                     {subIngredient && (
-                      <div className="rounded-2xl border border-[#111110]/[0.08] dark:border-white/[0.1] bg-[#F9F8F4]/85 dark:bg-[#1C1B18]/85 backdrop-blur-lg p-5 space-y-4">
+                      <div className="rounded-2xl border border-[#111110]/[0.08] dark:border-white/[0.1] bg-[#F6F6F5]/85 dark:bg-[#151514]/85 backdrop-blur-lg p-5 space-y-4">
                         <div className="flex items-center justify-between">
                           <h3 className="text-sm font-bold">جایگزین‌های پیشنهادی برای «{subIngredient}»</h3>
                           <button
                             type="button"
                             onClick={() => setSubIngredient(null)}
-                            className="text-xs text-[#615E55] min-h-[36px] px-2"
+                            className="text-xs text-[#5C5C58] min-h-[36px] px-2"
                           >
                             بستن
                           </button>
@@ -904,8 +904,8 @@ export function RecipeDetailModal({
                                   سازگاری {toFaDigits(s.compatibility)}٪{s.isVegan ? ' · گیاهی' : ''}
                                 </span>
                               </div>
-                              <p className="text-xs text-[#615E55] dark:text-[#A9A497]">نسبت: {s.ratio}</p>
-                              <p className="text-xs text-[#615E55] dark:text-[#A9A497] leading-[1.85]">
+                              <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">نسبت: {s.ratio}</p>
+                              <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] leading-[1.85]">
                                 {s.flavorNote}
                               </p>
                               <button
@@ -937,10 +937,10 @@ export function RecipeDetailModal({
                     <div className="space-y-8">
                       <div className="flex items-end justify-between gap-4">
                         <div className="space-y-1">
-                          <span className="text-[11px] font-medium text-[#847F73] dark:text-[#969083] block">
+                          <span className="text-[11px] font-medium text-[#847F73] dark:text-[#8C8C86] block">
                             فصل دوم · روایت پخت
                           </span>
-                          <h2 className="text-xl sm:text-2xl font-bold text-[#111110] dark:text-[#F4F1EA]">
+                          <h2 className="text-xl sm:text-2xl font-bold text-[#111110] dark:text-[#FAFAFA]">
                             مراحل پخت
                           </h2>
                         </div>
@@ -948,7 +948,7 @@ export function RecipeDetailModal({
                           <button
                             type="button"
                             onClick={() => setActiveStepOrder(null)}
-                            className="text-xs text-[#6E6A60] dark:text-[#A9A497] hover:text-[#111110] dark:hover:text-[#F4F1EA] min-h-[36px] px-2 transition-colors"
+                            className="text-xs text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#111110] dark:hover:text-[#FAFAFA] min-h-[36px] px-2 transition-colors"
                           >
                             نمایش یکسان همه مراحل
                           </button>
@@ -972,19 +972,19 @@ export function RecipeDetailModal({
                               <span
                                 className={`text-2xl sm:text-[1.85rem] font-light tabular-nums leading-none pt-1 min-w-[2.25rem] select-none transition-colors ${
                                   isFocused
-                                    ? 'text-[#C85A28] dark:text-[#E29A6F] font-semibold'
-                                    : 'text-[#C85A28]/70 dark:text-[#E29A6F]/75'
+                                    ? 'text-[#B54B1F] dark:text-[#E29A6F] font-semibold'
+                                    : 'text-[#B54B1F]/70 dark:text-[#E29A6F]/75'
                                 }`}
                               >
                                 {toFaDigits(step.order < 10 ? `0${step.order}` : step.order)}
                               </span>
                               <div className="space-y-3 flex-1 pb-6 border-b border-[#111110]/[0.05] dark:border-white/[0.06] group-last:border-b-0 group-last:pb-0">
-                                <p className="text-[15.5px] sm:text-[16.5px] leading-[2.05] text-[#1C1B18] dark:text-[#EFECE4] max-w-[58ch]">
+                                <p className="text-[15.5px] sm:text-[16.5px] leading-[2.05] text-[#0D0D0D] dark:text-[#EFEFED] max-w-[58ch]">
                                   {step.instruction}
                                 </p>
                                 {step.timerMinutes && (
-                                  <p className="text-xs text-[#787368] dark:text-[#A9A497] tabular-nums inline-flex items-center gap-1.5">
-                                    <Clock className="w-3.5 h-3.5 text-[#C85A28]/80 dark:text-[#E29A6F]" />
+                                  <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] tabular-nums inline-flex items-center gap-1.5">
+                                    <Clock className="w-3.5 h-3.5 text-[#B54B1F]/80 dark:text-[#E29A6F]" />
                                     <span>زمان تقریبی این مرحله: {toFaDigits(step.timerMinutes)} دقیقه</span>
                                   </p>
                                 )}
@@ -998,16 +998,16 @@ export function RecipeDetailModal({
                     {/* Quiet Contextual Partner Suggestion (Strictly capped by Admin Panel) */}
                     {contextualPartners.length > 0 && (
                       <div className="space-y-4 border-t border-[#111110]/[0.07] dark:border-white/[0.08] pt-10">
-                        <p className="text-xs text-[#6E6A60] dark:text-[#A9A497]">
+                        <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                           تامین مواد و تجهیزات مرتبط با این دستور
                         </p>
                         {contextualPartners.map((partner) => (
                           <div
                             key={partner.id}
-                            className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                            className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                           >
                             <div className="space-y-1">
-                              <div className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                              <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                                 {PARTNER_ROLE_LABELS[partner.roleType]} · {partner.city}
                               </div>
                               <button
@@ -1033,7 +1033,7 @@ export function RecipeDetailModal({
                                     }).catch(() => {});
                                     onNotify(`کد تخفیف ${partner.promoCode} کپی شد.`);
                                   }}
-                                  className="min-h-[44px] px-3.5 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-medium inline-flex items-center gap-1.5"
+                                  className="min-h-[44px] px-3.5 rounded-xl border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium inline-flex items-center gap-1.5"
                                 >
                                   <Copy className="w-3.5 h-3.5" />
                                   <span dir="ltr">{partner.promoCode}</span>
@@ -1042,7 +1042,7 @@ export function RecipeDetailModal({
                               <button
                                 type="button"
                                 onClick={() => onOpenPartner(partner)}
-                                className="min-h-[44px] px-4 rounded-xl bg-[#F1EFE8] dark:bg-[#24231F] text-xs font-medium"
+                                className="min-h-[44px] px-4 rounded-xl bg-[#EFEFED] dark:bg-[#20201E] text-xs font-medium"
                               >
                                 مشاهده صفحه
                               </button>
@@ -1060,7 +1060,7 @@ export function RecipeDetailModal({
                             <Camera className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
                             <span>عکس‌های واقعی کاربران از این دستور ({toFaDigits(communityPhotos.length)})</span>
                           </h2>
-                          <p className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                          <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                             تصاویر واقعی پخته‌شده توسط آشپزهای لاقلی در خانه
                           </p>
                         </div>
@@ -1083,10 +1083,10 @@ export function RecipeDetailModal({
                       {photoFormOpen && (
                         <form
                           onSubmit={handleUploadCommunityPhoto}
-                          className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-4"
+                          className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4"
                         >
                           <div className="flex flex-wrap items-center gap-3">
-                            <label className="min-h-[44px] px-4 rounded-xl border border-dashed border-[#B54B1F]/50 dark:border-[#E29A6F]/50 bg-[#F9F8F4] dark:bg-[#141412] text-xs font-medium inline-flex items-center gap-2 cursor-pointer hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]">
+                            <label className="min-h-[44px] px-4 rounded-xl border border-dashed border-[#B54B1F]/50 dark:border-[#E29A6F]/50 bg-[#F6F6F5] dark:bg-[#0B0B0B] text-xs font-medium inline-flex items-center gap-2 cursor-pointer hover:bg-[#EFEFED] dark:hover:bg-[#20201E]">
                               <Camera className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
                               <span>{photoPreview ? 'انتخاب تصویر دیگر' : 'انتخاب عکس از دوربین یا گالری'}</span>
                               <input
@@ -1110,7 +1110,7 @@ export function RecipeDetailModal({
                               <img
                                 src={photoPreview}
                                 alt="پیش‌نمایش عکس شما"
-                                className="w-24 h-18 object-cover rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27]"
+                                className="w-24 h-18 object-cover rounded-xl border border-[#E6E6E3] dark:border-[#282825]"
                               />
                             )}
                           </div>
@@ -1121,17 +1121,17 @@ export function RecipeDetailModal({
                             value={photoCaption}
                             onChange={(e) => setPhotoCaption(e.target.value)}
                             placeholder="تجربه پخت یا نکته کوتاه شما (اختیاری، مثلاً با روغن کرمانشاهی عالی شد)..."
-                            className="w-full min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3.5 text-xs"
+                            className="w-full min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3.5 text-xs"
                           />
 
                           <div className="flex items-center justify-between gap-3">
-                            <span className="text-[11px] text-[#615E55] dark:text-[#A9A497]">
+                            <span className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E]">
                               پس از تایید مدیریت منتشر می‌شود و با نام شما نمایش داده خواهد شد.
                             </span>
                             <button
                               type="submit"
                               disabled={uploadingPhoto || !photoPreview}
-                              className="min-h-[42px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-xs font-medium disabled:opacity-40"
+                              className="min-h-[42px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] text-xs font-medium disabled:opacity-40"
                             >
                               {uploadingPhoto ? 'در حال ارسال...' : 'ارسال برای انتشار'}
                             </button>
@@ -1144,7 +1144,7 @@ export function RecipeDetailModal({
                           {communityPhotos.map((ph) => (
                             <figure
                               key={ph.id}
-                              className="rounded-2xl overflow-hidden border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18]"
+                              className="rounded-2xl overflow-hidden border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514]"
                             >
                               <EditorialImage
                                 src={ph.imageUrl}
@@ -1160,7 +1160,7 @@ export function RecipeDetailModal({
                                   )}
                                 </div>
                                 {ph.caption && (
-                                  <p className="text-xs text-[#615E55] dark:text-[#A9A497] leading-relaxed">
+                                  <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
                                     {ph.caption}
                                   </p>
                                 )}
@@ -1169,7 +1169,7 @@ export function RecipeDetailModal({
                           ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                        <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                           هنوز عکسی از پخت کاربران برای این دستور ثبت نشده است. با ارسال اولین عکس، نام شما پای تصویر اصلی درج می‌شود.
                         </p>
                       )}
@@ -1204,17 +1204,17 @@ export function RecipeDetailModal({
                               key={v.id}
                               type="button"
                               onClick={() => loadDetail(v.id)}
-                              className="w-full text-right rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4 hover:border-[#B54B1F]/50 transition-colors"
+                              className="w-full text-right rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 hover:border-[#B54B1F]/50 transition-colors"
                             >
                               <div className="text-sm font-bold">{v.title}</div>
                               {v.variationNote && (
-                                <p className="text-xs text-[#615E55] dark:text-[#A9A497] mt-1">{v.variationNote}</p>
+                                <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] mt-1">{v.variationNote}</p>
                               )}
                             </button>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                        <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                           هنوز نسخه جایگزینی (مثلاً رژیمی یا بومی شهر دیگر) برای این دستور ثبت نشده است.
                         </p>
                       )}
@@ -1233,12 +1233,12 @@ export function RecipeDetailModal({
                           value={questionBody}
                           onChange={(e) => setQuestionBody(e.target.value)}
                           placeholder="سوالی درباره این دستور دارید؟ بپرسید..."
-                          className="flex-1 min-h-[48px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] px-4 text-sm"
+                          className="flex-1 min-h-[48px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] px-4 text-sm"
                         />
                         <button
                           type="submit"
                           disabled={questionBody.trim().length < 6}
-                          className="min-h-[48px] px-5 rounded-xl bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412] text-sm font-medium disabled:opacity-40"
+                          className="min-h-[48px] px-5 rounded-xl bg-[#B54B1F] text-[#FAFAFA] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-sm font-medium disabled:opacity-40"
                         >
                           ارسال
                         </button>
@@ -1248,9 +1248,9 @@ export function RecipeDetailModal({
                         {questions.map((q) => (
                           <div
                             key={q.id}
-                            className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4 space-y-3"
+                            className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 space-y-3"
                           >
-                            <div className="flex items-center justify-between text-xs text-[#615E55] dark:text-[#A9A497]">
+                            <div className="flex items-center justify-between text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                               <span>{q.authorName}</span>
                               {q.solved && (
                                 <span className="text-[#B54B1F] dark:text-[#E29A6F] font-medium">حل‌شده</span>
@@ -1259,11 +1259,11 @@ export function RecipeDetailModal({
                             <p className="text-sm font-medium">{q.body}</p>
 
                             {q.answers.length > 0 && (
-                              <div className="space-y-3 pt-2 border-t border-[#E5E1D6]/70 dark:border-[#2F2D27]">
+                              <div className="space-y-3 pt-2 border-t border-[#E6E6E3]/70 dark:border-[#282825]">
                                 {q.answers.map((a) => (
                                   <div key={a.id} className="space-y-1.5">
-                                    <div className="flex items-center justify-between text-xs text-[#615E55] dark:text-[#A9A497]">
-                                      <span className="inline-flex items-center gap-1 font-medium text-[#1C1B18] dark:text-[#F4F1EA]">
+                                    <div className="flex items-center justify-between text-xs text-[#5C5C58] dark:text-[#A3A39E]">
+                                      <span className="inline-flex items-center gap-1 font-medium text-[#0D0D0D] dark:text-[#FAFAFA]">
                                         {a.authorName}
                                         {a.authorVerified && (
                                           <BadgeCheck className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
@@ -1300,7 +1300,7 @@ export function RecipeDetailModal({
                                         </button>
                                       </div>
                                     </div>
-                                    <p className="text-sm text-[#615E55] dark:text-[#A9A497] leading-relaxed">
+                                    <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
                                       {a.body}
                                     </p>
                                   </div>
@@ -1315,12 +1315,12 @@ export function RecipeDetailModal({
                                   value={replyBody}
                                   onChange={(e) => setReplyBody(e.target.value)}
                                   placeholder="پاسخ خود را بنویسید..."
-                                  className="flex-1 min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                                  className="flex-1 min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
                                 />
                                 <button
                                   type="button"
                                   onClick={() => handleSubmitAnswer(q.id)}
-                                  className="min-h-[42px] px-4 rounded-xl bg-[#B54B1F] text-[#F9F8F4] text-xs font-medium"
+                                  className="min-h-[42px] px-4 rounded-xl bg-[#B54B1F] text-[#FAFAFA] text-xs font-medium"
                                 >
                                   ثبت پاسخ
                                 </button>
@@ -1329,7 +1329,7 @@ export function RecipeDetailModal({
                               <button
                                 type="button"
                                 onClick={() => setReplyTargetId(q.id)}
-                                className="text-xs text-[#615E55] hover:text-[#B54B1F] dark:text-[#A9A497] min-h-[36px]"
+                                className="text-xs text-[#5C5C58] hover:text-[#B54B1F] dark:text-[#A3A39E] min-h-[36px]"
                               >
                                 ثبت پاسخ به این سوال
                               </button>

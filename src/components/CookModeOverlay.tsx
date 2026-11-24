@@ -128,12 +128,12 @@ export function CookModeOverlay({recipe, servings, onClose, onNotify}: CookModeO
       role="dialog"
       aria-modal="true"
       aria-label={`حالت آشپزی ${recipe.title}`}
-      className="fixed inset-0 z-50 flex flex-col bg-[#F9F8F4] dark:bg-[#141412] text-[#1C1B18] dark:text-[#F4F1EA]"
+      className="fixed inset-0 z-50 flex flex-col bg-[#F6F6F5] dark:bg-[#0B0B0B] text-[#0D0D0D] dark:text-[#FAFAFA]"
     >
       {/* Top Bar */}
-      <div className="border-b border-[#E5E1D6] dark:border-[#2F2D27] px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
+      <div className="border-b border-[#E6E6E3] dark:border-[#282825] px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-xs text-[#615E55] dark:text-[#A9A497]">
+          <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
             حالت آشپزی · مرحله {toFaDigits(stepIdx + 1)} از {toFaDigits(recipe.steps.length)}
             {wakeLockActive ? ' · صفحه‌نمایش روشن می‌ماند' : ''}
           </p>
@@ -147,7 +147,7 @@ export function CookModeOverlay({recipe, servings, onClose, onNotify}: CookModeO
               if (res.message && onNotify) onNotify(res.message);
             }}
             aria-label="اشتراک‌گذاری دستور پخت"
-            className="min-h-[48px] px-3.5 rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F] inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap"
+            className="min-h-[48px] px-3.5 rounded-full border border-[#E6E6E3] dark:border-[#282825] hover:bg-[#EFEFED] dark:hover:bg-[#20201E] inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap"
           >
             <Share2 className="w-4 h-4" />
             <span className="hidden sm:inline">اشتراک‌گذاری</span>
@@ -156,7 +156,7 @@ export function CookModeOverlay({recipe, servings, onClose, onNotify}: CookModeO
             type="button"
             onClick={onClose}
             aria-label="خروج از حالت آشپزی"
-            className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+            className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-full border border-[#E6E6E3] dark:border-[#282825] hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
           >
             <X className="w-5 h-5" />
           </button>
@@ -164,7 +164,7 @@ export function CookModeOverlay({recipe, servings, onClose, onNotify}: CookModeO
       </div>
 
       {/* Progress Hairline */}
-      <div className="h-1 w-full bg-[#E5E1D6] dark:bg-[#2F2D27]">
+      <div className="h-1 w-full bg-[#E6E6E3] dark:bg-[#282825]">
         <div
           className="h-full bg-[#B54B1F] dark:bg-[#E29A6F] transition-all duration-300"
           style={{width: `${progress}%`}}
@@ -178,14 +178,14 @@ export function CookModeOverlay({recipe, servings, onClose, onNotify}: CookModeO
             گام {toFaDigits(currentStep?.order || stepIdx + 1)}
           </div>
 
-          <p className="text-2xl sm:text-3xl font-medium leading-[1.85] text-[#1C1B18] dark:text-[#F4F1EA]">
+          <p className="text-2xl sm:text-3xl font-medium leading-[1.85] text-[#0D0D0D] dark:text-[#FAFAFA]">
             {currentStep?.instruction}
           </p>
 
           {/* Inline Ingredients for this step */}
           {stepIngredients.length > 0 && (
-            <div className="border-t border-[#E5E1D6] dark:border-[#2F2D27] pt-5">
-              <p className="text-xs text-[#615E55] dark:text-[#A9A497] mb-3">
+            <div className="border-t border-[#E6E6E3] dark:border-[#282825] pt-5">
+              <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] mb-3">
                 مواد مورد نیاز این مرحله (برای {toFaDigits(servings)} نفر):
               </p>
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
@@ -205,7 +205,7 @@ export function CookModeOverlay({recipe, servings, onClose, onNotify}: CookModeO
               <button
                 type="button"
                 onClick={() => startStepTimer(currentStep.timerMinutes!, currentStep.order)}
-                className="inline-flex items-center gap-2.5 min-h-[48px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium transition-colors"
+                className="inline-flex items-center gap-2.5 min-h-[48px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] text-sm font-medium transition-colors"
               >
                 <Timer className="w-4 h-4" />
                 <span>شروع تایمر {toFaDigits(currentStep.timerMinutes)} دقیقه‌ای این مرحله</span>
@@ -216,16 +216,16 @@ export function CookModeOverlay({recipe, servings, onClose, onNotify}: CookModeO
 
         {/* Simultaneous Active Timers Bar */}
         {timers.length > 0 && (
-          <div aria-live="polite" className="border-t border-[#E5E1D6] dark:border-[#2F2D27] pt-5 space-y-3">
-            <p className="text-xs text-[#615E55] dark:text-[#A9A497]">تایمرهای فعال هم‌زمان</p>
+          <div aria-live="polite" className="border-t border-[#E6E6E3] dark:border-[#282825] pt-5 space-y-3">
+            <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">تایمرهای فعال هم‌زمان</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {timers.map((t) => (
                 <div
                   key={t.id}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] px-4 py-3"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] px-4 py-3"
                 >
                   <div>
-                    <div className="text-xs text-[#615E55] dark:text-[#A9A497] flex items-center gap-1.5">
+                    <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E] flex items-center gap-1.5">
                       <span>{t.label}</span>
                       {t.remainingSeconds === 0 && (
                         <span className="text-[#B54B1F] dark:text-[#E29A6F] font-semibold flex items-center gap-1">
@@ -246,7 +246,7 @@ export function CookModeOverlay({recipe, servings, onClose, onNotify}: CookModeO
                           prev.map((item) => (item.id === t.id ? {...item, running: !item.running} : item))
                         )
                       }
-                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
                     >
                       {t.running ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                     </button>
@@ -262,7 +262,7 @@ export function CookModeOverlay({recipe, servings, onClose, onNotify}: CookModeO
                           )
                         )
                       }
-                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
                     >
                       <RotateCcw className="w-4 h-4" />
                     </button>
@@ -275,13 +275,13 @@ export function CookModeOverlay({recipe, servings, onClose, onNotify}: CookModeO
       </div>
 
       {/* Bottom Large Touch Controls */}
-      <div className="border-t border-[#E5E1D6] dark:border-[#2F2D27] px-4 sm:px-8 py-4 bg-[#FFFFFF] dark:bg-[#1C1B18] pb-safe">
+      <div className="border-t border-[#E6E6E3] dark:border-[#282825] px-4 sm:px-8 py-4 bg-[#FFFFFF] dark:bg-[#151514] pb-safe">
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
           <button
             type="button"
             disabled={stepIdx === 0}
             onClick={() => setStepIdx((i) => Math.max(0, i - 1))}
-            className="min-h-[48px] px-5 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] flex items-center gap-2 text-sm font-medium disabled:opacity-40"
+            className="min-h-[48px] px-5 rounded-xl border border-[#E6E6E3] dark:border-[#282825] flex items-center gap-2 text-sm font-medium disabled:opacity-40"
           >
             <ChevronRight className="w-4 h-4" />
             <span>مرحله قبل</span>
@@ -291,7 +291,7 @@ export function CookModeOverlay({recipe, servings, onClose, onNotify}: CookModeO
             <button
               type="button"
               onClick={() => setStepIdx((i) => Math.min(recipe.steps.length - 1, i + 1))}
-              className="flex-1 sm:flex-none min-h-[48px] px-8 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] flex items-center justify-center gap-2 text-sm font-medium"
+              className="flex-1 sm:flex-none min-h-[48px] px-8 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] flex items-center justify-center gap-2 text-sm font-medium"
             >
               <span>مرحله بعد</span>
               <ChevronLeft className="w-4 h-4" />
@@ -304,7 +304,7 @@ export function CookModeOverlay({recipe, servings, onClose, onNotify}: CookModeO
                   const res = await shareRecipeWithWebShare(recipe, {servings, includeIngredients: true});
                   if (res.message && onNotify) onNotify(res.message);
                 }}
-                className="min-h-[48px] px-4 sm:px-5 rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F] inline-flex items-center gap-1.5 text-sm font-medium whitespace-nowrap"
+                className="min-h-[48px] px-4 sm:px-5 rounded-full border border-[#E6E6E3] dark:border-[#282825] hover:bg-[#EFEFED] dark:hover:bg-[#20201E] inline-flex items-center gap-1.5 text-sm font-medium whitespace-nowrap"
               >
                 <Share2 className="w-4 h-4" />
                 <span className="hidden sm:inline">اشتراک‌گذاری</span>
@@ -312,7 +312,7 @@ export function CookModeOverlay({recipe, servings, onClose, onNotify}: CookModeO
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 sm:flex-none min-h-[48px] px-7 rounded-full bg-[#111110] hover:bg-[#292825] dark:bg-[#F4F1EA] dark:text-[#111110] text-[#FFFFFF] text-sm font-semibold whitespace-nowrap"
+                className="flex-1 sm:flex-none min-h-[48px] px-7 rounded-full bg-[#111110] hover:bg-[#282825] dark:bg-[#FAFAFA] dark:text-[#111110] text-[#FFFFFF] text-sm font-semibold whitespace-nowrap"
               >
                 پایان آشپزی — نوش جان
               </button>

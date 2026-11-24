@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <rect width="512" height="512" rx="112" fill="#141412"/>
+  <rect width="512" height="512" rx="112" fill="#0B0B0B"/>
   <!-- Skillet Handle -->
-  <path d="M356 256H442" stroke="#F9F8F4" stroke-width="26" stroke-linecap="round"/>
-  <circle cx="430" cy="256" r="6" fill="#C85A28"/>
+  <path d="M356 256H442" stroke="#FAFAFA" stroke-width="26" stroke-linecap="round"/>
+  <circle cx="430" cy="256" r="6" fill="#B54B1F"/>
   <!-- Cast-Iron Skillet (Lagheli) -->
-  <circle cx="232" cy="256" r="134" fill="#1F1E1B" stroke="#F9F8F4" stroke-width="14"/>
+  <circle cx="232" cy="256" r="134" fill="#151514" stroke="#FAFAFA" stroke-width="14"/>
   <!-- Egg White -->
-  <path d="M168 232C162 198 194 176 232 182C268 188 302 204 298 242C294 278 276 318 232 320C188 322 174 268 168 232Z" fill="#F9F8F4"/>
+  <path d="M168 232C162 198 194 176 232 182C268 188 302 204 298 242C294 278 276 318 232 320C188 322 174 268 168 232Z" fill="#FAFAFA"/>
   <!-- Golden Saffron Egg Yolk -->
-  <circle cx="236" cy="250" r="34" fill="#D4942A"/>
-  <circle cx="224" cy="238" r="9" fill="#F9E2AE" fill-opacity="0.8"/>
+  <circle cx="236" cy="250" r="34" fill="#D8A85B"/>
+  <circle cx="224" cy="238" r="9" fill="#FAFAFA" fill-opacity="0.7"/>
 </svg>

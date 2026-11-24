@@ -275,7 +275,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
   return (
     <div className="space-y-6">
       {/* Sub-navigation bar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-[#E5E1D6] dark:border-[#2F2D27] pb-4">
+      <div className="flex flex-wrap items-center gap-2 border-b border-[#E6E6E3] dark:border-[#282825] pb-4">
         {tabs.map((t) => {
           const Icon = t.icon;
           const active = subTab === t.id;
@@ -286,8 +286,8 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
               onClick={() => setSubTab(t.id)}
               className={`min-h-[42px] px-4 rounded-xl text-xs font-medium inline-flex items-center gap-2 transition-colors ${
                 active
-                  ? 'bg-[#111110] text-white dark:bg-[#F4F1EA] dark:text-[#111110]'
-                  : 'border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] text-[#615E55] dark:text-[#A9A497] hover:text-[#111110] dark:hover:text-[#F4F1EA]'
+                  ? 'bg-[#111110] text-white dark:bg-[#FAFAFA] dark:text-[#111110]'
+                  : 'border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#111110] dark:hover:text-[#FAFAFA]'
               }`}
             >
               <Icon className="w-3.5 h-3.5" />
@@ -308,38 +308,38 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
           {/* Delivery Pricing Card */}
           <form
             onSubmit={handleSavePricing}
-            className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-4"
+            className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4"
           >
             <h3 className="text-sm font-bold">تعرفه‌های ارسال و بسته‌بندی سفارش روزانه</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <label className="space-y-1 text-xs">
-                <span className="text-[#615E55] dark:text-[#A9A497]">سقف ارسال رایگان (تومان)</span>
+                <span className="text-[#5C5C58] dark:text-[#A3A39E]">سقف ارسال رایگان (تومان)</span>
                 <input
                   type="number"
                   min={0}
                   value={pricing.freeDeliveryThreshold}
                   onChange={(e) => setPricing({...pricing, freeDeliveryThreshold: Number(e.target.value)})}
-                  className="w-full min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 tabular-nums"
+                  className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 tabular-nums"
                 />
               </label>
               <label className="space-y-1 text-xs">
-                <span className="text-[#615E55] dark:text-[#A9A497]">هزینه پیک استاندارد (تومان)</span>
+                <span className="text-[#5C5C58] dark:text-[#A3A39E]">هزینه پیک استاندارد (تومان)</span>
                 <input
                   type="number"
                   min={0}
                   value={pricing.standardDeliveryFee}
                   onChange={(e) => setPricing({...pricing, standardDeliveryFee: Number(e.target.value)})}
-                  className="w-full min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 tabular-nums"
+                  className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 tabular-nums"
                 />
               </label>
               <label className="space-y-1 text-xs">
-                <span className="text-[#615E55] dark:text-[#A9A497]">هزینه بسته‌بندی (تومان)</span>
+                <span className="text-[#5C5C58] dark:text-[#A3A39E]">هزینه بسته‌بندی (تومان)</span>
                 <input
                   type="number"
                   min={0}
                   value={pricing.packagingFee}
                   onChange={(e) => setPricing({...pricing, packagingFee: Number(e.target.value)})}
-                  className="w-full min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 tabular-nums"
+                  className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 tabular-nums"
                 />
               </label>
             </div>
@@ -355,7 +355,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
           {/* Add Dish to Daily Menu */}
           <form
             onSubmit={handleAddMenuDish}
-            className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-4"
+            className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4"
           >
             <h3 className="text-sm font-bold">افزودن غذای جدید به منوی روزانه</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -365,7 +365,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 placeholder="نام غذا (مثلاً قرمه‌سبزی جاافتاده)"
                 value={newDish.title}
                 onChange={(e) => setNewDish({...newDish, title: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
               <input
                 type="text"
@@ -373,12 +373,12 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 placeholder="زیرعنوان کوتاه"
                 value={newDish.subtitle}
                 onChange={(e) => setNewDish({...newDish, subtitle: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
               <select
                 value={newDish.category}
                 onChange={(e) => setNewDish({...newDish, category: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               >
                 <option value="منتخب سرآشپز">منتخب سرآشپز</option>
                 <option value="اصیل ایرانی">اصیل ایرانی</option>
@@ -391,7 +391,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 placeholder="قیمت تک‌نفره (تومان)"
                 value={newDish.singlePrice}
                 onChange={(e) => setNewDish({...newDish, singlePrice: Number(e.target.value)})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs tabular-nums"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
               />
               <input
                 type="number"
@@ -399,14 +399,14 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 placeholder="قیمت دونفره (تومان)"
                 value={newDish.doublePrice}
                 onChange={(e) => setNewDish({...newDish, doublePrice: Number(e.target.value)})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs tabular-nums"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
               />
               <input
                 type="text"
                 placeholder="نام آشپزخانه یا سرآشپز"
                 value={newDish.chefName}
                 onChange={(e) => setNewDish({...newDish, chefName: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -421,7 +421,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
               </label>
               <button
                 type="submit"
-                className="min-h-[42px] px-5 rounded-xl bg-[#111110] dark:bg-[#F4F1EA] text-white dark:text-[#111110] text-xs font-semibold inline-flex items-center gap-1.5"
+                className="min-h-[42px] px-5 rounded-xl bg-[#111110] dark:bg-[#FAFAFA] text-white dark:text-[#111110] text-xs font-semibold inline-flex items-center gap-1.5"
               >
                 <Plus className="w-4 h-4" />
                 <span>افزودن به منوی روز</span>
@@ -430,7 +430,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
           </form>
 
           {/* Existing Daily Menu List */}
-          <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] divide-y divide-[#E5E1D6]/70 dark:divide-[#2F2D27]">
+          <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] divide-y divide-[#E6E6E3]/70 dark:divide-[#282825]">
             {menuItems.map((dish) => (
               <div key={dish.id} className="p-4 flex flex-wrap items-center justify-between gap-4">
                 <div className="space-y-1 min-w-0">
@@ -440,7 +440,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                       <span className="text-[11px] font-medium text-[#B54B1F] dark:text-[#E29A6F]">· منتخب روز</span>
                     )}
                   </div>
-                  <p className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                  <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                     {dish.category} · {dish.chefName} · تک‌نفره {formatToman(dish.singlePrice)} / دونفره{' '}
                     {formatToman(dish.doublePrice)}
                   </p>
@@ -449,7 +449,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                   <button
                     type="button"
                     onClick={() => handleToggleDishFeatured(dish)}
-                    className="min-h-[38px] px-3 rounded-lg border border-[#E5E1D6] dark:border-[#2F2D27] text-xs inline-flex items-center gap-1"
+                    className="min-h-[38px] px-3 rounded-lg border border-[#E6E6E3] dark:border-[#282825] text-xs inline-flex items-center gap-1"
                   >
                     <Star className="w-3.5 h-3.5" fill={dish.featured ? 'currentColor' : 'none'} />
                     <span>{dish.featured ? 'منتخب' : 'تنظیم منتخب'}</span>
@@ -474,10 +474,10 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Quick Fridge Ingredients */}
-            <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-4">
+            <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
               <div className="space-y-1">
                 <h3 className="text-sm font-bold">مواد پیشنهادی سریع بخش یخچال‌گردی</h3>
-                <p className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                   این اقلام در صفحه «آشپزخانه هوشمند» برای انتخاب سریع کاربران نمایش داده می‌شوند (قابل تنظیم بر اساس فصل).
                 </p>
               </div>
@@ -487,7 +487,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                   value={newFridgeItem}
                   onChange={(e) => setNewFridgeItem(e.target.value)}
                   placeholder="افزودن ماده جدید (مثلاً کدو حلوایی)"
-                  className="flex-1 min-h-[40px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                  className="flex-1 min-h-[40px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
                 />
                 <button
                   type="button"
@@ -501,7 +501,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 {kitchenConfig.quickFridgeItems.map((item) => (
                   <span
                     key={item}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 py-1.5 text-xs"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 py-1.5 text-xs"
                   >
                     <span>{item}</span>
                     <button
@@ -513,7 +513,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                           quickFridgeItems: kitchenConfig.quickFridgeItems.filter((x) => x !== item),
                         })
                       }
-                      className="text-[#615E55] hover:text-red-600"
+                      className="text-[#5C5C58] hover:text-red-600"
                     >
                       ×
                     </button>
@@ -523,10 +523,10 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
             </div>
 
             {/* Quick Substitution Queries */}
-            <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-4">
+            <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
               <div className="space-y-1">
                 <h3 className="text-sm font-bold">پیشنهادهای سریع موتور جایگزین مواد</h3>
-                <p className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                   مواد پرتقاضایی که کاربران با یک کلیک جایگزین آن‌ها را جست‌وجو می‌کنند.
                 </p>
               </div>
@@ -536,7 +536,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                   value={newSubQuery}
                   onChange={(e) => setNewSubQuery(e.target.value)}
                   placeholder="مثلاً خامه صبحانه"
-                  className="flex-1 min-h-[40px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                  className="flex-1 min-h-[40px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
                 />
                 <button
                   type="button"
@@ -550,7 +550,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 {kitchenConfig.quickSubQueries.map((item) => (
                   <span
                     key={item}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 py-1.5 text-xs"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 py-1.5 text-xs"
                   >
                     <span>{item}</span>
                     <button
@@ -562,7 +562,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                           quickSubQueries: kitchenConfig.quickSubQueries.filter((x) => x !== item),
                         })
                       }
-                      className="text-[#615E55] hover:text-red-600"
+                      className="text-[#5C5C58] hover:text-red-600"
                     >
                       ×
                     </button>
@@ -575,7 +575,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
           {/* Custom Substitutions Rules */}
           <form
             onSubmit={handleAddCustomSub}
-            className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-4"
+            className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4"
           >
             <h3 className="text-sm font-bold">افزودن قانون جایگزین سفارشی سرآشپز</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -585,7 +585,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 placeholder="ماده اصلی (مثلاً خامه)"
                 value={newSubRule.ingredient}
                 onChange={(e) => setNewSubRule({...newSubRule, ingredient: e.target.value})}
-                className="min-h-[40px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[40px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
               <input
                 type="text"
@@ -593,14 +593,14 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 placeholder="جایگزین (مثلاً شیر + کره)"
                 value={newSubRule.substitute}
                 onChange={(e) => setNewSubRule({...newSubRule, substitute: e.target.value})}
-                className="min-h-[40px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[40px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
               <input
                 type="text"
                 placeholder="نسبت جایگزینی"
                 value={newSubRule.ratio}
                 onChange={(e) => setNewSubRule({...newSubRule, ratio: e.target.value})}
-                className="min-h-[40px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[40px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
               <input
                 type="number"
@@ -609,7 +609,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 placeholder="درصد سازگاری"
                 value={newSubRule.compatibility}
                 onChange={(e) => setNewSubRule({...newSubRule, compatibility: Number(e.target.value)})}
-                className="min-h-[40px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs tabular-nums"
+                className="min-h-[40px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -619,7 +619,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 placeholder="توضیح طعم و بافت جایگزین برای کاربر..."
                 value={newSubRule.flavorNote}
                 onChange={(e) => setNewSubRule({...newSubRule, flavorNote: e.target.value})}
-                className="flex-1 min-w-[200px] min-h-[40px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="flex-1 min-w-[200px] min-h-[40px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
               <label className="inline-flex items-center gap-1.5 text-xs">
                 <input
@@ -632,18 +632,18 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
               </label>
               <button
                 type="submit"
-                className="min-h-[40px] px-4 rounded-xl bg-[#111110] dark:bg-[#F4F1EA] text-white dark:text-[#111110] text-xs font-semibold"
+                className="min-h-[40px] px-4 rounded-xl bg-[#111110] dark:bg-[#FAFAFA] text-white dark:text-[#111110] text-xs font-semibold"
               >
                 ثبت جایگزین
               </button>
             </div>
 
             {kitchenConfig.customSubstitutions.length > 0 && (
-              <div className="pt-3 border-t border-[#E5E1D6] dark:border-[#2F2D27] space-y-2">
+              <div className="pt-3 border-t border-[#E6E6E3] dark:border-[#282825] space-y-2">
                 {kitchenConfig.customSubstitutions.map((rule) => (
                   <div
                     key={rule.id}
-                    className="flex items-center justify-between gap-3 rounded-xl bg-[#F9F8F4] dark:bg-[#141412] px-3.5 py-2.5 text-xs"
+                    className="flex items-center justify-between gap-3 rounded-xl bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3.5 py-2.5 text-xs"
                   >
                     <div>
                       <span className="font-bold">{rule.ingredient}</span> ←{' '}
@@ -675,7 +675,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
         <div className="space-y-6">
           <form
             onSubmit={handleAddGemOffer}
-            className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-4"
+            className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4"
           >
             <h3 className="text-sm font-bold">افزودن کوپن جدید به فروشگاه جِم</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -685,7 +685,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 placeholder="عنوان کوپن"
                 value={newOffer.title}
                 onChange={(e) => setNewOffer({...newOffer, title: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
               <input
                 type="text"
@@ -693,7 +693,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 placeholder="نام همکار / برند"
                 value={newOffer.partnerName}
                 onChange={(e) => setNewOffer({...newOffer, partnerName: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
               <input
                 type="text"
@@ -701,7 +701,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 placeholder="برچسب تخفیف (مثلاً ۵۰ هزار تومان)"
                 value={newOffer.discountLabel}
                 onChange={(e) => setNewOffer({...newOffer, discountLabel: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
               <input
                 type="number"
@@ -709,7 +709,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 placeholder="هزینه (جِم)"
                 value={newOffer.gemCost}
                 onChange={(e) => setNewOffer({...newOffer, gemCost: Number(e.target.value)})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs tabular-nums"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
               />
               <input
                 type="text"
@@ -717,7 +717,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 placeholder="پیشوند کد (LG)"
                 value={newOffer.codePrefix}
                 onChange={(e) => setNewOffer({...newOffer, codePrefix: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-xs"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               />
             </div>
             <button
@@ -733,11 +733,11 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
             {gemOffers.map((offer) => (
               <div
                 key={offer.id}
-                className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4 flex items-center justify-between gap-4"
+                className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 flex items-center justify-between gap-4"
               >
                 <div className="space-y-1">
                   <div className="text-sm font-bold">{offer.title}</div>
-                  <div className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                  <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                     {offer.partnerName} · {offer.discountLabel} · پیشوند <span dir="ltr">{offer.codePrefix}</span>
                   </div>
                   <div className="text-xs font-bold text-[#B54B1F] dark:text-[#E29A6F] tabular-nums">
@@ -762,19 +762,19 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
       {subTab === 'qa' && (
         <div className="space-y-4">
           {questions.length === 0 ? (
-            <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-8 text-center text-xs text-[#615E55]">
+            <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-8 text-center text-xs text-[#5C5C58]">
               هنوز پرسشی از سوی کاربران ثبت نشده است.
             </div>
           ) : (
             questions.map((q) => (
               <div
                 key={q.id}
-                className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-3"
+                className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
-                    <div className="text-xs text-[#615E55] dark:text-[#A9A497]">
-                      دستور: <strong className="text-[#1C1B18] dark:text-[#F4F1EA]">{q.recipeTitle}</strong> · پرسشگر:{' '}
+                    <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
+                      دستور: <strong className="text-[#0D0D0D] dark:text-[#FAFAFA]">{q.recipeTitle}</strong> · پرسشگر:{' '}
                       {q.authorName}
                     </div>
                     <p className="text-sm font-semibold">{q.body}</p>
@@ -790,18 +790,18 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
                 </div>
 
                 {q.answers.length > 0 && (
-                  <div className="pt-3 border-t border-[#E5E1D6]/70 dark:border-[#2F2D27] space-y-2">
+                  <div className="pt-3 border-t border-[#E6E6E3]/70 dark:border-[#282825] space-y-2">
                     {q.answers.map((a) => (
                       <div
                         key={a.id}
-                        className="flex items-center justify-between gap-3 rounded-xl bg-[#F9F8F4] dark:bg-[#141412] px-3.5 py-2.5 text-xs"
+                        className="flex items-center justify-between gap-3 rounded-xl bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3.5 py-2.5 text-xs"
                       >
                         <div className="space-y-0.5">
                           <span className="font-semibold">{a.authorName}</span>
                           {a.isBest && (
                             <span className="text-[#B54B1F] dark:text-[#E29A6F] mr-1.5">· بهترین پاسخ</span>
                           )}
-                          <p className="text-[#615E55] dark:text-[#A9A497]">{a.body}</p>
+                          <p className="text-[#5C5C58] dark:text-[#A3A39E]">{a.body}</p>
                         </div>
                         <button
                           type="button"

@@ -86,7 +86,7 @@ export function ShoppingListView({
   const renderRow = (item: ShoppingItem) => (
     <div
       key={item.id}
-      className="flex items-center justify-between gap-3 px-4 py-3 border-b last:border-b-0 border-[#E5E1D6]/70 dark:border-[#2F2D27]"
+      className="flex items-center justify-between gap-3 px-4 py-3 border-b last:border-b-0 border-[#E6E6E3]/70 dark:border-[#282825]"
     >
       <button
         type="button"
@@ -96,8 +96,8 @@ export function ShoppingListView({
         <span
           className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
             item.checked
-              ? 'bg-[#B54B1F] border-[#B54B1F] text-white dark:bg-[#E29A6F] dark:border-[#E29A6F] dark:text-[#141412]'
-              : 'border-[#615E55]/40'
+              ? 'bg-[#B54B1F] border-[#B54B1F] text-white dark:bg-[#E29A6F] dark:border-[#E29A6F] dark:text-[#0B0B0B]'
+              : 'border-[#5C5C58]/40'
           }`}
         >
           {item.checked && <Check className="w-3.5 h-3.5" />}
@@ -106,7 +106,7 @@ export function ShoppingListView({
           <div className={`text-sm font-medium ${item.checked ? 'line-through opacity-50' : ''}`}>
             {item.name}
           </div>
-          <div className="text-xs text-[#615E55] dark:text-[#A9A497] truncate">
+          <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E] truncate">
             {item.category}
             {item.recipeTitle ? ` · از ${item.recipeTitle}` : ''}
           </div>
@@ -114,14 +114,14 @@ export function ShoppingListView({
       </button>
 
       <div className="flex items-center gap-2 shrink-0">
-        <span className="text-xs text-[#615E55] dark:text-[#A9A497] tabular-nums">
+        <span className="text-xs text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
           {formatQuantity(item.amount)} {item.unit}
         </span>
         <button
           type="button"
           aria-label={`حذف ${item.name}`}
           onClick={() => onDeleteItem(item.id)}
-          className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-[#615E55] hover:text-red-600 hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+          className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-[#5C5C58] hover:text-red-600 hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -145,10 +145,10 @@ export function ShoppingListView({
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#E5E1D6] dark:border-[#2F2D27] pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#E6E6E3] dark:border-[#282825] pb-6">
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-bold">لیست خرید هوشمند</h1>
-          <p className="text-sm text-[#615E55] dark:text-[#A9A497] tabular-nums">
+          <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
             {toFaDigits(remaining.length)} قلم باقی‌مانده · دسته‌بندی خودکار ۱۱گانه و ادغام اقلام تکراری
           </p>
         </div>
@@ -157,7 +157,7 @@ export function ShoppingListView({
           <button
             type="button"
             onClick={handleShareList}
-            className="min-h-[44px] px-4 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-medium inline-flex items-center gap-1.5 hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+            className="min-h-[44px] px-4 rounded-xl border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium inline-flex items-center gap-1.5 hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
           >
             <Share2 className="w-3.5 h-3.5" />
             <span>اشتراک‌گذاری</span>
@@ -166,7 +166,7 @@ export function ShoppingListView({
             <button
               type="button"
               onClick={onClearChecked}
-              className="min-h-[44px] px-4 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-medium hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+              className="min-h-[44px] px-4 rounded-xl border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
             >
               پاک‌کردن تیک‌خورده‌ها ({toFaDigits(checkedCount)})
             </button>
@@ -208,7 +208,7 @@ export function ShoppingListView({
       {/* Add Manual Item Form */}
       <form
         onSubmit={handleAdd}
-        className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-12 gap-3"
+        className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-12 gap-3"
       >
         <input
           type="text"
@@ -216,7 +216,7 @@ export function ShoppingListView({
           onChange={(e) => setName(e.target.value)}
           placeholder="افزودن قلم جدید (مثلاً ریحان تازه، کره، زعفران)..."
           aria-label="نام قلم جدید"
-          className="sm:col-span-5 min-h-[46px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3.5 text-sm"
+          className="sm:col-span-5 min-h-[46px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3.5 text-sm"
         />
         <input
           type="number"
@@ -225,7 +225,7 @@ export function ShoppingListView({
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           aria-label="مقدار"
-          className="sm:col-span-2 min-h-[46px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-sm tabular-nums"
+          className="sm:col-span-2 min-h-[46px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-sm tabular-nums"
         />
         <input
           type="text"
@@ -233,13 +233,13 @@ export function ShoppingListView({
           onChange={(e) => setUnit(e.target.value)}
           placeholder="واحد"
           aria-label="واحد اندازه‌گیری"
-          className="sm:col-span-2 min-h-[46px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3 text-sm"
+          className="sm:col-span-2 min-h-[46px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-sm"
         />
         <select
           aria-label="دسته‌بندی قلم"
           value={manualCategory}
           onChange={(e) => setManualCategory(e.target.value)}
-          className="sm:col-span-2 min-h-[46px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-2.5 text-xs"
+          className="sm:col-span-2 min-h-[46px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-2.5 text-xs"
         >
           <option value="auto">تشخیص خودکار</option>
           {SHOPPING_CATEGORIES.map((c) => (
@@ -251,7 +251,7 @@ export function ShoppingListView({
         <button
           type="submit"
           aria-label="افزودن به لیست"
-          className="sm:col-span-1 min-h-[46px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] flex items-center justify-center"
+          className="sm:col-span-1 min-h-[46px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] flex items-center justify-center"
         >
           <Plus className="w-5 h-5" />
         </button>
@@ -261,7 +261,7 @@ export function ShoppingListView({
       {items.length > 0 && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex p-1 rounded-xl bg-[#F1EFE8] dark:bg-[#24231F]">
+            <div className="inline-flex p-1 rounded-xl bg-[#EFEFED] dark:bg-[#20201E]">
               {[
                 {id: 'category', label: 'بر اساس دسته‌بندی'},
                 {id: 'recipe', label: 'بر اساس دستور پخت'},
@@ -273,8 +273,8 @@ export function ShoppingListView({
                   onClick={() => setViewMode(m.id as 'category' | 'recipe' | 'all')}
                   className={`min-h-[40px] px-3.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                     viewMode === m.id
-                      ? 'bg-[#FFFFFF] dark:bg-[#1C1B18] text-[#1C1B18] dark:text-[#F4F1EA]'
-                      : 'text-[#615E55] dark:text-[#A9A497]'
+                      ? 'bg-[#FFFFFF] dark:bg-[#151514] text-[#0D0D0D] dark:text-[#FAFAFA]'
+                      : 'text-[#5C5C58] dark:text-[#A3A39E]'
                   }`}
                 >
                   {m.label}
@@ -290,8 +290,8 @@ export function ShoppingListView({
                 onClick={() => setSelectedCategory('همه')}
                 className={`min-h-[38px] px-3.5 rounded-lg text-xs whitespace-nowrap shrink-0 ${
                   selectedCategory === 'همه'
-                    ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
-                    : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
+                    ? 'bg-[#B54B1F] text-[#FAFAFA] dark:bg-[#E29A6F] dark:text-[#0B0B0B]'
+                    : 'bg-[#EFEFED] dark:bg-[#20201E] text-[#5C5C58] dark:text-[#A3A39E]'
                 }`}
               >
                 همه ({toFaDigits(items.length)})
@@ -303,8 +303,8 @@ export function ShoppingListView({
                   onClick={() => setSelectedCategory(cat)}
                   className={`min-h-[38px] px-3.5 rounded-lg text-xs whitespace-nowrap shrink-0 ${
                     selectedCategory === cat
-                      ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
-                      : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
+                      ? 'bg-[#B54B1F] text-[#FAFAFA] dark:bg-[#E29A6F] dark:text-[#0B0B0B]'
+                      : 'bg-[#EFEFED] dark:bg-[#20201E] text-[#5C5C58] dark:text-[#A3A39E]'
                   }`}
                 >
                   {cat}
@@ -317,25 +317,25 @@ export function ShoppingListView({
 
       {/* Items List */}
       {items.length === 0 ? (
-        <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-12 text-center space-y-2">
+        <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-12 text-center space-y-2">
           <p className="text-base font-semibold">لیست خرید شما خالی است</p>
-          <p className="text-sm text-[#615E55] dark:text-[#A9A497]">
+          <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E]">
             از داخل هر دستور پخت با یک کلیک کمبودها را اضافه کنید یا بالا به صورت دستی بنویسید.
           </p>
         </div>
       ) : viewMode === 'all' ? (
-        <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18]">
+        <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514]">
           {filteredItems.map(renderRow)}
         </div>
       ) : (
         <div className="space-y-6">
           {(viewMode === 'category' ? groupedByCategory : groupedByRecipe).map((group) => (
             <section key={group.title} className="space-y-2.5">
-              <div className="flex items-center justify-between text-xs text-[#615E55] dark:text-[#A9A497] px-1">
-                <h2 className="font-semibold text-[#1C1B18] dark:text-[#F4F1EA]">{group.title}</h2>
+              <div className="flex items-center justify-between text-xs text-[#5C5C58] dark:text-[#A3A39E] px-1">
+                <h2 className="font-semibold text-[#0D0D0D] dark:text-[#FAFAFA]">{group.title}</h2>
                 <span className="tabular-nums">{toFaDigits(group.list.length)} قلم</span>
               </div>
-              <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18]">
+              <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514]">
                 {group.list.map(renderRow)}
               </div>
             </section>
@@ -345,11 +345,11 @@ export function ShoppingListView({
 
       {/* Admin-Controlled Delivery Partner Suggestion */}
       {ecosystemConfig.shoppingDeliveryCardEnabled && deliveryPartner && (
-        <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             <Truck className="w-5 h-5 text-[#B54B1F] dark:text-[#E29A6F] shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <div className="text-xs text-[#615E55] dark:text-[#A9A497]">تامین و ارسال فوری لیست خرید</div>
+              <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">تامین و ارسال فوری لیست خرید</div>
               <div className="text-sm font-bold">{deliveryPartner.name}</div>
               {deliveryPartner.promoLabel && (
                 <div className="text-xs text-[#B54B1F] dark:text-[#E29A6F]">{deliveryPartner.promoLabel}</div>
@@ -359,7 +359,7 @@ export function ShoppingListView({
           <button
             type="button"
             onClick={() => onOpenPartner(deliveryPartner)}
-            className="min-h-[44px] px-4 rounded-xl bg-[#F1EFE8] dark:bg-[#24231F] text-xs font-medium shrink-0"
+            className="min-h-[44px] px-4 rounded-xl bg-[#EFEFED] dark:bg-[#20201E] text-xs font-medium shrink-0"
           >
             مشاهده سرویس ارسال
           </button>

@@ -42,12 +42,12 @@ export function EditorialImage({
       <div
         role="img"
         aria-label={`${alt} — در انتظار اولین عکس واقعی کاربران`}
-        className={`${aspectClass} ${className} relative w-full overflow-hidden bg-gradient-to-br from-[#F5F1E7] via-[#EFEAE0] to-[#E5DEC9] dark:from-[#23211C] dark:via-[#1D1B17] dark:to-[#171612] flex flex-col items-center justify-center p-5 text-center select-none`}
+        className={`${aspectClass} ${className} relative w-full overflow-hidden bg-gradient-to-br from-[#F6F6F5] via-[#EFEFED] to-[#E6E6E3] dark:from-[#20201E] dark:via-[#1A1A18] dark:to-[#0B0B0B] flex flex-col items-center justify-center p-5 text-center select-none`}
       >
         {/* Fine Editorial Architectural Inner Frame */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-3 rounded-xl border border-[#1C1B18]/10 dark:border-[#F4F1EA]/10"
+          className="pointer-events-none absolute inset-3 rounded-xl border border-[#0D0D0D]/10 dark:border-[#FAFAFA]/10"
         />
 
         {/* Subtle Minimalist Skillet Monogram */}
@@ -63,7 +63,7 @@ export function EditorialImage({
         </svg>
 
         {category && !compactEmpty && (
-          <span className="text-[11px] tracking-wide text-[#615E55] dark:text-[#A9A497] mb-1">
+          <span className="text-[11px] tracking-wide text-[#5C5C58] dark:text-[#A3A39E] mb-1">
             {category}
           </span>
         )}
@@ -71,7 +71,7 @@ export function EditorialImage({
         <span
           className={`${
             compactEmpty ? 'text-xs' : 'text-sm sm:text-base'
-          } font-bold text-[#1C1B18] dark:text-[#F4F1EA] line-clamp-2 max-w-[22ch] leading-snug`}
+          } font-bold text-[#0D0D0D] dark:text-[#FAFAFA] line-clamp-2 max-w-[22ch] leading-snug`}
         >
           {alt}
         </span>
@@ -89,12 +89,12 @@ export function EditorialImage({
   return (
     <div
       ref={containerRef}
-      className={`${aspectClass} relative w-full overflow-hidden bg-[#EFECE4] dark:bg-[#22211D] ${className}`}
+      className={`${aspectClass} relative w-full overflow-hidden bg-[#EFEFED] dark:bg-[#20201E] ${className}`}
     >
       {/* Data-Saver Mode Tap-to-Load Placeholder */}
       {deferredByDataSaver ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 p-4 text-center bg-gradient-to-br from-[#F5F2EA] to-[#EAE5D9] dark:from-[#23211C] dark:to-[#191815]">
-          <span className="text-xs font-medium text-[#59564E] dark:text-[#BDB8AC] line-clamp-1 max-w-[24ch]">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 p-4 text-center bg-gradient-to-br from-[#F6F6F5] to-[#E6E6E3] dark:from-[#20201E] dark:to-[#151514]">
+          <span className="text-xs font-medium text-[#5C5C58] dark:text-[#A3A39E] line-clamp-1 max-w-[24ch]">
             {alt}
           </span>
           <button
@@ -103,7 +103,7 @@ export function EditorialImage({
               e.stopPropagation();
               allowManualLoad();
             }}
-            className="min-h-[38px] px-4 rounded-full bg-[#111110]/85 dark:bg-[#F4F1EA]/90 text-[#FFFFFF] dark:text-[#111110] text-xs font-medium inline-flex items-center gap-1.5 hover:opacity-90 transition-opacity"
+            className="min-h-[38px] px-4 rounded-full bg-[#111110]/85 dark:bg-[#FAFAFA]/90 text-[#FFFFFF] dark:text-[#111110] text-xs font-medium inline-flex items-center gap-1.5 hover:opacity-90 transition-opacity"
           >
             <ImageDown className="w-3.5 h-3.5" />
             <span>نمایش تصویر (صرفه‌جویی دیتا)</span>
@@ -115,7 +115,7 @@ export function EditorialImage({
           {!loaded && (
             <div
               aria-hidden="true"
-              className="absolute inset-0 bg-gradient-to-br from-[#F2EFE7] via-[#EAE5D8] to-[#F2EFE7] dark:from-[#24231F] dark:via-[#2C2A24] dark:to-[#24231F] animate-pulse motion-reduce:animate-none"
+              className="absolute inset-0 bg-gradient-to-br from-[#EFEFED] via-[#E6E6E3] to-[#EFEFED] dark:from-[#20201E] dark:via-[#282825] dark:to-[#20201E] animate-pulse motion-reduce:animate-none"
             />
           )}
 
@@ -139,7 +139,7 @@ export function EditorialImage({
       )}
 
       {photoCreditName && (
-        <div className="absolute bottom-2.5 right-2.5 rounded-full bg-[#141412]/72 backdrop-blur-md border border-white/10 px-3 py-1 text-[11px] text-[#F9F8F4] flex items-center gap-1.5">
+        <div className="absolute bottom-2.5 right-2.5 rounded-full bg-[#0B0B0B]/72 backdrop-blur-md border border-white/10 px-3 py-1 text-[11px] text-[#FAFAFA] flex items-center gap-1.5">
           <Camera className="w-3 h-3 text-[#D8A85B]" />
           <span>عکس واقعی از {photoCreditName}</span>
         </div>
