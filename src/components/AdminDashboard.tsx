@@ -53,6 +53,7 @@ import type {
 } from '../shared/types.ts';
 import {AdminFrontendOpsPanel} from './AdminFrontendOpsPanel.tsx';
 import {EditorialImage} from './EditorialImage.tsx';
+import {AdminWorkspaceSkeleton} from './EditorialSkeletons.tsx';
 
 type AdminNavId =
   | 'overview'
@@ -143,6 +144,8 @@ export function AdminDashboard({
   onNotify,
 }: AdminDashboardProps) {
   const [adminConfigured, setAdminConfigured] = useState(true);
+  const [quickTestEnabled, setQuickTestEnabled] = useState(false);
+  const [explicitLogout, setExplicitLogout] = useState(false);
   const [adminAuthed, setAdminAuthed] = useState(Boolean(getAdminToken()));
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
@@ -216,12 +219,32 @@ export function AdminDashboard({
   const loadAllAdminData = useCallback(async () => {
     setLoading(true);
     try {
-      const statusRes = await apiRequest<{configured: boolean; authenticated: boolean}>('/api/admin/status', {
+      const statusRes = await apiRequest<{
+        configured: boolean;
+        authenticated: boolean;
+        quickTestLoginEnabled?: boolean;
+      }>('/api/admin/status', {
         useAdmin: true,
       });
       setAdminConfigured(statusRes.configured);
-      setAdminAuthed(statusRes.authenticated);
-      if (!statusRes.authenticated) {
+      setQuickTestEnabled(Boolean(statusRes.quickTestLoginEnabled));
+
+      let isAuthed = statusRes.authenticated;
+      // Seamless Test-Mode Auto-Login (automatically disabled in production when ADMIN_PASSCODE/DISABLE_QUICK_TEST_AUTH is set)
+      if (!isAuthed && statusRes.quickTestLoginEnabled && !explicitLogout) {
+        try {
+          const quickRes = await apiRequest<{adminToken: string}>('/api/admin/quick-test-login', {
+            method: 'POST',
+          });
+          setAdminToken(quickRes.adminToken);
+          isAuthed = true;
+        } catch {
+          // Fall back cleanly to standard login screen
+        }
+      }
+
+      setAdminAuthed(isAuthed);
+      if (!isAuthed) {
         setLoading(false);
         return;
       }
@@ -261,15 +284,32 @@ export function AdminDashboard({
     } finally {
       setLoading(false);
     }
-  }, [onNotify]);
+  }, [onNotify, explicitLogout]);
 
   useEffect(() => {
     loadAllAdminData();
   }, [loadAllAdminData]);
 
+  const handleQuickAdminTestLogin = async () => {
+    setAuthError(null);
+    setExplicitLogout(false);
+    try {
+      const res = await apiRequest<{adminToken: string; message?: string}>('/api/admin/quick-test-login', {
+        method: 'POST',
+      });
+      setAdminToken(res.adminToken);
+      setAdminAuthed(true);
+      onNotify(res.message || 'ورود سریع آزمایشی به پنل مدیریت انجام شد.');
+      loadAllAdminData();
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'ورود سریع ناموفق بود.');
+    }
+  };
+
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
+    setExplicitLogout(false);
     try {
       const endpoint = adminConfigured ? '/api/admin/login' : '/api/admin/setup';
       const res = await apiRequest<{adminToken: string; message?: string}>(endpoint, {
@@ -461,6 +501,16 @@ export function AdminDashboard({
 
           {authError && <p className="text-xs text-red-600 font-medium">{authError}</p>}
 
+          {quickTestEnabled && (
+            <button
+              type="button"
+              onClick={handleQuickAdminTestLogin}
+              className="w-full min-h-[48px] rounded-full bg-[#0D0D0D] hover:bg-[#242422] dark:bg-[#FAFAFA] dark:text-[#0B0B0B] text-[#FFFFFF] text-sm font-semibold transition-all active:scale-[0.98]"
+            >
+              ورود سریع آزمایشی به پنل مدیریت (بدون رمز)
+            </button>
+          )}
+
           <input
             type="password"
             required
@@ -474,14 +524,14 @@ export function AdminDashboard({
           <div className="flex items-center gap-2.5">
             <button
               type="submit"
-              className="flex-1 min-h-[48px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-semibold"
+              className="flex-1 min-h-[48px] rounded-full bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-semibold"
             >
-              {adminConfigured ? 'ورود به پنل مدیریت' : 'ثبت رمز و فعال‌سازی پنل'}
+              {adminConfigured ? 'ورود با رمز مدیریت' : 'ثبت رمز و فعال‌سازی پنل'}
             </button>
             <button
               type="button"
               onClick={onBackToApp}
-              className="min-h-[48px] px-4 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-medium"
+              className="min-h-[48px] px-4 rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] text-xs font-medium"
             >
               بازگشت
             </button>
@@ -585,6 +635,7 @@ export function AdminDashboard({
           <button
             type="button"
             onClick={() => {
+              setExplicitLogout(true);
               setAdminToken(null);
               setAdminAuthed(false);
               onNotify('از پنل مدیریت خارج شدید.');
@@ -644,6 +695,8 @@ export function AdminDashboard({
 
         {/* Main Workspace Canvas */}
         <div className="lg:col-span-9 xl:col-span-10 space-y-6 min-w-0">
+          {loading && !stats && <AdminWorkspaceSkeleton />}
+
           {/* =========================================================
               1. OVERVIEW & ANALYTICS
           ========================================================= */}

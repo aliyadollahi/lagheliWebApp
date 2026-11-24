@@ -70,6 +70,8 @@ export default function App() {
 
   // Core data state
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [quickTestLoginEnabled, setQuickTestLoginEnabled] = useState(false);
+  const [userLoggedOutExplicitly, setUserLoggedOutExplicitly] = useState(false);
   const [ecosystemConfig, setEcosystemConfig] = useState<EcosystemConfig>(INITIAL_CONFIG);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loadingRecipes, setLoadingRecipes] = useState(true);
@@ -138,8 +140,9 @@ export default function App() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const data = await apiRequest<{ecosystem: EcosystemConfig}>('/api/config');
+      const data = await apiRequest<{ecosystem: EcosystemConfig; quickTestLoginEnabled?: boolean}>('/api/config');
       setEcosystemConfig(data.ecosystem);
+      setQuickTestLoginEnabled(Boolean(data.quickTestLoginEnabled));
     } catch {
       // Offline fallback to current config
     }
@@ -218,6 +221,30 @@ export default function App() {
   useEffect(() => {
     loadRecipes();
   }, [loadRecipes]);
+
+  // Seamless Test-Mode Auto-Login for User Panel (only when server quickTestLoginEnabled is active and user hasn't explicitly logged out)
+  useEffect(() => {
+    if (!quickTestLoginEnabled || user || userLoggedOutExplicitly) return;
+    let cancelled = false;
+    apiRequest<{token: string; user: UserProfile}>('/api/auth/quick-test-login', {
+      method: 'POST',
+      body: JSON.stringify({
+        guestBookmarks: loadGuestBookmarks(),
+      }),
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setUserToken(res.token);
+        setUser(res.user);
+        loadServerShopping();
+      })
+      .catch(() => {
+        // Ignore if disabled or offline
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [quickTestLoginEnabled, user, userLoggedOutExplicitly, loadServerShopping]);
 
   // Merge/Consolidate Guest shopping items locally when not signed in
   const addShoppingItems = async (
@@ -344,6 +371,7 @@ export default function App() {
   const deliveryPartner = showcasePartners.find((p) => p.roleType === 'instant_delivery');
 
   const handleAuthSuccess = (loggedInUser: UserProfile) => {
+    setUserLoggedOutExplicitly(false);
     setUser(loggedInUser);
     saveGuestBookmarks([]);
     setGuestBookmarks([]);
@@ -354,6 +382,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    setUserLoggedOutExplicitly(true);
     await apiRequest('/api/auth/logout', {method: 'POST'}).catch(() => {});
     setUserToken(null);
     setUser(null);
@@ -362,7 +391,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F9F8F4] dark:bg-[#141412] text-[#1C1B18] dark:text-[#F4F1EA]">
+    <div className="min-h-screen flex flex-col bg-[#F6F6F5] dark:bg-[#0B0B0B] text-[#0D0D0D] dark:text-[#FAFAFA]">
       {/* Brand Skillet + Egg Splash Screen */}
       <SplashScreen visible={showSplash} onComplete={() => setShowSplash(false)} />
 
@@ -383,13 +412,14 @@ export default function App() {
 
       {/* Main Content Canvas */}
       <main
-        className={`flex-1 w-full mx-auto px-4 sm:px-6 pt-8 pb-24 md:pb-16 ${
+        className={`flex-1 w-full mx-auto px-4 sm:px-6 pt-8 pb-28 md:pb-16 ${
           activeTab === 'admin' ? 'max-w-[1440px]' : 'max-w-6xl'
         }`}
       >
         {activeTab === 'explore' && (
           <RecipeFeed
             recipes={recipes}
+            city={user?.city || 'تهران'}
             loading={loadingRecipes}
             filters={filters}
             onChangeFilters={setFilters}
@@ -423,6 +453,7 @@ export default function App() {
 
         {activeTab === 'kitchen' && (
           <KitchenHub
+            city={user?.city || 'تهران'}
             onOpenRecipe={(rec) => setOpenRecipeId(rec.id)}
             onAddShoppingItems={addShoppingItems}
           />
@@ -506,20 +537,30 @@ export default function App() {
       </main>
 
       {/* Quiet Editorial Footer (Desktop) */}
-      <footer className="hidden md:block border-t border-[#E5E1D6] dark:border-[#2F2D27] py-6 px-6 text-xs text-[#615E55] dark:text-[#A9A497]">
+      <footer className="hidden md:block border-t border-[#E6E6E3] dark:border-[#242422] py-6 px-6 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
           <span>لاقلی — سادگیِ اصیل، در هر وعده</span>
           <span>طراحی بومی فارسی · آماده کار در حالت آفلاین (PWA)</span>
         </div>
       </footer>
 
-      {/* Ergonomic Mobile Bottom Navigation */}
+      {/* Interactive High-Contrast Floating Mobile Dock */}
       <MobileBottomNav
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         shoppingRemainingCount={shoppingRemainingCount}
         cartCount={cartCount}
         ecosystemConfig={ecosystemConfig}
+        onOpenSubmitRecipe={() => {
+          if (!user) {
+            setAuthOpen(true);
+            return;
+          }
+          setVariationParent(null);
+          setSubmitOpen(true);
+        }}
+        theme={theme}
+        onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
       />
 
       {/* Offline Connectivity Banner */}
@@ -527,7 +568,7 @@ export default function App() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-20 md:bottom-6 right-4 z-40 flex items-center gap-2 rounded-xl bg-[#1C1B18] text-[#F9F8F4] px-4 py-2.5 text-xs shadow-lg"
+          className="fixed bottom-[88px] md:bottom-6 right-4 z-40 flex items-center gap-2 rounded-full bg-[#0D0D0D] text-[#FAFAFA] px-4 py-2.5 text-xs shadow-lg"
         >
           <WifiOff className="w-4 h-4 text-[#D8A85B]" />
           <span>حالت آفلاین — دسترسی به نشانک‌ها، لیست خرید و جایگزین‌ها فعال است.</span>
@@ -539,7 +580,7 @@ export default function App() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed top-18 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-[#1C1B18] dark:bg-[#F4F1EA] text-[#F9F8F4] dark:text-[#141412] px-5 py-3 text-xs sm:text-sm font-medium shadow-lg max-w-[90vw] text-center"
+          className="fixed top-18 left-1/2 -translate-x-1/2 z-50 rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] px-5 py-3 text-xs sm:text-sm font-medium shadow-lg max-w-[90vw] text-center"
         >
           {toast}
         </div>
@@ -548,6 +589,7 @@ export default function App() {
       {/* Modals */}
       <AuthModal
         open={authOpen}
+        quickTestLoginEnabled={quickTestLoginEnabled}
         onClose={() => setAuthOpen(false)}
         guestBookmarks={guestBookmarks}
         guestShoppingItems={shoppingItems}
@@ -557,6 +599,11 @@ export default function App() {
       {openRecipeId && (
         <RecipeDetailModal
           recipeId={openRecipeId}
+          adjacentRecipeIds={(() => {
+            const idx = recipes.findIndex((r) => r.id === openRecipeId || r.slug === openRecipeId);
+            if (idx < 0) return recipes.slice(0, 2).map((r) => r.id);
+            return recipes.slice(idx + 1, idx + 3).map((r) => r.id);
+          })()}
           user={user}
           city={user?.city || 'تهران'}
           isBookmarked={bookmarkedIdSet.has(openRecipeId)}

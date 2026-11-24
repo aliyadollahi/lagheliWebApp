@@ -1,4 +1,18 @@
-import {BookOpen, ChefHat, Shield, ShoppingBag, Store, User, Utensils} from 'lucide-react';
+import {useState} from 'react';
+import {AnimatePresence, motion} from 'motion/react';
+import {
+  BookOpen,
+  ChefHat,
+  Moon,
+  Plus,
+  Shield,
+  ShoppingBag,
+  Sparkles,
+  Store,
+  Sun,
+  User,
+  Utensils,
+} from 'lucide-react';
 import type {EcosystemConfig, UserProfile} from '../shared/types.ts';
 import {toFaDigits} from '../shared/persianEngine.ts';
 
@@ -13,6 +27,15 @@ interface NavigationProps {
   ecosystemConfig: EcosystemConfig;
   onOpenAuth: () => void;
   onOpenSubmitRecipe: () => void;
+}
+
+interface MobileBottomNavProps
+  extends Pick<
+    NavigationProps,
+    'activeTab' | 'onSelectTab' | 'shoppingRemainingCount' | 'cartCount' | 'ecosystemConfig' | 'onOpenSubmitRecipe'
+  > {
+  theme: 'light' | 'dark';
+  onToggleTheme: () => void;
 }
 
 export function TopHeader({
@@ -37,7 +60,7 @@ export function TopHeader({
   ];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[#EAE7DF] dark:border-[#2A2925] bg-[#FAF9F6]/92 dark:bg-[#141412]/92 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-[#E6E6E3] dark:border-[#242422] bg-[#FFFFFF]/90 dark:bg-[#0B0B0B]/90 backdrop-blur-xl">
       <div
         className={`${
           activeTab === 'admin' ? 'max-w-[1440px]' : 'max-w-6xl'
@@ -47,7 +70,7 @@ export function TopHeader({
         <button
           type="button"
           onClick={() => onSelectTab('explore')}
-          className="text-xl sm:text-2xl font-extrabold tracking-tight text-[#111110] dark:text-[#F4F1EA] whitespace-nowrap shrink-0 min-h-[44px] flex items-center gap-2"
+          className="text-xl sm:text-2xl font-extrabold tracking-tight text-[#0D0D0D] dark:text-[#FAFAFA] whitespace-nowrap shrink-0 min-h-[44px] flex items-center gap-2"
         >
           <span>لاقلی</span>
         </button>
@@ -63,8 +86,8 @@ export function TopHeader({
                 onClick={() => onSelectTab(item.id)}
                 className={`relative py-2 text-sm whitespace-nowrap shrink-0 transition-colors min-h-[44px] flex items-center gap-1.5 ${
                   active
-                    ? 'font-bold text-[#111110] dark:text-[#F4F1EA]'
-                    : 'text-[#615E55] dark:text-[#A9A497] hover:text-[#111110] dark:hover:text-[#F4F1EA]'
+                    ? 'font-bold text-[#0D0D0D] dark:text-[#FAFAFA]'
+                    : 'text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
                 }`}
               >
                 <span>{item.label}</span>
@@ -72,9 +95,11 @@ export function TopHeader({
                   <span className="text-xs tabular-nums opacity-75">({toFaDigits(item.count)})</span>
                 )}
                 {active && (
-                  <span
+                  <motion.span
+                    layoutId="desktop-nav-underline"
+                    transition={{type: 'spring', stiffness: 460, damping: 34}}
                     aria-hidden="true"
-                    className="absolute bottom-0 inset-x-0 h-[2px] rounded-full bg-[#111110] dark:bg-[#F4F1EA]"
+                    className="absolute bottom-0 inset-x-0 h-[2px] rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA]"
                   />
                 )}
               </button>
@@ -85,30 +110,32 @@ export function TopHeader({
             onClick={() => onSelectTab('profile')}
             className={`relative py-2 text-sm whitespace-nowrap shrink-0 transition-colors min-h-[44px] flex items-center ${
               activeTab === 'profile'
-                ? 'font-bold text-[#111110] dark:text-[#F4F1EA]'
-                : 'text-[#615E55] dark:text-[#A9A497] hover:text-[#111110] dark:hover:text-[#F4F1EA]'
+                ? 'font-bold text-[#0D0D0D] dark:text-[#FAFAFA]'
+                : 'text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
             }`}
           >
             {user ? user.name.split(' ')[0] : 'پروفایل'}
             {activeTab === 'profile' && (
-              <span
+              <motion.span
+                layoutId="desktop-nav-underline"
+                transition={{type: 'spring', stiffness: 460, damping: 34}}
                 aria-hidden="true"
-                className="absolute bottom-0 inset-x-0 h-[2px] rounded-full bg-[#111110] dark:bg-[#F4F1EA]"
+                className="absolute bottom-0 inset-x-0 h-[2px] rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA]"
               />
             )}
           </button>
         </nav>
 
-        {/* Zone 3: Desktop Admin Shortcut + Sculptural Primary Action */}
+        {/* Zone 3: Desktop Admin Shortcut + Sculptural Black & White Primary Action */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             type="button"
             onClick={() => onSelectTab(activeTab === 'admin' ? 'explore' : 'admin')}
             aria-label="پنل مدیریت"
-            className={`min-h-[40px] sm:min-h-[42px] px-2.5 sm:px-3.5 rounded-full border text-xs font-medium inline-flex items-center gap-1.5 transition-colors whitespace-nowrap ${
+            className={`min-h-[40px] sm:min-h-[42px] px-2.5 sm:px-3.5 rounded-full border text-xs font-medium inline-flex items-center gap-1.5 transition-all active:scale-[0.97] whitespace-nowrap ${
               activeTab === 'admin'
-                ? 'border-[#111110] bg-[#111110] text-white dark:border-[#F4F1EA] dark:bg-[#F4F1EA] dark:text-[#111110]'
-                : 'border-[#E5E1D6] dark:border-[#2F2D27] text-[#615E55] dark:text-[#A9A497] hover:text-[#111110] dark:hover:text-[#F4F1EA] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]'
+                ? 'border-[#0D0D0D] bg-[#0D0D0D] text-white dark:border-[#FAFAFA] dark:bg-[#FAFAFA] dark:text-[#0B0B0B]'
+                : 'border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA] hover:bg-[#EFEFED] dark:hover:bg-[#20201E]'
             }`}
           >
             <Shield className="w-3.5 h-3.5 shrink-0" />
@@ -120,7 +147,7 @@ export function TopHeader({
             <button
               type="button"
               onClick={onOpenSubmitRecipe}
-              className="min-h-[40px] sm:min-h-[42px] px-3.5 sm:px-5 rounded-full bg-[#111110] hover:bg-[#2A2925] dark:bg-[#F4F1EA] dark:hover:bg-[#E5E1D6] text-[#FAF9F6] dark:text-[#111110] text-xs sm:text-sm font-medium transition-colors whitespace-nowrap shrink-0"
+              className="min-h-[40px] sm:min-h-[42px] px-4 sm:px-5 rounded-full bg-[#0D0D0D] hover:bg-[#242422] active:scale-[0.97] dark:bg-[#FAFAFA] dark:hover:bg-[#E6E6E3] text-[#FFFFFF] dark:text-[#0B0B0B] text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0"
             >
               ثبت دستور
             </button>
@@ -128,7 +155,7 @@ export function TopHeader({
             <button
               type="button"
               onClick={onOpenAuth}
-              className="min-h-[40px] sm:min-h-[42px] px-4 sm:px-5 rounded-full bg-[#111110] hover:bg-[#2A2925] dark:bg-[#F4F1EA] dark:hover:bg-[#E5E1D6] text-[#FAF9F6] dark:text-[#111110] text-xs sm:text-sm font-medium transition-colors whitespace-nowrap shrink-0"
+              className="min-h-[40px] sm:min-h-[42px] px-4 sm:px-5 rounded-full bg-[#0D0D0D] hover:bg-[#242422] active:scale-[0.97] dark:bg-[#FAFAFA] dark:hover:bg-[#E6E6E3] text-[#FFFFFF] dark:text-[#0B0B0B] text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0"
             >
               ورود
             </button>
@@ -145,63 +172,223 @@ export function MobileBottomNav({
   shoppingRemainingCount,
   cartCount,
   ecosystemConfig,
-}: Pick<NavigationProps, 'activeTab' | 'onSelectTab' | 'shoppingRemainingCount' | 'cartCount' | 'ecosystemConfig'>) {
+  onOpenSubmitRecipe,
+  theme,
+  onToggleTheme,
+}: MobileBottomNavProps) {
+  const [quickOpen, setQuickOpen] = useState(false);
+
   const items: {id: AppTab; label: string; icon: typeof BookOpen; count?: number}[] = [
     {id: 'explore', label: 'کاوش', icon: BookOpen},
-    {id: 'kitchen', label: 'آشپزخانه', icon: ChefHat},
+    {id: 'kitchen', label: 'یخچال', icon: ChefHat},
     {id: 'order', label: 'سفارش', icon: Utensils, count: cartCount > 0 ? cartCount : undefined},
     {id: 'shopping', label: 'خرید', icon: ShoppingBag, count: shoppingRemainingCount > 0 ? shoppingRemainingCount : undefined},
-    ...(ecosystemConfig.marketplaceTabEnabled
-      ? [{id: 'marketplace' as AppTab, label: 'اصناف', icon: Store}]
-      : []),
     {id: 'profile', label: 'پروفایل', icon: User},
   ];
 
-  // Calm Navigation: strictly max 5 tabs in mobile bottom bar (Profile always reachable)
-  const displayItems =
-    items.length > 5
-      ? [items[0], items[1], items[2], items[3], items[items.length - 1]]
-      : items;
+  const triggerHaptic = () => {
+    try {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(8);
+      }
+    } catch {
+      // Ignore unsupported browsers
+    }
+  };
+
+  const handleSelect = (tab: AppTab) => {
+    triggerHaptic();
+    setQuickOpen(false);
+    onSelectTab(tab);
+  };
+
+  const toggleQuickMenu = () => {
+    triggerHaptic();
+    setQuickOpen((v) => !v);
+  };
 
   return (
-    <nav
-      aria-label="ناوبری موبایل"
-      className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-[#EAE7DF] dark:border-[#2A2925] bg-[#FAF9F6]/95 dark:bg-[#141412]/95 backdrop-blur-xl pb-safe"
-    >
-      <div className="grid grid-cols-5 h-16">
-        {displayItems.map((item) => {
-          const Icon = item.icon;
-          const active = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onSelectTab(item.id)}
-              className={`relative flex flex-col items-center justify-center gap-1 min-h-[48px] transition-colors ${
-                active
-                  ? 'text-[#111110] dark:text-[#F4F1EA] font-bold'
-                  : 'text-[#615E55] dark:text-[#A9A497]'
-              }`}
+    <>
+      {/* Interactive Quick-Action Backdrop & Monochrome Sheet */}
+      <AnimatePresence>
+        {quickOpen && (
+          <>
+            <motion.div
+              key="dock-backdrop"
+              initial={{opacity: 0}}
+              animate={{opacity: 1}}
+              exit={{opacity: 0}}
+              transition={{duration: 0.18}}
+              onClick={() => setQuickOpen(false)}
+              className="md:hidden fixed inset-0 z-30 bg-black/35 dark:bg-black/60 backdrop-blur-[3px]"
+            />
+
+            <motion.div
+              key="dock-quick-sheet"
+              initial={{opacity: 0, y: 18, scale: 0.94}}
+              animate={{opacity: 1, y: 0, scale: 1}}
+              exit={{opacity: 0, y: 14, scale: 0.94}}
+              transition={{type: 'spring', stiffness: 460, damping: 30}}
+              className="md:hidden fixed bottom-[84px] left-3 z-40 w-[232px] rounded-3xl bg-[#FFFFFF]/95 dark:bg-[#151514]/95 backdrop-blur-xl border border-[#E6E6E3] dark:border-[#2C2C29] shadow-[0_20px_50px_-14px_rgba(0,0,0,0.35)] p-2 space-y-1 pb-safe"
             >
-              <div className="relative">
-                <Icon className="w-5 h-5" strokeWidth={active ? 2.2 : 1.7} />
-                {item.count !== undefined && (
-                  <span className="absolute -top-1.5 -left-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#B54B1F] dark:bg-[#E29A6F] text-[#FAF9F6] dark:text-[#111110] text-[10px] font-bold flex items-center justify-center tabular-nums">
-                    {toFaDigits(item.count)}
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic();
+                  setQuickOpen(false);
+                  onOpenSubmitRecipe();
+                }}
+                className="w-full min-h-[46px] px-3.5 rounded-2xl flex items-center gap-3 text-sm font-semibold text-[#0D0D0D] dark:text-[#FAFAFA] hover:bg-[#F2F2F0] dark:hover:bg-[#232320] active:scale-[0.98] transition-all"
+              >
+                <span className="w-8 h-8 rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA] text-white dark:text-[#0B0B0B] flex items-center justify-center shrink-0">
+                  <Plus className="w-4 h-4" />
+                </span>
+                <span>ثبت دستور پخت</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelect('kitchen')}
+                className="w-full min-h-[46px] px-3.5 rounded-2xl flex items-center gap-3 text-sm font-medium text-[#0D0D0D] dark:text-[#FAFAFA] hover:bg-[#F2F2F0] dark:hover:bg-[#232320] active:scale-[0.98] transition-all"
+              >
+                <span className="w-8 h-8 rounded-full bg-[#EFEFED] dark:bg-[#232320] text-[#0D0D0D] dark:text-[#FAFAFA] flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
+                </span>
+                <span>با یخچال چی بپزم؟</span>
+              </button>
+
+              {ecosystemConfig.marketplaceTabEnabled && (
+                <button
+                  type="button"
+                  onClick={() => handleSelect('marketplace')}
+                  className="w-full min-h-[46px] px-3.5 rounded-2xl flex items-center gap-3 text-sm font-medium text-[#0D0D0D] dark:text-[#FAFAFA] hover:bg-[#F2F2F0] dark:hover:bg-[#232320] active:scale-[0.98] transition-all"
+                >
+                  <span className="w-8 h-8 rounded-full bg-[#EFEFED] dark:bg-[#232320] text-[#0D0D0D] dark:text-[#FAFAFA] flex items-center justify-center shrink-0">
+                    <Store className="w-4 h-4" />
                   </span>
-                )}
-              </div>
-              <span className="text-[11px] leading-none whitespace-nowrap">{item.label}</span>
-              {active && (
-                <span
-                  aria-hidden="true"
-                  className="absolute top-0 w-6 h-[2.5px] rounded-b-full bg-[#B54B1F] dark:bg-[#E29A6F]"
-                />
+                  <span>{ecosystemConfig.marketplaceTitle || 'بازارچه و اصناف'}</span>
+                </button>
               )}
-            </button>
-          );
-        })}
-      </div>
-    </nav>
+
+              <div className="h-px bg-[#E6E6E3] dark:bg-[#282825] mx-2 my-1" />
+
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic();
+                  onToggleTheme();
+                  setQuickOpen(false);
+                }}
+                className="w-full min-h-[44px] px-3.5 rounded-2xl flex items-center gap-3 text-xs font-medium text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA] hover:bg-[#F2F2F0] dark:hover:bg-[#232320] active:scale-[0.98] transition-all"
+              >
+                <span className="w-8 h-8 rounded-full bg-[#EFEFED] dark:bg-[#232320] flex items-center justify-center shrink-0">
+                  {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                </span>
+                <span>{theme === 'dark' ? 'حالت روشن (سفید)' : 'حالت تاریک (مشکی)'}</span>
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Sculptural High-Contrast Floating Black & White Interactive Dock */}
+      <nav
+        aria-label="ناوبری موبایل"
+        className="md:hidden fixed bottom-3 inset-x-3 z-40 pb-safe pointer-events-none"
+      >
+        <div className="max-w-md mx-auto flex items-center gap-2 pointer-events-auto">
+          {/* Primary Floating Pill Bar */}
+          <div className="flex-1 h-[60px] rounded-full bg-[#0D0D0D]/95 dark:bg-[#F5F5F4]/95 backdrop-blur-xl border border-white/10 dark:border-black/10 shadow-[0_14px_34px_-10px_rgba(0,0,0,0.45)] px-1.5 flex items-center justify-between gap-0.5">
+            {items.map((item) => {
+              const Icon = item.icon;
+              const active = activeTab === item.id;
+              return (
+                <motion.button
+                  key={item.id}
+                  type="button"
+                  whileTap={{scale: 0.9}}
+                  onClick={() => handleSelect(item.id)}
+                  aria-label={item.label}
+                  aria-current={active ? 'page' : undefined}
+                  className={`relative h-[48px] rounded-full flex items-center justify-center gap-1.5 transition-colors ${
+                    active
+                      ? 'px-3.5 text-[#0D0D0D] dark:text-[#FAFAFA] font-bold flex-none'
+                      : 'flex-1 min-w-[44px] text-[#A3A39E] dark:text-[#5C5C58] hover:text-white dark:hover:text-[#0D0D0D]'
+                  }`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="lagheli-mobile-dock-pill"
+                      transition={{type: 'spring', stiffness: 430, damping: 32}}
+                      aria-hidden="true"
+                      className="absolute inset-0 rounded-full bg-[#FFFFFF] dark:bg-[#0D0D0D] shadow-sm"
+                    />
+                  )}
+
+                  <motion.span
+                    animate={active ? {scale: 1.06} : {scale: 1}}
+                    transition={{type: 'spring', stiffness: 500, damping: 28}}
+                    className="relative z-10 flex items-center justify-center"
+                  >
+                    <Icon className="w-[19px] h-[19px]" strokeWidth={active ? 2.25 : 1.8} />
+                    {item.count !== undefined && (
+                      <motion.span
+                        key={item.count}
+                        initial={{scale: 0.7}}
+                        animate={{scale: 1}}
+                        className={`absolute -top-2 -left-2.5 min-w-[17px] h-[17px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center tabular-nums ${
+                          active
+                            ? 'bg-[#0D0D0D] text-white dark:bg-[#FAFAFA] dark:text-[#0D0D0D]'
+                            : 'bg-[#B54B1F] text-white dark:bg-[#B54B1F] dark:text-white'
+                        }`}
+                      >
+                        {toFaDigits(item.count)}
+                      </motion.span>
+                    )}
+                  </motion.span>
+
+                  <AnimatePresence initial={false} mode="popLayout">
+                    {active && (
+                      <motion.span
+                        key={`${item.id}-label`}
+                        initial={{opacity: 0, width: 0}}
+                        animate={{opacity: 1, width: 'auto'}}
+                        exit={{opacity: 0, width: 0}}
+                        transition={{duration: 0.18, ease: [0.16, 1, 0.3, 1]}}
+                        className="relative z-10 text-xs leading-none whitespace-nowrap overflow-hidden"
+                      >
+                        {item.label}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </motion.button>
+              );
+            })}
+          </div>
+
+          {/* Detached Tactile Monochrome Quick-Action Button */}
+          <motion.button
+            type="button"
+            whileTap={{scale: 0.9}}
+            onClick={toggleQuickMenu}
+            aria-label={quickOpen ? 'بستن منوی دسترسی سریع' : 'باز کردن منوی دسترسی سریع'}
+            aria-expanded={quickOpen}
+            className={`w-[56px] h-[56px] rounded-full shrink-0 flex items-center justify-center border shadow-[0_14px_30px_-10px_rgba(0,0,0,0.4)] transition-colors ${
+              quickOpen
+                ? 'bg-[#FFFFFF] text-[#0D0D0D] border-[#0D0D0D]/15 dark:bg-[#0D0D0D] dark:text-[#FAFAFA] dark:border-white/20'
+                : 'bg-[#0D0D0D] text-[#FFFFFF] border-white/10 dark:bg-[#FAFAFA] dark:text-[#0B0B0B] dark:border-black/10'
+            }`}
+          >
+            <motion.span
+              animate={{rotate: quickOpen ? 45 : 0}}
+              transition={{type: 'spring', stiffness: 450, damping: 26}}
+              className="flex items-center justify-center"
+            >
+              <Plus className="w-5 h-5" strokeWidth={2.4} />
+            </motion.span>
+          </motion.button>
+        </div>
+      </nav>
+    </>
   );
 }

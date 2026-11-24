@@ -12,9 +12,11 @@ import {
   X,
 } from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
+import {prefetchRecipeDetail} from '../lib/recipePrefetch.ts';
 import {formatToman, normalizePersian, toFaDigits, validateIranMobile} from '../shared/persianEngine.ts';
 import type {EditorialMenuItem, OrderRecord, UserProfile} from '../shared/types.ts';
 import {EditorialImage} from './EditorialImage.tsx';
+import {OrderMenuSkeleton} from './EditorialSkeletons.tsx';
 
 export interface CartEntry {
   dish: EditorialMenuItem;
@@ -44,6 +46,7 @@ export function EditorialOrderView({
   onNotify,
 }: EditorialOrderViewProps) {
   const [menu, setMenu] = useState<EditorialMenuItem[]>([]);
+  const [loadingMenu, setLoadingMenu] = useState(true);
   const [freeThreshold, setFreeThreshold] = useState(600000);
   const [packagingFee, setPackagingFee] = useState(18000);
   const [standardDeliveryFee, setStandardDeliveryFee] = useState(45000);
@@ -70,6 +73,7 @@ export function EditorialOrderView({
   const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
+    setLoadingMenu(true);
     apiRequest<{
       items: EditorialMenuItem[];
       freeDeliveryThreshold: number;
@@ -82,7 +86,8 @@ export function EditorialOrderView({
         setPackagingFee(res.packagingFee);
         setStandardDeliveryFee(res.standardDeliveryFee);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoadingMenu(false));
   }, []);
 
   useEffect(() => {
@@ -260,16 +265,16 @@ export function EditorialOrderView({
         <>
           {/* Minimalist Search & Filter */}
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
               {MENU_CATEGORIES.map((cat) => (
                 <button
                   key={cat}
                   type="button"
                   onClick={() => setCategory(cat)}
-                  className={`min-h-[44px] px-4 rounded-xl text-sm whitespace-nowrap shrink-0 transition-colors ${
+                  className={`min-h-[42px] px-4 rounded-full text-sm whitespace-nowrap shrink-0 transition-all active:scale-[0.97] ${
                     category === cat
-                      ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412] font-medium'
-                      : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
+                      ? 'bg-[#0D0D0D] text-[#FFFFFF] dark:bg-[#FAFAFA] dark:text-[#0B0B0B] font-semibold'
+                      : 'bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58] dark:text-[#A3A39E]'
                   }`}
                 >
                   {cat}
@@ -288,6 +293,10 @@ export function EditorialOrderView({
             </div>
           </div>
 
+          {loadingMenu ? (
+            <OrderMenuSkeleton />
+          ) : (
+            <>
           {/* Featured Chef's Dish of the Day */}
           {featuredDish && category === 'همه' && !query && (
             <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-stretch border-b border-[#E5E1D6] dark:border-[#2F2D27] pb-10">
@@ -320,15 +329,21 @@ export function EditorialOrderView({
                         setSelectedDish(featuredDish);
                         setPortion('single');
                       }}
-                      className="min-h-[48px] px-6 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium"
+                      className="min-h-[48px] px-6 rounded-full bg-[#0D0D0D] hover:bg-[#242422] active:scale-[0.98] dark:bg-[#FAFAFA] dark:text-[#0B0B0B] text-[#FFFFFF] text-sm font-semibold transition-all"
                     >
                       انتخاب پرس و افزودن به سبد
                     </button>
                     {featuredDish.linkedRecipeId && (
                       <button
                         type="button"
+                        onMouseEnter={() =>
+                          prefetchRecipeDetail(featuredDish.linkedRecipeId!, city, {priority: 'high'})
+                        }
+                        onTouchStart={() =>
+                          prefetchRecipeDetail(featuredDish.linkedRecipeId!, city, {priority: 'high'})
+                        }
                         onClick={() => onOpenLinkedRecipe(featuredDish.linkedRecipeId!)}
-                        className="min-h-[48px] px-4 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] text-sm"
+                        className="min-h-[48px] px-5 rounded-full border border-[#D8D8D4] dark:border-[#2E2E2B] bg-white dark:bg-[#151514] text-sm font-medium"
                       >
                         دستور پخت خانگی
                       </button>
@@ -376,6 +391,8 @@ export function EditorialOrderView({
                       {dish.linkedRecipeId && (
                         <button
                           type="button"
+                          onMouseEnter={() => prefetchRecipeDetail(dish.linkedRecipeId!, city, {priority: 'high'})}
+                          onTouchStart={() => prefetchRecipeDetail(dish.linkedRecipeId!, city, {priority: 'high'})}
                           onClick={() => onOpenLinkedRecipe(dish.linkedRecipeId!)}
                           className="min-h-[44px] px-3.5 rounded-xl text-xs text-[#615E55] dark:text-[#A9A497] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA]"
                         >
@@ -388,7 +405,7 @@ export function EditorialOrderView({
                           setSelectedDish(dish);
                           setPortion('single');
                         }}
-                        className="min-h-[44px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium"
+                        className="min-h-[44px] px-5 rounded-full bg-[#0D0D0D] hover:bg-[#242422] active:scale-[0.97] dark:bg-[#FAFAFA] dark:text-[#0B0B0B] text-[#FFFFFF] text-sm font-semibold transition-all"
                       >
                         افزودن
                       </button>
@@ -398,19 +415,21 @@ export function EditorialOrderView({
               </article>
             ))}
           </section>
+            </>
+          )}
         </>
       )}
 
       {/* Quiet Floating Cart Summary Bar */}
       {totalCount > 0 && !checkoutOpen && (
-        <div className="fixed bottom-18 md:bottom-6 inset-x-4 z-30 flex justify-center pointer-events-none">
+        <div className="fixed bottom-[86px] md:bottom-6 inset-x-4 z-30 flex justify-center pointer-events-none">
           <button
             type="button"
             onClick={() => {
               setConfirmedOrder(null);
               setCheckoutOpen(true);
             }}
-            className="pointer-events-auto w-full max-w-xl min-h-[54px] px-5 rounded-2xl bg-[#1C1B18] dark:bg-[#F4F1EA] text-[#F9F8F4] dark:text-[#141412] flex items-center justify-between gap-4 shadow-lg"
+            className="pointer-events-auto w-full max-w-xl min-h-[54px] px-5 rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] flex items-center justify-between gap-4 shadow-[0_14px_34px_-10px_rgba(0,0,0,0.45)] active:scale-[0.99] transition-transform"
           >
             <div className="flex items-center gap-2.5 text-sm font-medium">
               <ShoppingBag className="w-4 h-4" />

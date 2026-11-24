@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {
   ArrowLeftRight,
   BadgeCheck,
@@ -21,6 +21,13 @@ import {
 } from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
 import {fileToCompressedDataUrl} from '../lib/imageUpload.ts';
+import {
+  fetchRecipeDetail,
+  getCachedRecipeDetail,
+  invalidateRecipeDetail,
+  prefetchRecipeDetail,
+  type RecipeDetailPayload,
+} from '../lib/recipePrefetch.ts';
 import {shareRecipeWithWebShare} from '../lib/webShare.ts';
 import {
   PARTNER_ROLE_LABELS,
@@ -39,9 +46,11 @@ import type {
 } from '../shared/types.ts';
 import {CookModeOverlay} from './CookModeOverlay.tsx';
 import {EditorialImage} from './EditorialImage.tsx';
+import {RecipeDetailSkeleton} from './EditorialSkeletons.tsx';
 
 interface RecipeDetailModalProps {
   recipeId: string;
+  adjacentRecipeIds?: string[];
   user: UserProfile | null;
   city: string;
   isBookmarked: boolean;
@@ -61,6 +70,7 @@ interface RecipeDetailModalProps {
 
 export function RecipeDetailModal({
   recipeId,
+  adjacentRecipeIds = [],
   user,
   city,
   isBookmarked,
@@ -101,24 +111,21 @@ export function RecipeDetailModal({
   const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState('');
 
-  const loadDetail = async (idToLoad: string) => {
-    setLoading(true);
-    try {
-      const data = await apiRequest<{
-        recipe: Recipe;
-        variations: Recipe[];
-        questions: RecipeQuestion[];
-        contextualPartners: Partner[];
-        communityPhotos?: RecipePhoto[];
-      }>(`/api/recipes/${idToLoad}?city=${encodeURIComponent(city)}`);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const prefetchedNextRef = useRef<boolean>(false);
+
+  const applyDetailPayload = useCallback(
+    (data: RecipeDetailPayload, resetInteractiveState: boolean) => {
       setRecipe(data.recipe);
       setVariations(data.variations);
       setQuestions(data.questions);
       setContextualPartners(data.contextualPartners);
       setCommunityPhotos(data.communityPhotos || []);
-      setServings(data.recipe.servings);
-      setHaveSet(new Set());
-      setActiveStepOrder(null);
+      if (resetInteractiveState) {
+        setServings(data.recipe.servings);
+        setHaveSet(new Set());
+        setActiveStepOrder(null);
+      }
       // Record non-blocking partner impressions
       data.contextualPartners.forEach((p) => {
         apiRequest(`/api/partners/${p.id}/events`, {
@@ -126,38 +133,142 @@ export function RecipeDetailModal({
           body: JSON.stringify({eventType: 'impression'}),
         }).catch(() => {});
       });
-    } catch {
-      onNotify('خطا در بارگذاری جزئیات دستور پخت.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    []
+  );
+
+  const loadDetail = useCallback(
+    async (idToLoad: string, options?: {force?: boolean}) => {
+      const cached = options?.force ? null : getCachedRecipeDetail(idToLoad, city);
+
+      if (cached) {
+        // 0ms instant render from Prefetch LRU Cache
+        applyDetailPayload(cached.data, true);
+        setLoading(false);
+        if (cached.isFresh) return;
+      } else {
+        setLoading(true);
+      }
+
+      try {
+        const fresh = await fetchRecipeDetail(idToLoad, city, {force: options?.force});
+        applyDetailPayload(fresh, !cached);
+      } catch {
+        if (!cached) {
+          onNotify('خطا در بارگذاری جزئیات دستور پخت.');
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [city, applyDetailPayload, onNotify]
+  );
 
   useEffect(() => {
+    prefetchedNextRef.current = false;
     loadDetail(recipeId);
-  }, [recipeId, city]);
+  }, [recipeId, city, loadDetail]);
 
-  // Dynamic Schema.org Recipe JSON-LD & Page Title for Rich Search Results (SEO)
+  // Prefetch variations of the current recipe once loaded (instant variation switching)
+  useEffect(() => {
+    if (!recipe || variations.length === 0) return;
+    variations.slice(0, 2).forEach((v) => {
+      prefetchRecipeDetail(v.id, city, {priority: 'low', imageUrl: v.imageUrl});
+    });
+  }, [recipe, variations, city]);
+
+  // Prefetch upcoming adjacent recipes in the feed when user scrolls inside RecipeDetailModal
+  const handleModalScroll = useCallback(() => {
+    if (prefetchedNextRef.current || adjacentRecipeIds.length === 0) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const progress = (el.scrollTop + el.clientHeight) / Math.max(1, el.scrollHeight);
+    if (progress >= 0.35) {
+      prefetchedNextRef.current = true;
+      adjacentRecipeIds.slice(0, 2).forEach((nextId) => {
+        prefetchRecipeDetail(nextId, city, {priority: 'low'});
+      });
+    }
+  }, [adjacentRecipeIds, city]);
+
+  // Dynamic Meta Tags, Canonical URL & Schema.org @graph (Recipe + BreadcrumbList + FAQPage) for Rich Results
   useEffect(() => {
     if (!recipe) return;
-    const prevTitle = document.title;
-    const metaDesc = document.querySelector('meta[name="description"]');
-    const prevDesc = metaDesc?.getAttribute('content') || '';
 
-    document.title = `طرز تهیه ${recipe.title} | لاقلی`;
-    if (metaDesc && recipe.description) {
-      metaDesc.setAttribute('content', `${recipe.description} — زمان پخت ${recipe.cookMinutes} دقیقه در لاقلی.`);
-    }
-
+    const origin = window.location.origin;
+    const canonicalUrl = `${origin}/?recipe=${encodeURIComponent(recipe.slug || recipe.id)}`;
+    const pageTitle = `طرز تهیه ${recipe.title} | لاقلی`;
     const totalMinutes = (recipe.prepMinutes || 0) + (recipe.cookMinutes || 0);
-    const schemaData: Record<string, unknown> = {
-      '@context': 'https://schema.org',
+    const metaDescription = `${recipe.description.slice(0, 110)} — زمان پخت ${toFaDigits(totalMinutes || 30)} دقیقه، مناسب ${toFaDigits(recipe.servings)} نفر در لاقلی.`;
+    const primaryImage = recipe.imageUrl
+      ? recipe.imageUrl.startsWith('http')
+        ? recipe.imageUrl
+        : `${origin}${recipe.imageUrl}`
+      : `${origin}/icon.svg`;
+
+    const allImages: string[] = [];
+    if (recipe.imageUrl) allImages.push(primaryImage);
+    communityPhotos.forEach((p) => {
+      if (!p.imageUrl) return;
+      const abs = p.imageUrl.startsWith('http') ? p.imageUrl : `${origin}${p.imageUrl}`;
+      if (!allImages.includes(abs)) allImages.push(abs);
+    });
+
+    const prevTitle = document.title;
+    const setMeta = (selector: string, content: string): (() => void) => {
+      const el = document.querySelector(selector);
+      if (!el) return () => {};
+      const prev = el.getAttribute('content') || '';
+      el.setAttribute('content', content);
+      return () => el.setAttribute('content', prev);
+    };
+
+    document.title = pageTitle;
+    const restorers: (() => void)[] = [
+      setMeta('meta[name="description"]', metaDescription),
+      setMeta('meta[property="og:title"]', pageTitle),
+      setMeta('meta[property="og:description"]', metaDescription),
+      setMeta('meta[property="og:type"]', 'article'),
+      setMeta('meta[property="og:image"]', primaryImage),
+      setMeta('meta[name="twitter:title"]', pageTitle),
+      setMeta('meta[name="twitter:description"]', metaDescription),
+      setMeta('meta[name="twitter:image"]', primaryImage),
+    ];
+
+    // Dynamic canonical & og:url
+    let canonicalEl = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    const createdCanonical = !canonicalEl;
+    const prevCanonical = canonicalEl?.getAttribute('href') || '';
+    if (!canonicalEl) {
+      canonicalEl = document.createElement('link');
+      canonicalEl.rel = 'canonical';
+      document.head.appendChild(canonicalEl);
+    }
+    canonicalEl.href = canonicalUrl;
+
+    let ogUrlEl = document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null;
+    const createdOgUrl = !ogUrlEl;
+    const prevOgUrl = ogUrlEl?.getAttribute('content') || '';
+    if (!ogUrlEl) {
+      ogUrlEl = document.createElement('meta');
+      ogUrlEl.setAttribute('property', 'og:url');
+      document.head.appendChild(ogUrlEl);
+    }
+    ogUrlEl.content = canonicalUrl;
+
+    const recipeNode: Record<string, unknown> = {
       '@type': 'Recipe',
+      '@id': `${canonicalUrl}#recipe`,
+      url: canonicalUrl,
       name: recipe.title,
       description: recipe.description,
       inLanguage: 'fa-IR',
+      datePublished: (recipe.createdAt || new Date().toISOString()).slice(0, 10),
       recipeCategory: recipe.category,
       recipeCuisine: recipe.region ? `ایرانی (${recipe.region})` : 'ایرانی',
+      keywords: [recipe.title, recipe.category, recipe.region, ...(recipe.dietTags || []), 'دستور پخت ایرانی', 'لاقلی']
+        .filter(Boolean)
+        .join('، '),
       prepTime: `PT${Math.max(1, recipe.prepMinutes || 10)}M`,
       cookTime: `PT${Math.max(1, recipe.cookMinutes || 15)}M`,
       totalTime: `PT${Math.max(1, totalMinutes || 25)}M`,
@@ -178,27 +289,73 @@ export function RecipeDetailModal({
       recipeInstructions: recipe.steps.map((s) => ({
         '@type': 'HowToStep',
         position: s.order,
-        text: s.instruction,
+        name: `گام ${toFaDigits(s.order)}`,
+        text: s.timerMinutes
+          ? `${s.instruction} (زمان این مرحله: حدود ${toFaDigits(s.timerMinutes)} دقیقه)`
+          : s.instruction,
       })),
     };
-    if (recipe.imageUrl) {
-      schemaData.image = recipe.imageUrl.startsWith('http')
-        ? recipe.imageUrl
-        : `${window.location.origin}${recipe.imageUrl}`;
+    if (allImages.length > 0) {
+      recipeNode.image = allImages;
     }
+
+    const breadcrumbNode = {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {'@type': 'ListItem', position: 1, name: 'لاقلی', item: `${origin}/`},
+        {'@type': 'ListItem', position: 2, name: recipe.category || 'دستور پخت', item: `${origin}/?category=${encodeURIComponent(recipe.category || '')}`},
+        {'@type': 'ListItem', position: 3, name: recipe.title, item: canonicalUrl},
+      ],
+    };
+
+    const graph: Record<string, unknown>[] = [recipeNode, breadcrumbNode];
+
+    const answeredQuestions = questions.filter((q) => q.answers && q.answers.length > 0);
+    if (answeredQuestions.length > 0) {
+      graph.push({
+        '@type': 'FAQPage',
+        mainEntity: answeredQuestions.slice(0, 8).map((q) => {
+          const best = q.answers.find((a) => a.isBest) || q.answers[0];
+          return {
+            '@type': 'Question',
+            name: q.body,
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: best.body,
+            },
+          };
+        }),
+      });
+    }
+
+    const existingScript = document.getElementById('lagheli-recipe-jsonld');
+    if (existingScript) existingScript.remove();
 
     const scriptEl = document.createElement('script');
     scriptEl.type = 'application/ld+json';
     scriptEl.id = 'lagheli-recipe-jsonld';
-    scriptEl.textContent = JSON.stringify(schemaData);
+    scriptEl.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': graph,
+    });
     document.head.appendChild(scriptEl);
 
     return () => {
       document.title = prevTitle;
-      if (metaDesc && prevDesc) metaDesc.setAttribute('content', prevDesc);
+      restorers.forEach((fn) => fn());
+      if (createdCanonical) {
+        canonicalEl?.remove();
+      } else if (canonicalEl) {
+        canonicalEl.href = prevCanonical;
+      }
+      if (createdOgUrl) {
+        ogUrlEl?.remove();
+      } else if (ogUrlEl) {
+        ogUrlEl.content = prevOgUrl;
+      }
       scriptEl.remove();
     };
-  }, [recipe]);
+  }, [recipe, communityPhotos, questions]);
 
   const handleFindSubstitute = async (ingName: string) => {
     setSubIngredient(ingName);
@@ -239,9 +396,10 @@ export function RecipeDetailModal({
     }
     try {
       await apiRequest(`/api/recipes/${recipe.id}/unlock-vip`, {method: 'POST'});
+      invalidateRecipeDetail(recipe.id);
       onNotify('دستور ویژه با موفقیت بازگشایی شد.');
       onRefreshUser();
-      loadDetail(recipe.id);
+      loadDetail(recipe.id, {force: true});
     } catch (err) {
       onNotify(err instanceof Error ? err.message : 'خطا در بازگشایی دستور ویژه');
     }
@@ -259,6 +417,7 @@ export function RecipeDetailModal({
         method: 'POST',
         body: JSON.stringify({body: questionBody}),
       });
+      invalidateRecipeDetail(recipe.id);
       setQuestions((prev) => [res.question, ...prev]);
       setQuestionBody('');
       onRefreshUser();
@@ -281,7 +440,10 @@ export function RecipeDetailModal({
       setReplyBody('');
       setReplyTargetId(null);
       onRefreshUser();
-      if (recipe) loadDetail(recipe.id);
+      if (recipe) {
+        invalidateRecipeDetail(recipe.id);
+        loadDetail(recipe.id, {force: true});
+      }
       onNotify('پاسخ شما ثبت شد.');
     } catch (err) {
       onNotify(err instanceof Error ? err.message : 'خطا در ثبت پاسخ');
@@ -313,6 +475,7 @@ export function RecipeDetailModal({
         method: 'POST',
         body: JSON.stringify({imageDataUrl: photoPreview, caption: photoCaption.trim()}),
       });
+      invalidateRecipeDetail(recipe.id);
       setPhotoPreview('');
       setPhotoCaption('');
       setPhotoFormOpen(false);
@@ -339,10 +502,12 @@ export function RecipeDetailModal({
 
   return (
     <div
+      ref={scrollContainerRef}
+      onScroll={handleModalScroll}
       role="dialog"
       aria-modal="true"
       aria-label="جزئیات دستور پخت"
-      className="fixed inset-0 z-40 bg-black/45 overflow-y-auto"
+      className="fixed inset-0 z-50 bg-black/45 overflow-y-auto"
     >
       <div className="min-h-screen flex items-start justify-center p-0 sm:p-6 lg:p-10">
         <div className="w-full max-w-[1020px] bg-[#FFFFFF]/84 dark:bg-[#141412]/78 backdrop-blur-[12px] backdrop-saturate-150 sm:rounded-[32px] border border-[rgba(255,255,255,0.1)] shadow-[0_32px_90px_-28px_rgba(17,17,16,0.38),inset_0_1px_0_rgba(255,255,255,0.35)] dark:shadow-[0_32px_90px_-28px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.1)] overflow-hidden my-0 sm:my-4">
@@ -393,9 +558,7 @@ export function RecipeDetailModal({
           </div>
 
           {loading || !recipe ? (
-            <div className="py-24 px-8 text-center text-sm text-[#615E55] dark:text-[#A9A497]">
-              در حال بارگذاری دستور پخت...
-            </div>
+            <RecipeDetailSkeleton />
           ) : (
             <div className="px-5 sm:px-10 lg:px-14 pt-6 sm:pt-10 pb-14 sm:pb-20 space-y-14 sm:space-y-16">
               {/* Hero Photograph + Overlapping Glassmorphism Primary Dish Info Panel */}

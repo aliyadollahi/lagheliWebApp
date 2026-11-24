@@ -279,6 +279,12 @@ function mapPartnerRow(row: Record<string, unknown>, viewerId?: string): Partner
   };
 }
 
+function isTestQuickLoginEnabled(): boolean {
+  if (process.env.DISABLE_QUICK_TEST_AUTH === 'true') return false;
+  if (process.env.NODE_ENV === 'production' && isEnvAdminPasscodeSet()) return false;
+  return true;
+}
+
 // =========================================================================
 // 1. PUBLIC CONFIG & HEALTH
 // =========================================================================
@@ -289,6 +295,7 @@ app.get('/api/config', (_req, res) => {
     gemStoreOffers: getGemStoreOffers(GEM_STORE_OFFERS),
     kitchenConfig: getKitchenConfig(),
     deliveryPricing: getDeliveryPricingConfig(),
+    quickTestLoginEnabled: isTestQuickLoginEnabled(),
   });
 });
 
@@ -416,6 +423,66 @@ app.post('/api/auth/verify-otp', (req, res) => {
   const token = createSession(userRow.id, false);
   const profile = buildUserProfile(userRow.id);
   res.json({token, user: profile});
+});
+
+// Preview/Test-mode 1-click user login (automatically disabled when DISABLE_QUICK_TEST_AUTH=true or in production with secrets)
+const quickTestUserSchema = z.object({
+  guestBookmarks: z.array(z.string()).max(100).optional(),
+  guestShoppingItems: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(120),
+        amount: z.number().positive(),
+        unit: z.string().max(30),
+        category: z.string().optional(),
+        recipeId: z.string().nullable().optional(),
+        recipeTitle: z.string().nullable().optional(),
+        checked: z.boolean().optional(),
+      })
+    )
+    .max(100)
+    .optional(),
+});
+
+app.post('/api/auth/quick-test-login', (req, res) => {
+  if (!isTestQuickLoginEnabled()) {
+    return res.status(403).json({error: 'ورود سریع آزمایشی در این محیط غیرفعال است.'});
+  }
+  if (!checkRateLimit(`quick-user:${req.ip}`, 20, 1000 * 60 * 5)) {
+    return res.status(429).json({error: 'تعداد درخواست‌ها زیاد است؛ کمی صبر کنید.'});
+  }
+  const parsed = quickTestUserSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    return res.status(400).json({error: 'داده‌های همگام‌سازی نامعتبر است.'});
+  }
+
+  const testPhone = '09120000001';
+  const now = new Date().toISOString();
+  let userRow = db.prepare('SELECT id FROM users WHERE phone = ?').get(testPhone) as {id: string} | undefined;
+  if (!userRow) {
+    const newId = 'usr-test-preview';
+    db.prepare(
+      `INSERT OR IGNORE INTO users (id, phone, name, city, neighborhood, bio, specialty, is_verified_chef, chef_verification_status, role, xp, gems, wallet_balance, created_at)
+       VALUES (?, ?, 'کاربر آزمایشی لاقلی', 'تهران', 'ونک', 'حساب آزمایشی برای بررسی سریع امکانات لاقلی', 'آشپزی ایرانی', 1, 'approved', 'chef', 420, 350, 500000, ?)`
+    ).run(newId, testPhone, now);
+    userRow = (db.prepare('SELECT id FROM users WHERE phone = ?').get(testPhone) as {id: string}) || {id: newId};
+  }
+
+  if (parsed.data.guestBookmarks?.length) {
+    const stmt = db.prepare('INSERT OR IGNORE INTO bookmarks (user_id, recipe_id, created_at) VALUES (?, ?, ?)');
+    for (const rid of parsed.data.guestBookmarks) {
+      stmt.run(userRow.id, rid, now);
+    }
+  }
+  if (parsed.data.guestShoppingItems?.length) {
+    for (const item of parsed.data.guestShoppingItems) {
+      upsertShoppingItem(userRow.id, item);
+    }
+  }
+
+  const token = createSession(userRow.id, false);
+  const profile = buildUserProfile(userRow.id);
+  res.json({token, user: profile, testMode: true});
 });
 
 app.get('/api/auth/me', (req, res) => {
@@ -1681,7 +1748,19 @@ app.get('/api/admin/status', (req, res) => {
   res.json({
     configured: envConfigured || dbConfigured,
     authenticated: Boolean(session?.isAdmin),
+    quickTestLoginEnabled: isTestQuickLoginEnabled(),
   });
+});
+
+app.post('/api/admin/quick-test-login', (req, res) => {
+  if (!isTestQuickLoginEnabled()) {
+    return res.status(403).json({error: 'ورود سریع مدیریت در محیط عملیاتی غیرفعال است.'});
+  }
+  if (!checkRateLimit(`quick-admin:${req.ip}`, 20, 1000 * 60 * 5)) {
+    return res.status(429).json({error: 'تعداد درخواست‌ها زیاد است؛ کمی صبر کنید.'});
+  }
+  const adminToken = createSession('admin-root', true);
+  res.json({adminToken, testMode: true, message: 'ورود سریع آزمایشی به پنل مدیریت فعال شد.'});
 });
 
 app.post('/api/admin/setup', (req, res) => {

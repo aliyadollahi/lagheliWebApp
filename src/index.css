@@ -1,27 +1,56 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
-@import "vazirmatn/Vazirmatn-Variable-font-face.css";
+
+/*
+ * Vazirmatn Font Subsetting & Font-Display: Swap Strategy for Optimal Persian LCP:
+ * 1) Persian/Arabic Variable Subset (Vazirmatn-NL[wght].woff2 — ~47 KB vs 109 KB full file, 57% lighter)
+ *    downloads immediately for Persian UI with font-display: swap (zero invisible FOIT text).
+ * 2) Latin Variable Fallback downloads lazily ONLY when a view renders Latin glyphs (e.g. promo codes).
+ */
+@font-face {
+  font-family: 'Vazirmatn';
+  src:
+    url('vazirmatn/misc/Non-Latin/fonts/webfonts/Vazirmatn-NL[wght].woff2') format('woff2 supports variations'),
+    url('vazirmatn/misc/Non-Latin/fonts/webfonts/Vazirmatn-NL[wght].woff2') format('woff2-variations'),
+    url('vazirmatn/misc/Non-Latin/fonts/webfonts/Vazirmatn-NL[wght].woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FEFF;
+}
+
+@font-face {
+  font-family: 'Vazirmatn';
+  src:
+    url('vazirmatn/fonts/webfonts/Vazirmatn[wght].woff2') format('woff2 supports variations'),
+    url('vazirmatn/fonts/webfonts/Vazirmatn[wght].woff2') format('woff2-variations'),
+    url('vazirmatn/fonts/webfonts/Vazirmatn[wght].woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
 @layer base {
   :root {
-    --lagheli-canvas: #F9F8F4;
+    --lagheli-canvas: #F6F6F5;
     --lagheli-surface: #FFFFFF;
-    --lagheli-surface-muted: #F1EFE8;
-    --lagheli-border: #E5E1D6;
-    --lagheli-ink: #1C1B18;
-    --lagheli-ink-muted: #615E55;
+    --lagheli-surface-muted: #EFEFED;
+    --lagheli-border: #E6E6E3;
+    --lagheli-ink: #0D0D0D;
+    --lagheli-ink-muted: #5C5C58;
     --lagheli-accent: #B54B1F;
     --lagheli-accent-hover: #963B15;
     --lagheli-saffron: #A97222;
   }
 
   .dark {
-    --lagheli-canvas: #141412;
-    --lagheli-surface: #1C1B18;
-    --lagheli-surface-muted: #24231F;
-    --lagheli-border: #2F2D27;
-    --lagheli-ink: #F4F1EA;
-    --lagheli-ink-muted: #A9A497;
+    --lagheli-canvas: #0B0B0B;
+    --lagheli-surface: #151514;
+    --lagheli-surface-muted: #20201E;
+    --lagheli-border: #282825;
+    --lagheli-ink: #FAFAFA;
+    --lagheli-ink-muted: #A3A39E;
     --lagheli-accent: #E29A6F;
     --lagheli-accent-hover: #ECA982;
     --lagheli-saffron: #D8A85B;
@@ -45,7 +74,7 @@
 
   h1, h2, h3, h4 {
     text-wrap: balance;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
   }
 
   /* Respect reduced motion accessibility setting (WCAG 2.2 AA) */
@@ -59,13 +88,55 @@
   }
 }
 
+/* Editorial Shimmer Skeleton Utility (Compositor-Friendly) */
+@keyframes lagheli-skeleton-shimmer {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.editorial-skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: #EAEAE7;
+}
+
+.dark .editorial-skeleton {
+  background-color: #1E1E1C;
+}
+
+.editorial-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 100%
+  );
+  animation: lagheli-skeleton-shimmer 1.65s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.dark .editorial-skeleton::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.07) 50%,
+    transparent 100%
+  );
+}
+
 /* Clean custom focus rings for WCAG 2.2 AA keyboard navigation */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--lagheli-accent);
+  outline: 2px solid var(--lagheli-ink);
   outline-offset: 2px;
 }
 
@@ -75,4 +146,13 @@ textarea:focus-visible {
 
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

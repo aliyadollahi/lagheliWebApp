@@ -1,11 +1,14 @@
 import {useEffect, useState} from 'react';
 import {ArrowLeftRight, Plus, Search, ShoppingBag, Sparkles, X} from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
+import {prefetchRecipeDetail} from '../lib/recipePrefetch.ts';
 import {findNativeSubstitutions, toFaDigits} from '../shared/persianEngine.ts';
 import type {IngredientItem, KitchenConfig, Recipe, SubstitutionSuggestion} from '../shared/types.ts';
 import {EditorialImage} from './EditorialImage.tsx';
+import {FridgeMatchesSkeleton} from './EditorialSkeletons.tsx';
 
 interface KitchenHubProps {
+  city?: string;
   onOpenRecipe: (recipe: Recipe) => void;
   onAddShoppingItems: (
     items: {name: string; amount: number; unit: string; recipeId?: string; recipeTitle?: string}[]
@@ -39,7 +42,7 @@ interface FridgeMatchResult {
   missingIngredients: IngredientItem[];
 }
 
-export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) {
+export function KitchenHub({city = 'تهران', onOpenRecipe, onAddShoppingItems}: KitchenHubProps) {
   const [mode, setMode] = useState<'fridge' | 'substitute'>('fridge');
 
   // Admin-managed dynamic chips with offline fallback
@@ -109,6 +112,10 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
         }),
       });
       setMatches(res.matches);
+      // Prefetch top 2 Smart Fridge recipe matches so opening them is instantaneous
+      res.matches.slice(0, 2).forEach((m) => {
+        prefetchRecipeDetail(m.recipe.id, city, {priority: 'low', imageUrl: m.recipe.imageUrl});
+      });
     } finally {
       setLoadingMatches(false);
     }
@@ -205,10 +212,10 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
                       key={item}
                       type="button"
                       onClick={() => toggleIngredient(item)}
-                      className={`min-h-[40px] px-3.5 rounded-lg text-xs font-medium transition-colors ${
+                      className={`min-h-[40px] px-3.5 rounded-full text-xs font-medium transition-all active:scale-[0.96] ${
                         selected
-                          ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
-                          : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
+                          ? 'bg-[#0D0D0D] text-[#FFFFFF] dark:bg-[#FAFAFA] dark:text-[#0B0B0B]'
+                          : 'bg-[#F2F2F0] dark:bg-[#20201E] text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
                       }`}
                     >
                       {item}
@@ -276,7 +283,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
               type="button"
               onClick={runFridgeMatch}
               disabled={loadingMatches || selectedIngredients.length === 0}
-              className="w-full min-h-[48px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium inline-flex items-center justify-center gap-2 disabled:opacity-40"
+              className="w-full min-h-[50px] rounded-full bg-[#0D0D0D] hover:bg-[#242422] active:scale-[0.98] dark:bg-[#FAFAFA] dark:text-[#0B0B0B] text-[#FFFFFF] text-sm font-semibold inline-flex items-center justify-center gap-2 transition-all disabled:opacity-40"
             >
               <Sparkles className="w-4 h-4" />
               <span>{loadingMatches ? 'در حال بررسی دستورها...' : 'پیشنهاد غذاهای قابل پخت'}</span>
@@ -285,7 +292,9 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
 
           {/* Right Panel: Ranked Results */}
           <div className="lg:col-span-7 space-y-4">
-            {matches === null ? (
+            {loadingMatches ? (
+              <FridgeMatchesSkeleton />
+            ) : matches === null ? (
               <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-10 text-center space-y-2">
                 <p className="text-base font-semibold">مواد موجود را انتخاب و دکمه پیشنهاد را لمس کنید</p>
                 <p className="text-sm text-[#615E55] dark:text-[#A9A497]">
@@ -303,6 +312,12 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
               matches.map((item) => (
                 <div
                   key={item.recipe.id}
+                  onMouseEnter={() =>
+                    prefetchRecipeDetail(item.recipe.id, city, {priority: 'high', imageUrl: item.recipe.imageUrl})
+                  }
+                  onTouchStart={() =>
+                    prefetchRecipeDetail(item.recipe.id, city, {priority: 'high', imageUrl: item.recipe.imageUrl})
+                  }
                   className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4 sm:p-5 flex flex-col sm:flex-row gap-5"
                 >
                   <div
@@ -397,7 +412,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
             </div>
             <button
               type="submit"
-              className="min-h-[48px] px-6 rounded-xl bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412] text-sm font-medium"
+              className="min-h-[48px] px-6 rounded-full bg-[#0D0D0D] hover:bg-[#242422] active:scale-[0.98] text-[#FFFFFF] dark:bg-[#FAFAFA] dark:text-[#0B0B0B] text-sm font-semibold transition-all"
             >
               جست‌وجو
             </button>
@@ -409,10 +424,10 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
                 key={item}
                 type="button"
                 onClick={() => runSubstituteSearch(item)}
-                className={`min-h-[40px] px-3.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`min-h-[40px] px-4 rounded-full text-xs font-medium transition-all active:scale-[0.96] ${
                   subQuery === item
-                    ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
-                    : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
+                    ? 'bg-[#0D0D0D] text-[#FFFFFF] dark:bg-[#FAFAFA] dark:text-[#0B0B0B]'
+                    : 'bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58] dark:text-[#A3A39E]'
                 }`}
               >
                 {item}
@@ -421,7 +436,22 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
           </div>
 
           {loadingSub ? (
-            <p className="text-sm text-[#615E55]">در حال جست‌وجوی جایگزین...</p>
+            <div aria-busy="true" aria-label="در حال جست‌وجوی جایگزین" className="space-y-4">
+              {[0, 1].map((idx) => (
+                <div
+                  key={idx}
+                  className="rounded-2xl border border-[#E6E6E3] dark:border-[#242422] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="h-5 w-40 rounded-lg editorial-skeleton" />
+                    <div className="h-3.5 w-24 rounded-full editorial-skeleton" />
+                  </div>
+                  <div className="h-4 w-56 rounded-md editorial-skeleton" />
+                  <div className="h-3.5 w-full rounded-md editorial-skeleton" />
+                  <div className="h-10 w-36 rounded-full editorial-skeleton" />
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="space-y-4">
               {subResults.map((s) => (

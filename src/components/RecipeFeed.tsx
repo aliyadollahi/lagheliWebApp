@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {motion} from 'motion/react';
 import {
   ArrowUpLeft,
@@ -17,10 +17,12 @@ import {
   X,
 } from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
+import {prefetchNextRecipes, prefetchRecipeDetail} from '../lib/recipePrefetch.ts';
 import {shareRecipeWithWebShare} from '../lib/webShare.ts';
 import {PARTNER_ROLE_LABELS, toFaDigits} from '../shared/persianEngine.ts';
 import type {EcosystemConfig, Partner, Recipe, SponsorCampaign} from '../shared/types.ts';
 import {EditorialImage} from './EditorialImage.tsx';
+import {RecipeFeedSkeleton} from './EditorialSkeletons.tsx';
 
 export interface RecipeFilterState {
   q: string;
@@ -36,6 +38,7 @@ export interface RecipeFilterState {
 
 interface RecipeFeedProps {
   recipes: Recipe[];
+  city?: string;
   loading: boolean;
   filters: RecipeFilterState;
   onChangeFilters: (next: RecipeFilterState) => void;
@@ -70,6 +73,7 @@ const DIETS = ['سنتی', 'گیاهی', 'رژیمی', 'پرپروتئین', 'ب
 
 export function RecipeFeed({
   recipes,
+  city = 'تهران',
   loading,
   filters,
   onChangeFilters,
@@ -87,6 +91,7 @@ export function RecipeFeed({
   onNotify,
 }: RecipeFeedProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const gridContainerRef = useRef<HTMLDivElement | null>(null);
 
   const toggleMulti = (key: 'categories' | 'seasons' | 'regions' | 'diets', value: string) => {
     const list = filters[key];
@@ -139,6 +144,46 @@ export function RecipeFeed({
     ? displayedRecipes.filter((r) => r.id !== heroRecipe.id)
     : displayedRecipes;
 
+  // Prefetch the Editorial Hero recipe + top 2 cards quietly right after mount
+  useEffect(() => {
+    if (heroRecipe) {
+      prefetchRecipeDetail(heroRecipe.id, city, {priority: 'low', imageUrl: heroRecipe.imageUrl});
+    }
+    if (gridRecipes.length > 0) {
+      prefetchNextRecipes(gridRecipes, -1, city, 2);
+    }
+  }, [heroRecipe?.id, gridRecipes.length, city]);
+
+  // Shared IntersectionObserver: prefetch visible cards + next 2 upcoming recipes as user scrolls
+  useEffect(() => {
+    const container = gridContainerRef.current;
+    if (!container || typeof IntersectionObserver === 'undefined' || gridRecipes.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const el = entry.target as HTMLElement;
+          const recId = el.dataset.prefetchId;
+          const idx = Number(el.dataset.prefetchIndex);
+          if (recId) {
+            const target = gridRecipes[idx];
+            prefetchRecipeDetail(recId, city, {priority: 'low', imageUrl: target?.imageUrl});
+          }
+          if (!Number.isNaN(idx)) {
+            prefetchNextRecipes(gridRecipes, idx, city, 2);
+          }
+          observer.unobserve(el);
+        }
+      },
+      {rootMargin: '420px 0px', threshold: 0.01}
+    );
+
+    const cards = container.querySelectorAll<HTMLElement>('[data-prefetch-id]');
+    cards.forEach((card) => observer.observe(card));
+    return () => observer.disconnect();
+  }, [gridRecipes, city]);
+
   const exploreCampaign = activeCampaigns.find((c) => c.placement === 'explore_showcase');
 
   return (
@@ -188,6 +233,12 @@ export function RecipeFeed({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-stretch">
             <div
               onClick={() => onOpenRecipe(heroRecipe)}
+              onMouseEnter={() =>
+                prefetchRecipeDetail(heroRecipe.id, city, {priority: 'high', imageUrl: heroRecipe.imageUrl})
+              }
+              onTouchStart={() =>
+                prefetchRecipeDetail(heroRecipe.id, city, {priority: 'high', imageUrl: heroRecipe.imageUrl})
+              }
               className="lg:col-span-7 group cursor-pointer rounded-3xl overflow-hidden border border-[#E5E1D6]/80 dark:border-[#2F2D27] shadow-[0_12px_40px_-24px_rgba(28,27,24,0.22)]"
             >
               <EditorialImage
@@ -256,7 +307,7 @@ export function RecipeFeed({
                 <button
                   type="button"
                   onClick={() => onOpenRecipe(heroRecipe)}
-                  className="min-h-[50px] px-7 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] active:scale-[0.98] dark:bg-[#E29A6F] dark:hover:bg-[#ECA982] text-[#F9F8F4] dark:text-[#141412] text-sm font-semibold transition-all inline-flex items-center gap-2"
+                  className="min-h-[50px] px-7 rounded-full bg-[#0D0D0D] hover:bg-[#242422] active:scale-[0.98] dark:bg-[#FAFAFA] dark:hover:bg-[#E6E6E3] text-[#FFFFFF] dark:text-[#0B0B0B] text-sm font-semibold transition-all inline-flex items-center gap-2 shadow-[0_10px_24px_-12px_rgba(0,0,0,0.45)]"
                 >
                   <span>شروع مطالعه و آشپزی</span>
                   <ArrowUpLeft className="w-4 h-4" />
@@ -265,7 +316,7 @@ export function RecipeFeed({
                   <button
                     type="button"
                     onClick={() => onJumpToOrder(heroRecipe.linkedMenuDishId)}
-                    className="min-h-[50px] px-5 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F] active:scale-[0.98] text-sm font-medium transition-all"
+                    className="min-h-[50px] px-5 rounded-full border border-[#D8D8D4] dark:border-[#2E2E2B] bg-white dark:bg-[#151514] hover:bg-[#EFEFED] dark:hover:bg-[#20201E] active:scale-[0.98] text-sm font-medium transition-all"
                   >
                     سفارش آماده امروز
                   </button>
@@ -287,17 +338,17 @@ export function RecipeFeed({
               onChange={(e) => onChangeFilters({...filters, q: e.target.value})}
               placeholder="جست‌وجو میان هزاران دستور پخت، مواد اولیه، شهر یا سرآشپز..."
               aria-label="جست‌وجوی دستور پخت"
-              className="w-full min-h-[50px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] pr-11 pl-4 text-sm placeholder:text-[#615E55]/70 shadow-[0_2px_12px_-6px_rgba(28,27,24,0.08)]"
+              className="w-full min-h-[50px] rounded-full border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] pr-11 pl-5 text-sm placeholder:text-[#5C5C58]/75 shadow-[0_2px_12px_-6px_rgba(0,0,0,0.08)]"
             />
           </div>
 
           <button
             type="button"
             onClick={() => setShowAdvanced((v) => !v)}
-            className={`min-h-[50px] px-4 rounded-xl border text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors whitespace-nowrap shrink-0 ${
+            className={`min-h-[50px] px-5 rounded-full border text-sm font-medium inline-flex items-center justify-center gap-2 transition-all active:scale-[0.98] whitespace-nowrap shrink-0 ${
               showAdvanced || activeFilterCount > 0
-                ? 'border-[#B54B1F] bg-[#B54B1F]/8 text-[#B54B1F] dark:border-[#E29A6F] dark:text-[#E29A6F]'
-                : 'border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18]'
+                ? 'border-[#0D0D0D] bg-[#0D0D0D] text-[#FFFFFF] dark:border-[#FAFAFA] dark:bg-[#FAFAFA] dark:text-[#0B0B0B]'
+                : 'border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] text-[#0D0D0D] dark:text-[#FAFAFA]'
             }`}
           >
             <SlidersHorizontal className="w-4 h-4" />
@@ -324,10 +375,10 @@ export function RecipeFeed({
                     ? onChangeFilters({...filters, categories: [], needsPhotoOnly: false})
                     : toggleMulti('categories', cat)
                 }
-                className={`min-h-[44px] px-4 rounded-xl text-sm whitespace-nowrap shrink-0 transition-colors ${
+                className={`min-h-[42px] px-4 rounded-full text-sm whitespace-nowrap shrink-0 transition-all active:scale-[0.97] ${
                   active
-                    ? 'bg-[#B54B1F] dark:bg-[#E29A6F] text-[#F9F8F4] dark:text-[#141412] font-medium'
-                    : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA]'
+                    ? 'bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] font-semibold'
+                    : 'bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
                 }`}
               >
                 {cat}
@@ -338,10 +389,10 @@ export function RecipeFeed({
             <button
               type="button"
               onClick={() => onChangeFilters({...filters, needsPhotoOnly: !filters.needsPhotoOnly})}
-              className={`min-h-[44px] px-4 rounded-xl text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 transition-colors ${
+              className={`min-h-[42px] px-4 rounded-full text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 transition-all active:scale-[0.97] ${
                 filters.needsPhotoOnly
-                  ? 'bg-[#A97222] text-white font-medium'
-                  : 'border border-[#A97222]/35 bg-[#A97222]/8 text-[#A97222] dark:text-[#D8A85B]'
+                  ? 'bg-[#0D0D0D] text-white dark:bg-[#FAFAFA] dark:text-[#0B0B0B] font-semibold'
+                  : 'border border-[#B54B1F]/35 bg-[#FFFFFF] dark:bg-[#151514] text-[#B54B1F] dark:text-[#E29A6F]'
               }`}
             >
               <Camera className="w-3.5 h-3.5" />
@@ -491,15 +542,7 @@ export function RecipeFeed({
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="space-y-3 animate-pulse">
-                <div className="aspect-[4/3] rounded-2xl bg-[#F1EFE8] dark:bg-[#24231F]" />
-                <div className="h-4 w-1/3 bg-[#F1EFE8] dark:bg-[#24231F] rounded" />
-                <div className="h-5 w-4/5 bg-[#F1EFE8] dark:bg-[#24231F] rounded" />
-              </div>
-            ))}
-          </div>
+          <RecipeFeedSkeleton includeHero={isCleanHome && !heroRecipe} />
         ) : gridRecipes.length === 0 ? (
           <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-12 text-center space-y-3">
             <p className="text-base font-medium">دستور پختی با این فیلترها پیدا نشد.</p>
@@ -515,14 +558,23 @@ export function RecipeFeed({
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
-            {gridRecipes.map((recipe) => {
+          <div ref={gridContainerRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
+            {gridRecipes.map((recipe, idx) => {
               const isBookmarked = bookmarkedIds.has(recipe.id) || Boolean(recipe.isBookmarked);
               const totalTime = recipe.prepMinutes + recipe.cookMinutes;
               return (
                 <article
                   key={recipe.id}
+                  data-prefetch-id={recipe.id}
+                  data-prefetch-index={idx}
                   onClick={() => onOpenRecipe(recipe)}
+                  onMouseEnter={() => {
+                    prefetchRecipeDetail(recipe.id, city, {priority: 'high', imageUrl: recipe.imageUrl});
+                    prefetchNextRecipes(gridRecipes, idx, city, 1);
+                  }}
+                  onTouchStart={() =>
+                    prefetchRecipeDetail(recipe.id, city, {priority: 'high', imageUrl: recipe.imageUrl})
+                  }
                   className="group cursor-pointer flex flex-col justify-between space-y-4"
                 >
                   <div className="space-y-4">

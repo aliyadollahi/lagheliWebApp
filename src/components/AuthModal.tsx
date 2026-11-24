@@ -6,6 +6,7 @@ import type {ShoppingItem, UserProfile} from '../shared/types.ts';
 
 interface AuthModalProps {
   open: boolean;
+  quickTestLoginEnabled?: boolean;
   onClose: () => void;
   guestBookmarks: string[];
   guestShoppingItems: ShoppingItem[];
@@ -14,6 +15,7 @@ interface AuthModalProps {
 
 export function AuthModal({
   open,
+  quickTestLoginEnabled = false,
   onClose,
   guestBookmarks,
   guestShoppingItems,
@@ -83,6 +85,35 @@ export function AuthModal({
     }
   };
 
+  const handleQuickTestUserLogin = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await apiRequest<{token: string; user: UserProfile}>('/api/auth/quick-test-login', {
+        method: 'POST',
+        body: JSON.stringify({
+          guestBookmarks,
+          guestShoppingItems: guestShoppingItems.map((i) => ({
+            name: i.name,
+            amount: i.amount,
+            unit: i.unit,
+            category: i.category,
+            recipeId: i.recipeId,
+            recipeTitle: i.recipeTitle,
+            checked: i.checked,
+          })),
+        }),
+      });
+      setUserToken(res.token);
+      onSuccess(res.user);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ورود سریع آزمایشی ناموفق بود');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div
       role="dialog"
@@ -120,8 +151,24 @@ export function AuthModal({
           </div>
         )}
 
+        {quickTestLoginEnabled && (
+          <div className="mt-5 pb-5 border-b border-[#E6E6E3] dark:border-[#242422] space-y-2">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleQuickTestUserLogin}
+              className="w-full min-h-[48px] rounded-full bg-[#0D0D0D] hover:bg-[#242422] active:scale-[0.98] dark:bg-[#FAFAFA] dark:text-[#0B0B0B] text-[#FFFFFF] text-sm font-semibold transition-all disabled:opacity-50"
+            >
+              {loading ? 'در حال ورود...' : 'ورود سریع آزمایشی (بدون کد پیامکی)'}
+            </button>
+            <p className="text-[11px] text-center text-[#5C5C58] dark:text-[#A3A39E]">
+              حالت تست فعال است · برای بررسی فوری امکانات کاربر و سرآشپز بدون نیاز به دریافت کد
+            </p>
+          </div>
+        )}
+
         {step === 'phone' ? (
-          <form onSubmit={handleRequestOtp} className="mt-6 space-y-4">
+          <form onSubmit={handleRequestOtp} className="mt-5 space-y-4">
             <div>
               <label htmlFor="auth-phone" className="block text-sm font-medium mb-1.5">
                 شماره موبایل

@@ -3,28 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>لاقلی — مرجع دستور پخت ایرانی، آشپزخانه هوشمند و سفارش غذای اصیل</title>
+    <title>لاقلی — دستور پخت اصیل ایرانی، یخچال‌گردی و سفارش غذا</title>
     <meta
       name="description"
-      content="لاقلی؛ مرجع فارسی دستور پخت غذاهای ایرانی و ملل با عکس‌های واقعی کاربران، یخچال‌گردی هوشمند، جایگزین مواد اولیه، لیست خرید و سفارش غذای روز."
+      content="طرز تهیه گام‌به‌گام غذاهای اصیل ایرانی با عکس واقعی کاربران، یخچال‌گردی هوشمند، جایگزین مواد اولیه، لیست خرید و سفارش غذای روز در لاقلی."
     />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <meta property="og:locale" content="fa_IR" />
     <meta property="og:site_name" content="لاقلی" />
-    <meta property="og:title" content="لاقلی — مرجع دستور پخت ایرانی، آشپزخانه هوشمند و سفارش غذای اصیل" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="لاقلی — دستور پخت اصیل ایرانی، یخچال‌گردی و سفارش غذا" />
     <meta
       property="og:description"
-      content="دستور پخت گام‌به‌گام غذاهای ایرانی با عکس واقعی آشپزهای خانگی، مقیاس‌پذیری خودکار نفرات، یخچال‌گردی هوشمند و لیست خرید."
+      content="طرز تهیه گام‌به‌گام غذاهای اصیل ایرانی با عکس واقعی کاربران، مقیاس‌پذیری خودکار نفرات، یخچال‌گردی هوشمند و لیست خرید."
     />
-    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/icon.svg" />
+    <meta property="og:image:alt" content="لاقلی — مرجع آشپزی فارسی و آشپزخانه هوشمند" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="لاقلی — مرجع دستور پخت ایرانی و آشپزخانه هوشمند" />
+    <meta name="twitter:title" content="لاقلی — دستور پخت اصیل ایرانی و آشپزخانه هوشمند" />
     <meta
       name="twitter:description"
-      content="دستور پخت گام‌به‌گام غذاهای ایرانی با عکس‌های واقعی کاربران، جایگزین مواد و لیست خرید هوشمند."
+      content="دستور پخت گام‌به‌گام غذاهای ایرانی با عکس واقعی کاربران، یخچال‌گردی هوشمند، جایگزین مواد و لیست خرید."
     />
-    <meta name="theme-color" content="#F9F8F4" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#141412" media="(prefers-color-scheme: dark)" />
+    <meta name="twitter:image" content="/icon.svg" />
+    <meta name="theme-color" content="#F6F6F5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0B0B0B" media="(prefers-color-scheme: dark)" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -36,11 +39,22 @@
         "@context": "https://schema.org",
         "@graph": [
           {
+            "@type": "Organization",
+            "name": "لاقلی",
+            "alternateName": "Lagheli",
+            "logo": "/icon.svg"
+          },
+          {
             "@type": "WebSite",
             "name": "لاقلی",
             "alternateName": "Lagheli",
             "inLanguage": "fa-IR",
-            "description": "مرجع فارسی دستور پخت غذاهای ایرانی و ملل، یخچال‌گردی هوشمند و اکوسیستم صنعت غذا"
+            "description": "مرجع فارسی دستور پخت غذاهای ایرانی و ملل، یخچال‌گردی هوشمند و اکوسیستم صنعت غذا",
+            "potentialAction": {
+              "@type": "SearchAction",
+              "target": "/?q={search_term_string}",
+              "query-input": "required name=search_term_string"
+            }
           },
           {
             "@type": "WebApplication",
@@ -48,7 +62,7 @@
             "applicationCategory": "LifestyleApplication",
             "operatingSystem": "All",
             "inLanguage": "fa-IR",
-            "description": "وب‌اپلیکیشن پیش‌رونده آشپزی فارسی با دستور پخت گام‌به‌گام، عکس‌های واقعی کاربران، جایگزین مواد و لیست خرید هوشمند",
+            "description": "وب‌اپلیکیشن پیش‌رونده آشپزی فارسی با دستور پخت گام‌به‌گام، عکس‌های واقعی کاربران، یخچال‌گردی هوشمند، جایگزین مواد و لیست خرید",
             "offers": {
               "@type": "Offer",
               "price": "0",
@@ -59,7 +73,7 @@
       }
     </script>
   </head>
-  <body class="bg-[#F9F8F4] text-[#1C1B18] dark:bg-[#141412] dark:text-[#F4F1EA] antialiased selection:bg-[#B54B1F]/20">
+  <body class="bg-[#F6F6F5] text-[#0D0D0D] dark:bg-[#0B0B0B] dark:text-[#FAFAFA] antialiased selection:bg-[#0D0D0D]/15 dark:selection:bg-white/20">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

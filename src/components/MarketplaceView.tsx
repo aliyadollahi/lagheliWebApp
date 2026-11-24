@@ -3,6 +3,7 @@ import {BadgeCheck, Building2, Copy, ExternalLink, MapPin, Phone, Plus, Search, 
 import {apiRequest} from '../lib/api.ts';
 import {PARTNER_ROLES, PARTNER_ROLE_LABELS, formatToman, toFaDigits} from '../shared/persianEngine.ts';
 import type {EcosystemConfig, Partner, PartnerRoleId, UserProfile} from '../shared/types.ts';
+import {MarketplaceSkeleton} from './EditorialSkeletons.tsx';
 
 interface MarketplaceViewProps {
   user: UserProfile | null;
@@ -230,7 +231,7 @@ export function MarketplaceView({
 
       {/* Partners Directory Grid */}
       {loading ? (
-        <div className="p-8 text-center text-sm text-[#615E55]">در حال بارگذاری دایرکتوری اصناف...</div>
+        <MarketplaceSkeleton />
       ) : partners.length === 0 ? (
         <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-12 text-center space-y-2">
           <p className="text-base font-semibold">کسب‌وکاری در این دسته‌بندی یافت نشد</p>

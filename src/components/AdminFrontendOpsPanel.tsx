@@ -19,6 +19,7 @@ import type {
   GemStoreOffer,
   KitchenConfig,
 } from '../shared/types.ts';
+import {AdminWorkspaceSkeleton} from './EditorialSkeletons.tsx';
 
 interface AdminFrontendOpsPanelProps {
   onRefreshAppConfig: () => void;
@@ -299,10 +300,10 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
         })}
       </div>
 
-      {loading && <p className="text-xs text-[#615E55]">در حال همگام‌سازی تنظیمات بخش‌های فرانت‌اند...</p>}
+      {loading && menuItems.length === 0 ? <AdminWorkspaceSkeleton /> : null}
 
       {/* 1. DAILY MENU & DELIVERY PRICING */}
-      {subTab === 'menu' && (
+      {!loading && subTab === 'menu' && (
         <div className="space-y-6">
           {/* Delivery Pricing Card */}
           <form
