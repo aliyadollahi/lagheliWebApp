@@ -158,7 +158,7 @@ export function MarketplaceView({
         <button
           type="button"
           onClick={() => setShowRegister(true)}
-          className="min-h-[46px] px-5 rounded-xl bg-[#3F523B] hover:bg-[#31412E] dark:bg-[#8EA888] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium inline-flex items-center justify-center gap-2 self-start sm:self-auto"
+          className="min-h-[46px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium inline-flex items-center justify-center gap-2 self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           <span>ثبت کسب‌وکار یا برند</span>
@@ -199,7 +199,7 @@ export function MarketplaceView({
             onClick={() => setRoleFilter('all')}
             className={`min-h-[42px] px-4 rounded-xl text-xs font-medium whitespace-nowrap shrink-0 ${
               roleFilter === 'all'
-                ? 'bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412]'
+                ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
                 : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
             }`}
           >
@@ -212,7 +212,7 @@ export function MarketplaceView({
               onClick={() => setRoleFilter(role.id)}
               className={`min-h-[42px] px-4 rounded-xl text-xs font-medium whitespace-nowrap shrink-0 ${
                 roleFilter === role.id
-                  ? 'bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412]'
+                  ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
                   : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
               }`}
             >
@@ -244,7 +244,7 @@ export function MarketplaceView({
             <article
               key={partner.id}
               onClick={() => openPartnerDetail(partner)}
-              className="cursor-pointer rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-6 flex flex-col justify-between gap-5 hover:border-[#3F523B]/50 transition-colors"
+              className="cursor-pointer rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-6 flex flex-col justify-between gap-5 hover:border-[#B54B1F]/50 transition-colors"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs text-[#615E55] dark:text-[#A9A497]">
@@ -256,7 +256,7 @@ export function MarketplaceView({
 
                 <div className="flex items-center gap-1.5">
                   <h2 className="text-lg font-bold">{partner.name}</h2>
-                  {partner.verified && <BadgeCheck className="w-4 h-4 text-[#3F523B] dark:text-[#8EA888] shrink-0" />}
+                  {partner.verified && <BadgeCheck className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F] shrink-0" />}
                 </div>
 
                 <p className="text-sm text-[#615E55] dark:text-[#A9A497] leading-relaxed line-clamp-3">
@@ -265,7 +265,7 @@ export function MarketplaceView({
               </div>
 
               <div className="pt-3 border-t border-[#E5E1D6]/70 dark:border-[#2F2D27] flex items-center justify-between text-xs">
-                <span className="text-[#3F523B] dark:text-[#8EA888] font-medium truncate">
+                <span className="text-[#B54B1F] dark:text-[#E29A6F] font-medium truncate">
                   {partner.promoLabel || 'مشاهده صفحه و کاتالوگ'}
                 </span>
                 {partner.claimStatus === 'unclaimed' && (
@@ -292,7 +292,7 @@ export function MarketplaceView({
                 </div>
                 <h2 className="text-2xl font-bold flex items-center gap-2">
                   <span>{selectedPartner.name}</span>
-                  {selectedPartner.verified && <BadgeCheck className="w-5 h-5 text-[#3F523B] dark:text-[#8EA888]" />}
+                  {selectedPartner.verified && <BadgeCheck className="w-5 h-5 text-[#B54B1F] dark:text-[#E29A6F]" />}
                 </h2>
               </div>
               <button
@@ -322,8 +322,8 @@ export function MarketplaceView({
                 onClick={() => handleFollowPartner(selectedPartner)}
                 className={`min-h-[44px] px-5 rounded-xl text-sm font-medium transition-colors ${
                   selectedPartner.isFollowing
-                    ? 'border border-[#3F523B] text-[#3F523B] dark:border-[#8EA888] dark:text-[#8EA888]'
-                    : 'bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412]'
+                    ? 'border border-[#B54B1F] text-[#B54B1F] dark:border-[#E29A6F] dark:text-[#E29A6F]'
+                    : 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
                 }`}
               >
                 {selectedPartner.isFollowing ? 'دنبال می‌کنید' : 'دنبال کردن کسب‌وکار'} ({toFaDigits(selectedPartner.followersCount)})
@@ -394,7 +394,7 @@ export function MarketplaceView({
                 <button
                   type="button"
                   onClick={() => setClaimTarget(selectedPartner)}
-                  className="min-h-[42px] px-4 rounded-xl border border-[#3F523B] text-[#3F523B] dark:border-[#8EA888] dark:text-[#8EA888] text-xs font-medium shrink-0"
+                  className="min-h-[42px] px-4 rounded-xl border border-[#B54B1F] text-[#B54B1F] dark:border-[#E29A6F] dark:text-[#E29A6F] text-xs font-medium shrink-0"
                 >
                   ثبت مالکیت صفحه
                 </button>
@@ -438,7 +438,7 @@ export function MarketplaceView({
               </button>
               <button
                 type="submit"
-                className="flex-1 min-h-[46px] rounded-xl bg-[#3F523B] text-[#F9F8F4] text-sm font-medium"
+                className="flex-1 min-h-[46px] rounded-xl bg-[#B54B1F] text-[#F9F8F4] text-sm font-medium"
               >
                 ارسال درخواست مالکیت
               </button>
@@ -460,7 +460,7 @@ export function MarketplaceView({
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-[#3F523B] dark:text-[#8EA888]" />
+                <Building2 className="w-5 h-5 text-[#B54B1F] dark:text-[#E29A6F]" />
                 <h2 className="text-lg font-bold">ثبت‌نام همکاران و اصناف در لاقلی</h2>
               </div>
               <button
@@ -568,7 +568,7 @@ export function MarketplaceView({
 
             <button
               type="submit"
-              className="w-full min-h-[48px] rounded-xl bg-[#3F523B] hover:bg-[#31412E] text-[#F9F8F4] text-sm font-medium"
+              className="w-full min-h-[48px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] text-[#F9F8F4] text-sm font-medium"
             >
               ارسال درخواست به صف تایید پنل مدیریت
             </button>

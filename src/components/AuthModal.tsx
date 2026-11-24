@@ -174,7 +174,7 @@ export function AuthModal({
             <button
               type="submit"
               disabled={loading}
-              className="w-full min-h-[48px] rounded-xl bg-[#3F523B] hover:bg-[#31412E] dark:bg-[#8EA888] dark:hover:bg-[#A2BC9C] text-[#F9F8F4] dark:text-[#141412] font-medium text-sm transition-colors disabled:opacity-50"
+              className="w-full min-h-[48px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:hover:bg-[#ECA982] text-[#F9F8F4] dark:text-[#141412] font-medium text-sm transition-colors disabled:opacity-50"
             >
               {loading ? 'در حال ارسال کد...' : 'دریافت کد تایید پیامکی'}
             </button>
@@ -182,13 +182,13 @@ export function AuthModal({
         ) : (
           <form onSubmit={handleVerifyOtp} className="mt-6 space-y-4">
             {devCode && (
-              <div className="rounded-xl border border-[#3F523B]/25 bg-[#F1EFE8] dark:bg-[#24231F] p-3.5 text-sm flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-[#3F523B] dark:text-[#8EA888] shrink-0 mt-0.5" />
+              <div className="rounded-xl border border-[#B54B1F]/25 bg-[#F1EFE8] dark:bg-[#24231F] p-3.5 text-sm flex items-start gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F] shrink-0 mt-0.5" />
                 <div>
                   <p className="text-[#1C1B18] dark:text-[#F4F1EA]">
                     کد آزمایشی برای شماره <span dir="ltr" className="tabular-nums font-medium">{toFaDigits(phone)}</span>:
                   </p>
-                  <p dir="ltr" className="mt-1 text-lg font-bold tracking-widest text-[#3F523B] dark:text-[#8EA888] tabular-nums">
+                  <p dir="ltr" className="mt-1 text-lg font-bold tracking-widest text-[#B54B1F] dark:text-[#E29A6F] tabular-nums">
                     {devCode}
                   </p>
                 </div>
@@ -227,7 +227,7 @@ export function AuthModal({
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 min-h-[48px] rounded-xl bg-[#3F523B] hover:bg-[#31412E] dark:bg-[#8EA888] dark:hover:bg-[#A2BC9C] text-[#F9F8F4] dark:text-[#141412] font-medium text-sm transition-colors disabled:opacity-50"
+                className="flex-1 min-h-[48px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:hover:bg-[#ECA982] text-[#F9F8F4] dark:text-[#141412] font-medium text-sm transition-colors disabled:opacity-50"
               >
                 {loading ? 'در حال بررسی...' : 'تایید و ورود'}
               </button>

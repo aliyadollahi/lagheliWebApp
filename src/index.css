@@ -10,8 +10,8 @@
     --lagheli-border: #E5E1D6;
     --lagheli-ink: #1C1B18;
     --lagheli-ink-muted: #615E55;
-    --lagheli-accent: #3F523B;
-    --lagheli-accent-hover: #31412E;
+    --lagheli-accent: #B54B1F;
+    --lagheli-accent-hover: #963B15;
     --lagheli-saffron: #A97222;
   }
 
@@ -22,8 +22,8 @@
     --lagheli-border: #2F2D27;
     --lagheli-ink: #F4F1EA;
     --lagheli-ink-muted: #A9A497;
-    --lagheli-accent: #8EA888;
-    --lagheli-accent-hover: #A2BC9C;
+    --lagheli-accent: #E29A6F;
+    --lagheli-accent-hover: #ECA982;
     --lagheli-saffron: #D8A85B;
   }
 
@@ -31,6 +31,7 @@
     font-family: 'Vazirmatn', system-ui, -apple-system, sans-serif;
     direction: rtl;
     scroll-behavior: smooth;
+    overflow-x: clip;
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -39,6 +40,7 @@
     color: var(--lagheli-ink);
     font-feature-settings: "tnum" on;
     line-height: 1.7;
+    overflow-x: clip;
   }
 
   h1, h2, h3, h4 {

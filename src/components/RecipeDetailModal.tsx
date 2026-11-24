@@ -3,6 +3,7 @@ import {
   ArrowLeftRight,
   BadgeCheck,
   Bookmark,
+  Camera,
   Check,
   ChefHat,
   Clock,
@@ -15,9 +16,12 @@ import {
   Share2,
   ShoppingBag,
   ThumbsUp,
+  Upload,
   X,
 } from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
+import {fileToCompressedDataUrl} from '../lib/imageUpload.ts';
+import {shareRecipeWithWebShare} from '../lib/webShare.ts';
 import {
   PARTNER_ROLE_LABELS,
   findNativeSubstitutions,
@@ -28,6 +32,7 @@ import type {
   IngredientItem,
   Partner,
   Recipe,
+  RecipePhoto,
   RecipeQuestion,
   SubstitutionSuggestion,
   UserProfile,
@@ -74,10 +79,18 @@ export function RecipeDetailModal({
   const [variations, setVariations] = useState<Recipe[]>([]);
   const [questions, setQuestions] = useState<RecipeQuestion[]>([]);
   const [contextualPartners, setContextualPartners] = useState<Partner[]>([]);
+  const [communityPhotos, setCommunityPhotos] = useState<RecipePhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [servings, setServings] = useState(4);
   const [haveSet, setHaveSet] = useState<Set<string>>(new Set());
   const [cookMode, setCookMode] = useState(false);
+  const [activeStepOrder, setActiveStepOrder] = useState<number | null>(null);
+
+  // Community real dish photo uploader state
+  const [photoFormOpen, setPhotoFormOpen] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState('');
+  const [photoCaption, setPhotoCaption] = useState('');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // Inline substitution finder state
   const [subIngredient, setSubIngredient] = useState<string | null>(null);
@@ -96,13 +109,16 @@ export function RecipeDetailModal({
         variations: Recipe[];
         questions: RecipeQuestion[];
         contextualPartners: Partner[];
+        communityPhotos?: RecipePhoto[];
       }>(`/api/recipes/${idToLoad}?city=${encodeURIComponent(city)}`);
       setRecipe(data.recipe);
       setVariations(data.variations);
       setQuestions(data.questions);
       setContextualPartners(data.contextualPartners);
+      setCommunityPhotos(data.communityPhotos || []);
       setServings(data.recipe.servings);
       setHaveSet(new Set());
+      setActiveStepOrder(null);
       // Record non-blocking partner impressions
       data.contextualPartners.forEach((p) => {
         apiRequest(`/api/partners/${p.id}/events`, {
@@ -120,6 +136,69 @@ export function RecipeDetailModal({
   useEffect(() => {
     loadDetail(recipeId);
   }, [recipeId, city]);
+
+  // Dynamic Schema.org Recipe JSON-LD & Page Title for Rich Search Results (SEO)
+  useEffect(() => {
+    if (!recipe) return;
+    const prevTitle = document.title;
+    const metaDesc = document.querySelector('meta[name="description"]');
+    const prevDesc = metaDesc?.getAttribute('content') || '';
+
+    document.title = `طرز تهیه ${recipe.title} | لاقلی`;
+    if (metaDesc && recipe.description) {
+      metaDesc.setAttribute('content', `${recipe.description} — زمان پخت ${recipe.cookMinutes} دقیقه در لاقلی.`);
+    }
+
+    const totalMinutes = (recipe.prepMinutes || 0) + (recipe.cookMinutes || 0);
+    const schemaData: Record<string, unknown> = {
+      '@context': 'https://schema.org',
+      '@type': 'Recipe',
+      name: recipe.title,
+      description: recipe.description,
+      inLanguage: 'fa-IR',
+      recipeCategory: recipe.category,
+      recipeCuisine: recipe.region ? `ایرانی (${recipe.region})` : 'ایرانی',
+      prepTime: `PT${Math.max(1, recipe.prepMinutes || 10)}M`,
+      cookTime: `PT${Math.max(1, recipe.cookMinutes || 15)}M`,
+      totalTime: `PT${Math.max(1, totalMinutes || 25)}M`,
+      recipeYield: `${recipe.servings} نفر`,
+      author: {
+        '@type': 'Person',
+        name: recipe.authorName,
+      },
+      nutrition: {
+        '@type': 'NutritionInformation',
+        calories: `${recipe.nutrition.calories} calories`,
+        proteinContent: `${recipe.nutrition.protein} g`,
+        carbohydrateContent: `${recipe.nutrition.carbs} g`,
+        fatContent: `${recipe.nutrition.fat} g`,
+        fiberContent: `${recipe.nutrition.fiber} g`,
+      },
+      recipeIngredient: recipe.ingredients.map((i) => `${i.amount} ${i.unit} ${i.name}`),
+      recipeInstructions: recipe.steps.map((s) => ({
+        '@type': 'HowToStep',
+        position: s.order,
+        text: s.instruction,
+      })),
+    };
+    if (recipe.imageUrl) {
+      schemaData.image = recipe.imageUrl.startsWith('http')
+        ? recipe.imageUrl
+        : `${window.location.origin}${recipe.imageUrl}`;
+    }
+
+    const scriptEl = document.createElement('script');
+    scriptEl.type = 'application/ld+json';
+    scriptEl.id = 'lagheli-recipe-jsonld';
+    scriptEl.textContent = JSON.stringify(schemaData);
+    document.head.appendChild(scriptEl);
+
+    return () => {
+      document.title = prevTitle;
+      if (metaDesc && prevDesc) metaDesc.setAttribute('content', prevDesc);
+      scriptEl.remove();
+    };
+  }, [recipe]);
 
   const handleFindSubstitute = async (ingName: string) => {
     setSubIngredient(ingName);
@@ -211,25 +290,49 @@ export function RecipeDetailModal({
 
   const handleShareText = async () => {
     if (!recipe) return;
-    const scale = servings / Math.max(1, recipe.servings);
-    const ingText = recipe.ingredients
-      .map((i) => `- ${i.name}: ${formatQuantity(i.amount * scale)} ${i.unit}`)
-      .join('\n');
-    const fullText = `${recipe.title} (برای ${toFaDigits(servings)} نفر)\n\nمواد اولیه:\n${ingText}\n\n${window.location.origin}/?recipe=${recipe.slug}`;
+    const result = await shareRecipeWithWebShare(recipe, {servings, includeIngredients: true});
+    if (result.message) {
+      onNotify(result.message);
+    }
+  };
+
+  const handleUploadCommunityPhoto = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recipe) return;
+    if (!user) {
+      onRequireAuth();
+      return;
+    }
+    if (!photoPreview) {
+      onNotify('لطفاً ابتدا عکس غذای پخته‌شده خود را انتخاب کنید.');
+      return;
+    }
+    setUploadingPhoto(true);
     try {
-      if (navigator.share) {
-        await navigator.share({title: recipe.title, text: fullText});
-      } else {
-        await navigator.clipboard.writeText(fullText);
-        onNotify('متن و لینک دستور پخت کپی شد.');
-      }
-    } catch {
-      // Ignore cancel
+      const res = await apiRequest<{message: string}>(`/api/recipes/${recipe.id}/photos`, {
+        method: 'POST',
+        body: JSON.stringify({imageDataUrl: photoPreview, caption: photoCaption.trim()}),
+      });
+      setPhotoPreview('');
+      setPhotoCaption('');
+      setPhotoFormOpen(false);
+      onNotify(res.message);
+    } catch (err) {
+      onNotify(err instanceof Error ? err.message : 'خطا در ارسال عکس غذا');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
   if (cookMode && recipe) {
-    return <CookModeOverlay recipe={recipe} servings={servings} onClose={() => setCookMode(false)} />;
+    return (
+      <CookModeOverlay
+        recipe={recipe}
+        servings={servings}
+        onClose={() => setCookMode(false)}
+        onNotify={onNotify}
+      />
+    );
   }
 
   const scale = recipe ? servings / Math.max(1, recipe.servings) : 1;
@@ -239,40 +342,47 @@ export function RecipeDetailModal({
       role="dialog"
       aria-modal="true"
       aria-label="جزئیات دستور پخت"
-      className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs overflow-y-auto"
+      className="fixed inset-0 z-40 bg-black/45 overflow-y-auto"
     >
-      <div className="min-h-screen flex items-start justify-center p-0 sm:p-6">
-        <div className="w-full max-w-4xl bg-[#F9F8F4] dark:bg-[#141412] sm:rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] overflow-hidden my-0 sm:my-6">
-          {/* Sticky Modal Top Bar */}
-          <div className="sticky top-0 z-20 flex items-center justify-between gap-4 px-5 sm:px-8 h-16 bg-[#F9F8F4]/95 dark:bg-[#141412]/95 backdrop-blur-md border-b border-[#E5E1D6] dark:border-[#2F2D27]">
+      <div className="min-h-screen flex items-start justify-center p-0 sm:p-6 lg:p-10">
+        <div className="w-full max-w-[1020px] bg-[#FFFFFF]/84 dark:bg-[#141412]/78 backdrop-blur-[12px] backdrop-saturate-150 sm:rounded-[32px] border border-[rgba(255,255,255,0.1)] shadow-[0_32px_90px_-28px_rgba(17,17,16,0.38),inset_0_1px_0_rgba(255,255,255,0.35)] dark:shadow-[0_32px_90px_-28px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.1)] overflow-hidden my-0 sm:my-4">
+          {/* Sticky Frosted Glass Reading Bar */}
+          <div className="sticky top-0 z-20 flex items-center justify-between gap-4 px-5 sm:px-10 h-16 bg-[#FFFFFF]/72 dark:bg-[#141412]/72 backdrop-blur-[12px] backdrop-saturate-150 border-b border-[rgba(255,255,255,0.1)] shadow-[0_1px_0_rgba(17,17,16,0.05)] dark:shadow-none">
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[44px] px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+              className="min-h-[44px] px-3.5 rounded-full text-sm font-medium inline-flex items-center gap-1.5 hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07] transition-colors whitespace-nowrap shrink-0"
             >
               <X className="w-4 h-4" />
               <span>بستن</span>
             </button>
 
             {recipe && (
-              <div className="flex items-center gap-1.5">
+              <span className="hidden md:block text-xs font-medium text-[#615E55] dark:text-[#A9A497] truncate max-w-md">
+                {recipe.title}
+              </span>
+            )}
+
+            {recipe && (
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={handleShareText}
-                  aria-label="اشتراک‌گذاری"
-                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+                  aria-label="اشتراک‌گذاری دستور پخت"
+                  className="min-h-[44px] px-3.5 rounded-full text-sm inline-flex items-center justify-center gap-1.5 hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07] transition-colors whitespace-nowrap shrink-0"
                 >
                   <Share2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">اشتراک‌گذاری</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => onToggleBookmark(recipe.id)}
                   aria-label={isBookmarked ? 'حذف نشانک' : 'ذخیره در نشانک‌ها'}
                   aria-pressed={isBookmarked}
-                  className={`min-h-[44px] px-3.5 rounded-lg text-sm inline-flex items-center gap-1.5 transition-colors ${
+                  className={`min-h-[44px] px-4 rounded-full text-sm inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
                     isBookmarked
-                      ? 'bg-[#3F523B]/10 text-[#3F523B] dark:text-[#8EA888] font-medium'
-                      : 'hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]'
+                      ? 'bg-[#B54B1F]/12 text-[#B54B1F] dark:text-[#E29A6F] font-medium'
+                      : 'hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07]'
                   }`}
                 >
                   <Bookmark className="w-4 h-4" fill={isBookmarked ? 'currentColor' : 'none'} />
@@ -283,17 +393,28 @@ export function RecipeDetailModal({
           </div>
 
           {loading || !recipe ? (
-            <div className="p-12 text-center text-sm text-[#615E55]">در حال بارگذاری دستور پخت...</div>
+            <div className="py-24 px-8 text-center text-sm text-[#615E55] dark:text-[#A9A497]">
+              در حال بارگذاری دستور پخت...
+            </div>
           ) : (
-            <div className="p-5 sm:p-8 space-y-10">
-              {/* Hero Header */}
-              <div className="space-y-5">
-                <div className="rounded-2xl overflow-hidden border border-[#E5E1D6] dark:border-[#2F2D27]">
-                  <EditorialImage src={recipe.imageUrl} alt={recipe.title} aspectClass="aspect-[16/9]" priority />
+            <div className="px-5 sm:px-10 lg:px-14 pt-6 sm:pt-10 pb-14 sm:pb-20 space-y-14 sm:space-y-16">
+              {/* Hero Photograph + Overlapping Glassmorphism Primary Dish Info Panel */}
+              <div className="relative">
+                <div className="rounded-[26px] overflow-hidden border border-[rgba(255,255,255,0.1)] bg-[#F5F3EE] dark:bg-[#1C1B18]">
+                  <EditorialImage
+                    src={recipe.imageUrl}
+                    alt={recipe.title}
+                    category={recipe.category}
+                    photoCreditName={recipe.photoCreditName}
+                    aspectClass="aspect-[16/10] sm:aspect-[16/9]"
+                    priority
+                  />
                 </div>
 
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-[#615E55] dark:text-[#A9A497]">
+                {/* Glassmorphism Primary Dish Information Panel — Elevated over Hero Edge for Visual Depth */}
+                <div className="relative z-10 -mt-10 sm:-mt-16 mx-2 sm:mx-6 lg:mx-8 rounded-[28px] bg-[#FFFFFF]/74 dark:bg-[#1A1916]/72 backdrop-blur-[12px] backdrop-saturate-150 border border-[rgba(255,255,255,0.1)] shadow-[0_24px_60px_-24px_rgba(17,17,16,0.24),inset_0_1px_0_rgba(255,255,255,0.4)] dark:shadow-[0_28px_70px_-24px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.1)] p-6 sm:p-9 lg:p-10 space-y-6">
+                  {/* Quiet Unboxed Editorial Metadata Line */}
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[#615E55] dark:text-[#B8B3A6]">
                     <span>{recipe.category}</span>
                     <span aria-hidden="true">·</span>
                     <span>{recipe.region}</span>
@@ -309,90 +430,147 @@ export function RecipeDetailModal({
                     )}
                   </div>
 
-                  <h1 className="text-2xl sm:text-3xl font-bold leading-snug">{recipe.title}</h1>
-                  <p className="text-sm sm:text-base text-[#615E55] dark:text-[#A9A497] leading-relaxed">
-                    {recipe.description}
-                  </p>
+                  {/* Display Headline & Editorial Deck with Generous Measure */}
+                  <div className="space-y-4">
+                    <h1 className="text-2xl sm:text-3xl lg:text-[2.15rem] font-bold leading-[1.35] text-balance text-[#111110] dark:text-[#F4F1EA]">
+                      {recipe.title}
+                    </h1>
+                    <p className="text-sm sm:text-base text-[#4F4C44] dark:text-[#C4BFB2] leading-[1.95] max-w-[62ch]">
+                      {recipe.description}
+                    </p>
+                  </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-[#E5E1D6] dark:border-[#2F2D27]">
+                  {/* Chef Attribution & Time Strip */}
+                  <div className="flex flex-wrap items-center justify-between gap-4 pt-5 border-t border-[#111110]/[0.08] dark:border-white/[0.1]">
                     <button
                       type="button"
                       onClick={() => onOpenChef(recipe.authorId)}
-                      className="inline-flex items-center gap-1.5 text-sm font-medium min-h-[44px] hover:text-[#3F523B] dark:hover:text-[#8EA888]"
+                      className="inline-flex items-center gap-1.5 text-sm font-medium min-h-[44px] text-[#111110] dark:text-[#F4F1EA] hover:text-[#B54B1F] dark:hover:text-[#E29A6F] transition-colors"
                     >
                       <span>{recipe.authorName}</span>
                       {recipe.authorVerified && (
-                        <BadgeCheck className="w-4 h-4 text-[#3F523B] dark:text-[#8EA888]" />
+                        <BadgeCheck className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
                       )}
                     </button>
 
-                    <div className="flex items-center gap-4 text-xs text-[#615E55] dark:text-[#A9A497] tabular-nums">
-                      <span className="inline-flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" /> آماده‌سازی: {toFaDigits(recipe.prepMinutes)} دقیقه
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-[#59564E] dark:text-[#B8B3A6] tabular-nums">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-[#C85A28] dark:text-[#E29A6F]" />
+                        آماده‌سازی: {toFaDigits(recipe.prepMinutes)} دقیقه
                       </span>
                       <span>پخت: {toFaDigits(recipe.cookMinutes)} دقیقه</span>
+                      <span>کل زمان: {toFaDigits(recipe.prepMinutes + recipe.cookMinutes)} دقیقه</span>
                     </div>
+                  </div>
+
+                  {/* Primary Action Bar — Sculptural Obsidian Pill CTA */}
+                  <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-1">
+                    {recipe.isVip && !recipe.isUnlocked ? (
+                      <button
+                        type="button"
+                        onClick={handleUnlockVip}
+                        className="w-full sm:w-auto justify-center min-h-[50px] px-6 sm:px-7 rounded-full bg-[#B54B1F] hover:bg-[#963B15] text-white text-sm font-semibold inline-flex items-center gap-2 transition-colors whitespace-nowrap"
+                      >
+                        <Lock className="w-4 h-4 shrink-0" />
+                        <span>بازگشایی دستور ویژه با {toFaDigits(recipe.vipGemCost)} جِم</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setCookMode(true)}
+                        className="w-full sm:w-auto justify-center min-h-[50px] px-6 sm:px-7 rounded-full bg-[#111110] hover:bg-[#292825] dark:bg-[#F4F1EA] dark:hover:bg-[#E5E1D6] dark:text-[#111110] text-[#FFFFFF] text-sm font-semibold inline-flex items-center gap-2 transition-colors whitespace-nowrap"
+                      >
+                        <ChefHat className="w-4 h-4 shrink-0" />
+                        <span>شروع حالت آشپزی (گام‌به‌گام)</span>
+                      </button>
+                    )}
+
+                    {recipe.linkedMenuDishId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onJumpToOrder(recipe.linkedMenuDishId!);
+                        }}
+                        className="w-full sm:w-auto justify-center min-h-[48px] px-5 sm:px-6 rounded-full border border-[#111110]/15 dark:border-white/15 bg-[#FFFFFF]/60 dark:bg-white/[0.04] hover:bg-[#F5F3EE] dark:hover:bg-white/[0.08] text-sm font-medium inline-flex items-center transition-colors whitespace-nowrap"
+                      >
+                        حوصله پخت نداری؟ آماده سفارش بده
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleShareText}
+                      className="w-full sm:w-auto justify-center min-h-[48px] px-5 rounded-full border border-[#111110]/15 dark:border-white/15 bg-[#FFFFFF]/60 dark:bg-white/[0.04] hover:bg-[#F5F3EE] dark:hover:bg-white/[0.08] text-sm font-medium inline-flex items-center gap-2 transition-colors whitespace-nowrap"
+                    >
+                      <Share2 className="w-4 h-4 shrink-0" />
+                      <span>اشتراک‌گذاری دستور</span>
+                    </button>
                   </div>
                 </div>
 
-                {/* Primary Action Bar */}
-                <div className="flex flex-wrap items-center gap-3">
-                  {recipe.isVip && !recipe.isUnlocked ? (
-                    <button
-                      type="button"
-                      onClick={handleUnlockVip}
-                      className="min-h-[48px] px-6 rounded-xl bg-[#A97222] hover:opacity-90 text-white text-sm font-medium inline-flex items-center gap-2"
-                    >
-                      <Lock className="w-4 h-4" />
-                      <span>بازگشایی دستور ویژه با {toFaDigits(recipe.vipGemCost)} جِم</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setCookMode(true)}
-                      className="min-h-[48px] px-6 rounded-xl bg-[#3F523B] hover:bg-[#31412E] dark:bg-[#8EA888] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium inline-flex items-center gap-2"
-                    >
-                      <ChefHat className="w-4 h-4" />
-                      <span>شروع حالت آشپزی (گام‌به‌گام)</span>
-                    </button>
-                  )}
-
-                  {recipe.linkedMenuDishId && (
+                {/* Callout for Photo-less Recipes: Invite First Real User Dish Photo */}
+                {(!recipe.imageUrl || recipe.imageUrl.trim().length === 0) && (
+                  <div className="mt-8 mx-2 sm:mx-6 lg:mx-8 rounded-2xl border border-[#B54B1F]/20 dark:border-[#E29A6F]/25 bg-[#F9F8F4] dark:bg-[#1B1A17] p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-bold text-[#1C1B18] dark:text-[#F4F1EA]">
+                        این دستور هنوز عکس واقعی ندارد — اولین عکاس آن باشید
+                      </p>
+                      <p className="text-xs text-[#615E55] dark:text-[#A9A497] leading-[1.85] max-w-xl">
+                        پس از پخت، عکس واقعی غذای خود را ثبت کنید تا با نام شما تصویر اصلی این دستور شود و ۴۰ جِم هدیه بگیرید.
+                      </p>
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
-                        onClose();
-                        onJumpToOrder(recipe.linkedMenuDishId!);
+                        if (!user) {
+                          onRequireAuth();
+                          return;
+                        }
+                        setPhotoFormOpen(true);
                       }}
-                      className="min-h-[48px] px-5 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F] text-sm font-medium"
+                      className="w-full sm:w-auto min-h-[44px] px-5 rounded-full bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-xs font-medium inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 transition-colors"
                     >
-                      حوصله پخت نداری؟ آماده سفارش بده
+                      <Camera className="w-4 h-4" />
+                      <span>ارسال عکس واقعی (+۴۰ جِم)</span>
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
-              {/* Nutrition Breakdown (Clean Tabular Strip) */}
-              <div className="grid grid-cols-5 gap-2 sm:gap-4 rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4 text-center tabular-nums">
-                <div>
-                  <div className="text-xs text-[#615E55] dark:text-[#A9A497]">کالری</div>
-                  <div className="text-base sm:text-lg font-bold mt-0.5">{toFaDigits(recipe.nutrition.calories)}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-[#615E55] dark:text-[#A9A497]">پروتئین</div>
-                  <div className="text-base sm:text-lg font-bold mt-0.5">{toFaDigits(recipe.nutrition.protein)} گ</div>
-                </div>
-                <div>
-                  <div className="text-xs text-[#615E55] dark:text-[#A9A497]">کربوهیدرات</div>
-                  <div className="text-base sm:text-lg font-bold mt-0.5">{toFaDigits(recipe.nutrition.carbs)} گ</div>
-                </div>
-                <div>
-                  <div className="text-xs text-[#615E55] dark:text-[#A9A497]">چربی</div>
-                  <div className="text-base sm:text-lg font-bold mt-0.5">{toFaDigits(recipe.nutrition.fat)} گ</div>
-                </div>
-                <div>
-                  <div className="text-xs text-[#615E55] dark:text-[#A9A497]">فیبر</div>
-                  <div className="text-base sm:text-lg font-bold mt-0.5">{toFaDigits(recipe.nutrition.fiber)} گ</div>
+              {/* Airy Editorial Nutrition Strip (Mobile-Safe 2->5 Cols, Zero Heavy Box) */}
+              <div className="mx-2 sm:mx-6 lg:mx-8 border-y border-[#111110]/[0.07] dark:border-white/[0.08] py-6 sm:py-7">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-y-5 gap-x-4 sm:gap-6 text-center tabular-nums">
+                  <div className="space-y-1">
+                    <div className="text-xs text-[#6E6A60] dark:text-[#A9A497]">کالری</div>
+                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#F4F1EA]">
+                      {toFaDigits(recipe.nutrition.calories)}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs text-[#6E6A60] dark:text-[#A9A497]">پروتئین</div>
+                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#F4F1EA]">
+                      {toFaDigits(recipe.nutrition.protein)} گ
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs text-[#6E6A60] dark:text-[#A9A497]">کربوهیدرات</div>
+                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#F4F1EA]">
+                      {toFaDigits(recipe.nutrition.carbs)} گ
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs text-[#6E6A60] dark:text-[#A9A497]">چربی</div>
+                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#F4F1EA]">
+                      {toFaDigits(recipe.nutrition.fat)} گ
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs text-[#6E6A60] dark:text-[#A9A497]">فیبر</div>
+                    <div className="text-lg sm:text-xl font-bold text-[#111110] dark:text-[#F4F1EA]">
+                      {toFaDigits(recipe.nutrition.fiber)} گ
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -407,49 +585,77 @@ export function RecipeDetailModal({
                   <button
                     type="button"
                     onClick={handleUnlockVip}
-                    className="min-h-[48px] px-6 rounded-xl bg-[#3F523B] text-[#F9F8F4] text-sm font-medium mt-2"
+                    className="min-h-[48px] px-6 rounded-xl bg-[#B54B1F] text-[#F9F8F4] text-sm font-medium mt-2"
                   >
                     بازگشایی با {toFaDigits(recipe.vipGemCost)} جِم
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                  {/* Ingredients + Servings Scaler + 1-Click Shopping */}
-                  <div className="lg:col-span-5 space-y-5">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-bold">مواد اولیه</h2>
-                      <div className="inline-flex items-center gap-2 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] px-2 py-1">
-                        <button
-                          type="button"
-                          aria-label="کاهش تعداد نفرات"
-                          onClick={() => setServings((s) => Math.max(1, s - 1))}
-                          className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="text-sm font-medium tabular-nums min-w-[4.5rem] text-center">
-                          {toFaDigits(servings)} نفر
-                        </span>
-                        <button
-                          type="button"
-                          aria-label="افزایش تعداد نفرات"
-                          onClick={() => setServings((s) => Math.min(20, s + 1))}
-                          className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
+                <div className="mx-2 sm:mx-6 lg:mx-8 grid grid-cols-1 lg:grid-cols-12 gap-14 lg:gap-14 xl:gap-16 items-start">
+                  {/* Sticky Editorial Ingredients Ledger + Servings Scaler */}
+                  <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="space-y-1">
+                          <span className="text-[11px] font-medium text-[#847F73] dark:text-[#969083] block">
+                            فصل اول · فهرست تدارک
+                          </span>
+                          <h2 className="text-xl font-bold text-[#111110] dark:text-[#F4F1EA]">مواد اولیه</h2>
+                        </div>
+                        <div className="inline-flex items-center gap-1.5 rounded-full border border-[#111110]/[0.1] dark:border-white/[0.12] bg-[#F9F8F4] dark:bg-[#1C1B18] p-1">
+                          <button
+                            type="button"
+                            aria-label="کاهش تعداد نفرات"
+                            onClick={() => setServings((s) => Math.max(1, s - 1))}
+                            className="min-h-[34px] min-w-[34px] flex items-center justify-center rounded-full hover:bg-[#ECE8DE] dark:hover:bg-[#24231F] transition-colors"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="text-xs sm:text-sm font-semibold tabular-nums min-w-[4.25rem] text-center">
+                            {toFaDigits(servings)} نفر
+                          </span>
+                          <button
+                            type="button"
+                            aria-label="افزایش تعداد نفرات"
+                            onClick={() => setServings((s) => Math.min(20, s + 1))}
+                            className="min-h-[34px] min-w-[34px] flex items-center justify-center rounded-full bg-[#111110] dark:bg-[#F4F1EA] text-[#FFFFFF] dark:text-[#111110] transition-colors"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Quick Servings Choices (Inspired by Editorial Quick Choices) */}
+                      <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+                        {[2, 4, 6, 8].map((preset) => {
+                          const active = servings === preset;
+                          return (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setServings(preset)}
+                              className={`min-h-[38px] px-4 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                                active
+                                  ? 'bg-[#111110] text-[#FFFFFF] dark:bg-[#F4F1EA] dark:text-[#111110]'
+                                  : 'bg-[#F5F3EE] dark:bg-[#1C1B18] text-[#615E55] dark:text-[#A9A497] hover:text-[#111110] dark:hover:text-[#F4F1EA]'
+                              }`}
+                            >
+                              {toFaDigits(preset)} نفره
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
-                    <p className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                    <p className="text-xs text-[#6E6A60] dark:text-[#A9A497] leading-[1.85]">
                       موادی که در خانه دارید را تیک بزنید تا فقط کمبودها با یک کلیک به لیست خرید اضافه شوند.
                     </p>
 
-                    <ul className="divide-y divide-[#E5E1D6]/70 dark:divide-[#2F2D27] rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18]">
+                    <ul className="divide-y divide-[#111110]/[0.07] dark:divide-white/[0.08] border-y border-[#111110]/[0.07] dark:border-white/[0.08]">
                       {recipe.ingredients.map((ing: IngredientItem) => {
                         const checked = haveSet.has(ing.name);
                         return (
-                          <li key={ing.name} className="flex items-center justify-between gap-2 px-4 py-3">
+                          <li key={ing.name} className="flex items-center justify-between gap-3 py-3.5">
                             <button
                               type="button"
                               onClick={() =>
@@ -465,19 +671,23 @@ export function RecipeDetailModal({
                               <span
                                 className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
                                   checked
-                                    ? 'bg-[#3F523B] border-[#3F523B] text-white dark:bg-[#8EA888] dark:border-[#8EA888] dark:text-[#141412]'
-                                    : 'border-[#615E55]/40'
+                                    ? 'bg-[#B54B1F] border-[#B54B1F] text-white dark:bg-[#E29A6F] dark:border-[#E29A6F] dark:text-[#141412]'
+                                    : 'border-[#615E55]/35'
                                 }`}
                               >
                                 {checked && <Check className="w-3.5 h-3.5" />}
                               </span>
-                              <span className={`text-sm ${checked ? 'line-through opacity-50' : ''}`}>
+                              <span
+                                className={`text-sm leading-relaxed ${
+                                  checked ? 'line-through opacity-45' : 'text-[#1C1B18] dark:text-[#F4F1EA]'
+                                }`}
+                              >
                                 {ing.name}
                               </span>
                             </button>
 
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-xs text-[#615E55] dark:text-[#A9A497] tabular-nums">
+                              <span className="text-xs font-semibold text-[#524F47] dark:text-[#C4BFB2] tabular-nums">
                                 {formatQuantity(ing.amount * scale)} {ing.unit}
                               </span>
                               <button
@@ -485,7 +695,7 @@ export function RecipeDetailModal({
                                 aria-label={`یافتن جایگزین برای ${ing.name}`}
                                 title="یافتن جایگزین"
                                 onClick={() => handleFindSubstitute(ing.name)}
-                                className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg text-[#615E55] hover:text-[#3F523B] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+                                className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-full text-[#6E6A60] hover:text-[#111110] hover:bg-[#F5F3EE] dark:hover:text-[#F4F1EA] dark:hover:bg-[#24231F] transition-colors"
                               >
                                 <ArrowLeftRight className="w-3.5 h-3.5" />
                               </button>
@@ -498,7 +708,7 @@ export function RecipeDetailModal({
                     <button
                       type="button"
                       onClick={handleAddMissing}
-                      className="w-full min-h-[48px] rounded-xl bg-[#3F523B] hover:bg-[#31412E] dark:bg-[#8EA888] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
+                      className="w-full min-h-[50px] rounded-full bg-[#111110] hover:bg-[#292825] dark:bg-[#F4F1EA] dark:hover:bg-[#E5E1D6] dark:text-[#111110] text-[#FFFFFF] text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
                     >
                       <ShoppingBag className="w-4 h-4" />
                       <span>
@@ -506,9 +716,9 @@ export function RecipeDetailModal({
                       </span>
                     </button>
 
-                    {/* Inline Substitution Results Box */}
+                    {/* Frosted Inline Substitution Layer */}
                     {subIngredient && (
-                      <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4 space-y-3">
+                      <div className="rounded-2xl border border-[#111110]/[0.08] dark:border-white/[0.1] bg-[#F9F8F4]/85 dark:bg-[#1C1B18]/85 backdrop-blur-lg p-5 space-y-4">
                         <div className="flex items-center justify-between">
                           <h3 className="text-sm font-bold">جایگزین‌های پیشنهادی برای «{subIngredient}»</h3>
                           <button
@@ -519,20 +729,20 @@ export function RecipeDetailModal({
                             بستن
                           </button>
                         </div>
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                           {subResults.map((s) => (
                             <div
                               key={s.substitute}
-                              className="pt-3 first:pt-0 border-t first:border-t-0 border-[#E5E1D6]/70 dark:border-[#2F2D27] space-y-1.5"
+                              className="pt-3.5 first:pt-0 border-t first:border-t-0 border-[#111110]/[0.07] dark:border-white/[0.08] space-y-1.5"
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-sm font-semibold">{s.substitute}</span>
-                                <span className="text-xs text-[#3F523B] dark:text-[#8EA888] tabular-nums">
+                                <span className="text-xs text-[#B54B1F] dark:text-[#E29A6F] tabular-nums">
                                   سازگاری {toFaDigits(s.compatibility)}٪{s.isVegan ? ' · گیاهی' : ''}
                                 </span>
                               </div>
                               <p className="text-xs text-[#615E55] dark:text-[#A9A497]">نسبت: {s.ratio}</p>
-                              <p className="text-xs text-[#615E55] dark:text-[#A9A497] leading-relaxed">
+                              <p className="text-xs text-[#615E55] dark:text-[#A9A497] leading-[1.85]">
                                 {s.flavorNote}
                               </p>
                               <button
@@ -548,7 +758,7 @@ export function RecipeDetailModal({
                                     },
                                   ])
                                 }
-                                className="text-xs font-medium text-[#3F523B] dark:text-[#8EA888] hover:underline min-h-[36px]"
+                                className="text-xs font-medium text-[#B54B1F] dark:text-[#E29A6F] hover:underline min-h-[36px]"
                               >
                                 + افزودن به لیست خرید
                               </button>
@@ -559,33 +769,73 @@ export function RecipeDetailModal({
                     )}
                   </div>
 
-                  {/* Steps + Quiet Contextual Partner + Variations + Q&A */}
-                  <div className="lg:col-span-7 space-y-10">
-                    <div className="space-y-5">
-                      <h2 className="text-lg font-bold">مراحل پخت</h2>
-                      <ol className="space-y-6">
-                        {recipe.steps.map((step) => (
-                          <li key={step.order} className="flex gap-4">
-                            <span className="w-8 h-8 rounded-full bg-[#F1EFE8] dark:bg-[#24231F] text-[#3F523B] dark:text-[#8EA888] text-sm font-bold flex items-center justify-center shrink-0 tabular-nums mt-0.5">
-                              {toFaDigits(step.order)}
-                            </span>
-                            <div className="space-y-1.5">
-                              <p className="text-sm sm:text-base leading-relaxed">{step.instruction}</p>
-                              {step.timerMinutes && (
-                                <p className="text-xs text-[#615E55] dark:text-[#A9A497] tabular-nums">
-                                  زمان تقریبی این مرحله: {toFaDigits(step.timerMinutes)} دقیقه
+                  {/* Spacious Editorial Cooking Narrative + Subsequent Magazine Chapters */}
+                  <div className="lg:col-span-7 space-y-16">
+                    <div className="space-y-8">
+                      <div className="flex items-end justify-between gap-4">
+                        <div className="space-y-1">
+                          <span className="text-[11px] font-medium text-[#847F73] dark:text-[#969083] block">
+                            فصل دوم · روایت پخت
+                          </span>
+                          <h2 className="text-xl sm:text-2xl font-bold text-[#111110] dark:text-[#F4F1EA]">
+                            مراحل پخت
+                          </h2>
+                        </div>
+                        {activeStepOrder !== null && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveStepOrder(null)}
+                            className="text-xs text-[#6E6A60] dark:text-[#A9A497] hover:text-[#111110] dark:hover:text-[#F4F1EA] min-h-[36px] px-2 transition-colors"
+                          >
+                            نمایش یکسان همه مراحل
+                          </button>
+                        )}
+                      </div>
+
+                      <ol className="space-y-10 sm:space-y-12">
+                        {recipe.steps.map((step) => {
+                          const isFocused = activeStepOrder === step.order;
+                          const isDimmed = activeStepOrder !== null && !isFocused;
+                          return (
+                            <li
+                              key={step.order}
+                              onClick={() =>
+                                setActiveStepOrder((curr) => (curr === step.order ? null : step.order))
+                              }
+                              className={`group flex gap-5 sm:gap-7 cursor-pointer transition-opacity duration-200 ${
+                                isDimmed ? 'opacity-45 hover:opacity-85' : 'opacity-100'
+                              }`}
+                            >
+                              <span
+                                className={`text-2xl sm:text-[1.85rem] font-light tabular-nums leading-none pt-1 min-w-[2.25rem] select-none transition-colors ${
+                                  isFocused
+                                    ? 'text-[#C85A28] dark:text-[#E29A6F] font-semibold'
+                                    : 'text-[#C85A28]/70 dark:text-[#E29A6F]/75'
+                                }`}
+                              >
+                                {toFaDigits(step.order < 10 ? `0${step.order}` : step.order)}
+                              </span>
+                              <div className="space-y-3 flex-1 pb-6 border-b border-[#111110]/[0.05] dark:border-white/[0.06] group-last:border-b-0 group-last:pb-0">
+                                <p className="text-[15.5px] sm:text-[16.5px] leading-[2.05] text-[#1C1B18] dark:text-[#EFECE4] max-w-[58ch]">
+                                  {step.instruction}
                                 </p>
-                              )}
-                            </div>
-                          </li>
-                        ))}
+                                {step.timerMinutes && (
+                                  <p className="text-xs text-[#787368] dark:text-[#A9A497] tabular-nums inline-flex items-center gap-1.5">
+                                    <Clock className="w-3.5 h-3.5 text-[#C85A28]/80 dark:text-[#E29A6F]" />
+                                    <span>زمان تقریبی این مرحله: {toFaDigits(step.timerMinutes)} دقیقه</span>
+                                  </p>
+                                )}
+                              </div>
+                            </li>
+                          );
+                        })}
                       </ol>
                     </div>
 
                     {/* Quiet Contextual Partner Suggestion (Strictly capped by Admin Panel) */}
                     {contextualPartners.length > 0 && (
-                      <div className="space-y-3 border-t border-[#E5E1D6] dark:border-[#2F2D27] pt-6">
-                        <p className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                      <div className="space-y-4 border-t border-[#111110]/[0.07] dark:border-white/[0.08] pt-10">
+                        <p className="text-xs text-[#6E6A60] dark:text-[#A9A497]">
                           تامین مواد و تجهیزات مرتبط با این دستور
                         </p>
                         {contextualPartners.map((partner) => (
@@ -600,12 +850,12 @@ export function RecipeDetailModal({
                               <button
                                 type="button"
                                 onClick={() => onOpenPartner(partner)}
-                                className="text-base font-bold hover:text-[#3F523B] dark:hover:text-[#8EA888] text-right"
+                                className="text-base font-bold hover:text-[#B54B1F] dark:hover:text-[#E29A6F] text-right"
                               >
                                 {partner.name}
                               </button>
                               {partner.promoLabel && (
-                                <p className="text-xs text-[#3F523B] dark:text-[#8EA888]">{partner.promoLabel}</p>
+                                <p className="text-xs text-[#B54B1F] dark:text-[#E29A6F]">{partner.promoLabel}</p>
                               )}
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
@@ -639,11 +889,134 @@ export function RecipeDetailModal({
                       </div>
                     )}
 
+                    {/* Community Real Cooked Photos Gallery & Upload */}
+                    <div className="border-t border-[#111110]/[0.07] dark:border-white/[0.08] pt-10 space-y-6">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <h2 className="text-base font-bold inline-flex items-center gap-2">
+                            <Camera className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
+                            <span>عکس‌های واقعی کاربران از این دستور ({toFaDigits(communityPhotos.length)})</span>
+                          </h2>
+                          <p className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                            تصاویر واقعی پخته‌شده توسط آشپزهای لاقلی در خانه
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!user) {
+                              onRequireAuth();
+                              return;
+                            }
+                            setPhotoFormOpen((v) => !v);
+                          }}
+                          className="min-h-[42px] px-4 rounded-xl border border-[#B54B1F]/40 dark:border-[#E29A6F]/40 text-xs font-medium text-[#B54B1F] dark:text-[#E29A6F] hover:bg-[#B54B1F]/8 inline-flex items-center gap-1.5"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>ثبت عکس غذای پخته‌شده من</span>
+                        </button>
+                      </div>
+
+                      {photoFormOpen && (
+                        <form
+                          onSubmit={handleUploadCommunityPhoto}
+                          className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 space-y-4"
+                        >
+                          <div className="flex flex-wrap items-center gap-3">
+                            <label className="min-h-[44px] px-4 rounded-xl border border-dashed border-[#B54B1F]/50 dark:border-[#E29A6F]/50 bg-[#F9F8F4] dark:bg-[#141412] text-xs font-medium inline-flex items-center gap-2 cursor-pointer hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]">
+                              <Camera className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
+                              <span>{photoPreview ? 'انتخاب تصویر دیگر' : 'انتخاب عکس از دوربین یا گالری'}</span>
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                capture="environment"
+                                className="sr-only"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  try {
+                                    const compressed = await fileToCompressedDataUrl(file);
+                                    setPhotoPreview(compressed);
+                                  } catch (err) {
+                                    onNotify(err instanceof Error ? err.message : 'خطا در خواندن تصویر');
+                                  }
+                                }}
+                              />
+                            </label>
+                            {photoPreview && (
+                              <img
+                                src={photoPreview}
+                                alt="پیش‌نمایش عکس شما"
+                                className="w-24 h-18 object-cover rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27]"
+                              />
+                            )}
+                          </div>
+
+                          <input
+                            type="text"
+                            maxLength={240}
+                            value={photoCaption}
+                            onChange={(e) => setPhotoCaption(e.target.value)}
+                            placeholder="تجربه پخت یا نکته کوتاه شما (اختیاری، مثلاً با روغن کرمانشاهی عالی شد)..."
+                            className="w-full min-h-[44px] rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#F9F8F4] dark:bg-[#141412] px-3.5 text-xs"
+                          />
+
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-[11px] text-[#615E55] dark:text-[#A9A497]">
+                              پس از تایید مدیریت منتشر می‌شود و با نام شما نمایش داده خواهد شد.
+                            </span>
+                            <button
+                              type="submit"
+                              disabled={uploadingPhoto || !photoPreview}
+                              className="min-h-[42px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-xs font-medium disabled:opacity-40"
+                            >
+                              {uploadingPhoto ? 'در حال ارسال...' : 'ارسال برای انتشار'}
+                            </button>
+                          </div>
+                        </form>
+                      )}
+
+                      {communityPhotos.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {communityPhotos.map((ph) => (
+                            <figure
+                              key={ph.id}
+                              className="rounded-2xl overflow-hidden border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18]"
+                            >
+                              <EditorialImage
+                                src={ph.imageUrl}
+                                alt={`عکس واقعی از ${ph.userName}`}
+                                aspectClass="aspect-[4/3]"
+                                compactEmpty
+                              />
+                              <figcaption className="p-3.5 space-y-1">
+                                <div className="flex items-center justify-between text-xs font-semibold">
+                                  <span>{ph.userName}</span>
+                                  {ph.isCover && (
+                                    <span className="text-[11px] text-[#B54B1F] dark:text-[#E29A6F]">تصویر منتخب دستور</span>
+                                  )}
+                                </div>
+                                {ph.caption && (
+                                  <p className="text-xs text-[#615E55] dark:text-[#A9A497] leading-relaxed">
+                                    {ph.caption}
+                                  </p>
+                                )}
+                              </figcaption>
+                            </figure>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                          هنوز عکسی از پخت کاربران برای این دستور ثبت نشده است. با ارسال اولین عکس، نام شما پای تصویر اصلی درج می‌شود.
+                        </p>
+                      )}
+                    </div>
+
                     {/* Variations / Forking */}
-                    <div className="border-t border-[#E5E1D6] dark:border-[#2F2D27] pt-6 space-y-4">
+                    <div className="border-t border-[#111110]/[0.07] dark:border-white/[0.08] pt-10 space-y-5">
                       <div className="flex items-center justify-between gap-4">
                         <h2 className="text-base font-bold inline-flex items-center gap-2">
-                          <GitFork className="w-4 h-4 text-[#3F523B] dark:text-[#8EA888]" />
+                          <GitFork className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
                           <span>روش‌های پخت جایگزین ({toFaDigits(variations.length)})</span>
                         </h2>
                         <button
@@ -655,7 +1028,7 @@ export function RecipeDetailModal({
                             }
                             onOpenVariationSubmit(recipe);
                           }}
-                          className="text-xs font-medium text-[#3F523B] dark:text-[#8EA888] hover:underline min-h-[44px] px-2"
+                          className="text-xs font-medium text-[#B54B1F] dark:text-[#E29A6F] hover:underline min-h-[44px] px-2"
                         >
                           + ثبت روش جایگزین
                         </button>
@@ -668,7 +1041,7 @@ export function RecipeDetailModal({
                               key={v.id}
                               type="button"
                               onClick={() => loadDetail(v.id)}
-                              className="w-full text-right rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4 hover:border-[#3F523B]/50 transition-colors"
+                              className="w-full text-right rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-4 hover:border-[#B54B1F]/50 transition-colors"
                             >
                               <div className="text-sm font-bold">{v.title}</div>
                               {v.variationNote && (
@@ -685,9 +1058,9 @@ export function RecipeDetailModal({
                     </div>
 
                     {/* Q&A Section */}
-                    <div className="border-t border-[#E5E1D6] dark:border-[#2F2D27] pt-6 space-y-5">
+                    <div className="border-t border-[#111110]/[0.07] dark:border-white/[0.08] pt-10 space-y-6">
                       <h2 className="text-base font-bold inline-flex items-center gap-2">
-                        <MessageSquare className="w-4 h-4 text-[#3F523B] dark:text-[#8EA888]" />
+                        <MessageSquare className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
                         <span>پرسش و پاسخ آشپزی ({toFaDigits(questions.length)})</span>
                       </h2>
 
@@ -702,7 +1075,7 @@ export function RecipeDetailModal({
                         <button
                           type="submit"
                           disabled={questionBody.trim().length < 6}
-                          className="min-h-[48px] px-5 rounded-xl bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412] text-sm font-medium disabled:opacity-40"
+                          className="min-h-[48px] px-5 rounded-xl bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412] text-sm font-medium disabled:opacity-40"
                         >
                           ارسال
                         </button>
@@ -717,7 +1090,7 @@ export function RecipeDetailModal({
                             <div className="flex items-center justify-between text-xs text-[#615E55] dark:text-[#A9A497]">
                               <span>{q.authorName}</span>
                               {q.solved && (
-                                <span className="text-[#3F523B] dark:text-[#8EA888] font-medium">حل‌شده</span>
+                                <span className="text-[#B54B1F] dark:text-[#E29A6F] font-medium">حل‌شده</span>
                               )}
                             </div>
                             <p className="text-sm font-medium">{q.body}</p>
@@ -730,10 +1103,10 @@ export function RecipeDetailModal({
                                       <span className="inline-flex items-center gap-1 font-medium text-[#1C1B18] dark:text-[#F4F1EA]">
                                         {a.authorName}
                                         {a.authorVerified && (
-                                          <BadgeCheck className="w-3.5 h-3.5 text-[#3F523B] dark:text-[#8EA888]" />
+                                          <BadgeCheck className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
                                         )}
                                         {a.isBest && (
-                                          <span className="text-[#3F523B] dark:text-[#8EA888] mr-1">· بهترین پاسخ</span>
+                                          <span className="text-[#B54B1F] dark:text-[#E29A6F] mr-1">· بهترین پاسخ</span>
                                         )}
                                       </span>
 
@@ -746,7 +1119,7 @@ export function RecipeDetailModal({
                                               if (recipe) loadDetail(recipe.id);
                                               onNotify('بهترین پاسخ انتخاب شد.');
                                             }}
-                                            className="text-xs text-[#3F523B] dark:text-[#8EA888] hover:underline"
+                                            className="text-xs text-[#B54B1F] dark:text-[#E29A6F] hover:underline"
                                           >
                                             انتخاب بهترین پاسخ
                                           </button>
@@ -757,7 +1130,7 @@ export function RecipeDetailModal({
                                             await apiRequest(`/api/answers/${a.id}/upvote`, {method: 'POST'});
                                             if (recipe) loadDetail(recipe.id);
                                           }}
-                                          className="inline-flex items-center gap-1 text-xs hover:text-[#3F523B] tabular-nums min-h-[32px] px-1.5"
+                                          className="inline-flex items-center gap-1 text-xs hover:text-[#B54B1F] tabular-nums min-h-[32px] px-1.5"
                                         >
                                           <ThumbsUp className="w-3.5 h-3.5" />
                                           <span>{toFaDigits(a.upvotes)}</span>
@@ -784,7 +1157,7 @@ export function RecipeDetailModal({
                                 <button
                                   type="button"
                                   onClick={() => handleSubmitAnswer(q.id)}
-                                  className="min-h-[42px] px-4 rounded-xl bg-[#3F523B] text-[#F9F8F4] text-xs font-medium"
+                                  className="min-h-[42px] px-4 rounded-xl bg-[#B54B1F] text-[#F9F8F4] text-xs font-medium"
                                 >
                                   ثبت پاسخ
                                 </button>
@@ -793,7 +1166,7 @@ export function RecipeDetailModal({
                               <button
                                 type="button"
                                 onClick={() => setReplyTargetId(q.id)}
-                                className="text-xs text-[#615E55] hover:text-[#3F523B] dark:text-[#A9A497] min-h-[36px]"
+                                className="text-xs text-[#615E55] hover:text-[#B54B1F] dark:text-[#A9A497] min-h-[36px]"
                               >
                                 ثبت پاسخ به این سوال
                               </button>

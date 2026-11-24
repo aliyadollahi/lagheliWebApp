@@ -1,6 +1,7 @@
 import {useState} from 'react';
-import {Plus, Trash2, X} from 'lucide-react';
+import {Camera, Plus, Trash2, X} from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
+import {fileToCompressedDataUrl} from '../lib/imageUpload.ts';
 import {toFaDigits} from '../shared/persianEngine.ts';
 import type {Recipe} from '../shared/types.ts';
 
@@ -11,14 +12,6 @@ interface SubmitRecipeModalProps {
   onSubmitted: () => void;
   onNotify: (msg: string) => void;
 }
-
-const IMAGE_PRESETS = [
-  {label: 'ته‌چین زعفرانی', url: '/src/assets/images/hero_tahchin_saffron_1795554313371.jpg'},
-  {label: 'خورشت فسنجان', url: '/src/assets/images/dish_fesenjan_editorial_1795554313427.jpg'},
-  {label: 'میرزاقاسمی', url: '/src/assets/images/dish_mirza_ghasemi_1795554314673.jpg'},
-  {label: 'باقالی‌پلو', url: '/src/assets/images/dish_baghali_polo_1795554313137.jpg'},
-  {label: 'آش رشته', url: '/src/assets/images/dish_ash_reshteh_1795554316371.jpg'},
-];
 
 export function SubmitRecipeModal({
   open,
@@ -32,7 +25,8 @@ export function SubmitRecipeModal({
   const [subtitle, setSubtitle] = useState('');
   const [description, setDescription] = useState('');
   const [variationNote, setVariationNote] = useState('');
-  const [imageUrl, setImageUrl] = useState(parentRecipe?.imageUrl || IMAGE_PRESETS[0].url);
+  const [imageUrl, setImageUrl] = useState(parentRecipe?.imageUrl || '');
+  const [imageDataUrl, setImageDataUrl] = useState<string>('');
   const [category, setCategory] = useState(parentRecipe?.category || 'ناهار و شام');
   const [region, setRegion] = useState(parentRecipe?.region || 'تهران');
   const [season, setSeason] = useState('چهارفصل');
@@ -74,6 +68,7 @@ export function SubmitRecipeModal({
           subtitle: subtitle.trim() || description.trim().slice(0, 70),
           description: description.trim(),
           imageUrl,
+          imageDataUrl: imageDataUrl || undefined,
           category,
           region,
           season,
@@ -138,7 +133,7 @@ export function SubmitRecipeModal({
               onClick={() => setStep(s.id as 1 | 2 | 3)}
               className={`min-h-[40px] rounded-xl text-xs font-medium transition-colors ${
                 step === s.id
-                  ? 'bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412]'
+                  ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
                   : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
               }`}
             >
@@ -258,24 +253,51 @@ export function SubmitRecipeModal({
                 </div>
               </div>
 
-              <div>
-                <p className="text-xs text-[#615E55] mb-2">انتخاب تصویر ادیتوریال</p>
-                <div className="flex flex-wrap gap-2">
-                  {IMAGE_PRESETS.map((img) => (
+              <div className="space-y-2.5">
+                <p className="text-xs text-[#615E55] dark:text-[#A9A497]">
+                  تصویر واقعی غذای پخته‌شده (اختیاری — اگر فعلاً عکسی ندارید، کاربران بعد از پخت عکس واقعی آن را ثبت می‌کنند)
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="min-h-[44px] px-4 rounded-xl border border-dashed border-[#B54B1F]/50 dark:border-[#E29A6F]/50 bg-[#F9F8F4] dark:bg-[#141412] text-xs font-medium inline-flex items-center gap-2 cursor-pointer hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]">
+                    <Camera className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
+                    <span>{imageDataUrl ? 'تغییر عکس انتخاب‌شده' : 'آپلود عکس واقعی از گوشی یا سیستم'}</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const dataUrl = await fileToCompressedDataUrl(file);
+                          setImageDataUrl(dataUrl);
+                          setImageUrl('');
+                        } catch (err) {
+                          onNotify(err instanceof Error ? err.message : 'خطا در خواندن تصویر');
+                        }
+                      }}
+                    />
+                  </label>
+                  {(imageDataUrl || imageUrl) && (
                     <button
-                      key={img.url}
                       type="button"
-                      onClick={() => setImageUrl(img.url)}
-                      className={`min-h-[38px] px-3 rounded-lg text-xs ${
-                        imageUrl === img.url
-                          ? 'bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412]'
-                          : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55]'
-                      }`}
+                      onClick={() => {
+                        setImageDataUrl('');
+                        setImageUrl('');
+                      }}
+                      className="text-xs text-[#615E55] hover:text-red-600 min-h-[40px] px-2"
                     >
-                      {img.label}
+                      حذف تصویر
                     </button>
-                  ))}
+                  )}
                 </div>
+                {(imageDataUrl || imageUrl) && (
+                  <img
+                    src={imageDataUrl || imageUrl}
+                    alt="پیش‌نمایش تصویر دستور"
+                    className="w-40 h-28 object-cover rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27]"
+                  />
+                )}
               </div>
 
               <div>
@@ -288,7 +310,7 @@ export function SubmitRecipeModal({
                       onClick={() => toggleDiet(d)}
                       className={`min-h-[36px] px-3 rounded-lg text-xs ${
                         dietTags.includes(d)
-                          ? 'bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412]'
+                          ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
                           : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55]'
                       }`}
                     >
@@ -425,7 +447,7 @@ export function SubmitRecipeModal({
               <button
                 type="button"
                 onClick={() => setStep((s) => (s + 1) as 1 | 2 | 3)}
-                className="min-h-[46px] px-6 rounded-xl bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412] text-sm font-medium"
+                className="min-h-[46px] px-6 rounded-xl bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412] text-sm font-medium"
               >
                 مرحله بعد
               </button>
@@ -433,7 +455,7 @@ export function SubmitRecipeModal({
               <button
                 type="submit"
                 disabled={submitting}
-                className="min-h-[46px] px-6 rounded-xl bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412] text-sm font-medium disabled:opacity-40"
+                className="min-h-[46px] px-6 rounded-xl bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412] text-sm font-medium disabled:opacity-40"
               >
                 {submitting ? 'در حال ثبت...' : 'ثبت نهایی دستور (+۲۰ جِم)'}
               </button>

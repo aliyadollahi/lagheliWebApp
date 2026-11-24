@@ -81,7 +81,7 @@ export function ChefProfileModal({
             <div className="space-y-1.5">
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-bold">{chef.name}</h2>
-                {chef.isVerifiedChef && <BadgeCheck className="w-5 h-5 text-[#3F523B] dark:text-[#8EA888]" />}
+                {chef.isVerifiedChef && <BadgeCheck className="w-5 h-5 text-[#B54B1F] dark:text-[#E29A6F]" />}
               </div>
               <div className="text-xs text-[#615E55] dark:text-[#A9A497] flex items-center gap-2">
                 <span className="inline-flex items-center gap-1">
@@ -129,8 +129,8 @@ export function ChefProfileModal({
                   onClick={handleToggleFollow}
                   className={`min-h-[44px] px-5 rounded-xl text-sm font-medium transition-colors ${
                     chef.isFollowing
-                      ? 'border border-[#3F523B] text-[#3F523B] dark:border-[#8EA888] dark:text-[#8EA888]'
-                      : 'bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412]'
+                      ? 'border border-[#B54B1F] text-[#B54B1F] dark:border-[#E29A6F] dark:text-[#E29A6F]'
+                      : 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
                   }`}
                 >
                   {chef.isFollowing ? 'لغو دنبال کردن' : 'دنبال کردن'}
@@ -200,14 +200,14 @@ export function ChefProfileModal({
                         <div className="text-sm font-semibold flex items-center gap-1.5">
                           <span>{person.name}</span>
                           {person.isVerifiedChef && (
-                            <BadgeCheck className="w-3.5 h-3.5 text-[#3F523B] dark:text-[#8EA888]" />
+                            <BadgeCheck className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
                           )}
                         </div>
                         <div className="text-xs text-[#615E55] dark:text-[#A9A497]">
                           {person.city} · {person.specialty}
                         </div>
                       </div>
-                      <span className="text-xs text-[#3F523B] dark:text-[#8EA888]">مشاهده</span>
+                      <span className="text-xs text-[#B54B1F] dark:text-[#E29A6F]">مشاهده</span>
                     </button>
                   ))
                 )}

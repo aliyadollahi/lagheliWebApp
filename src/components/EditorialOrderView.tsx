@@ -186,7 +186,7 @@ export function EditorialOrderView({
 
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="inline-flex items-center gap-1.5 rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] px-3 min-h-[44px] text-xs">
-            <MapPin className="w-3.5 h-3.5 text-[#3F523B] dark:text-[#8EA888]" />
+            <MapPin className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
             <select
               aria-label="شهر تحویل"
               value={city}
@@ -233,7 +233,7 @@ export function EditorialOrderView({
                 <span dir="ltr" className="font-mono font-semibold text-[#1C1B18] dark:text-[#F4F1EA]">
                   {ord.trackingCode}
                 </span>
-                <span className="text-[#3F523B] dark:text-[#8EA888] font-medium">
+                <span className="text-[#B54B1F] dark:text-[#E29A6F] font-medium">
                   تاییدشده — در حال آماده‌سازی در آشپزخانه
                 </span>
               </div>
@@ -268,7 +268,7 @@ export function EditorialOrderView({
                   onClick={() => setCategory(cat)}
                   className={`min-h-[44px] px-4 rounded-xl text-sm whitespace-nowrap shrink-0 transition-colors ${
                     category === cat
-                      ? 'bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412] font-medium'
+                      ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412] font-medium'
                       : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
                   }`}
                 >
@@ -307,7 +307,7 @@ export function EditorialOrderView({
                   <p className="text-sm text-[#615E55] dark:text-[#A9A497] leading-relaxed">{featuredDish.story}</p>
                   <div className="inline-flex items-center gap-1.5 text-xs text-[#615E55] dark:text-[#A9A497]">
                     <span>{featuredDish.chefName}</span>
-                    {featuredDish.chefVerified && <BadgeCheck className="w-3.5 h-3.5 text-[#3F523B] dark:text-[#8EA888]" />}
+                    {featuredDish.chefVerified && <BadgeCheck className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />}
                   </div>
                 </div>
 
@@ -320,7 +320,7 @@ export function EditorialOrderView({
                         setSelectedDish(featuredDish);
                         setPortion('single');
                       }}
-                      className="min-h-[48px] px-6 rounded-xl bg-[#3F523B] hover:bg-[#31412E] dark:bg-[#8EA888] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium"
+                      className="min-h-[48px] px-6 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium"
                     >
                       انتخاب پرس و افزودن به سبد
                     </button>
@@ -388,7 +388,7 @@ export function EditorialOrderView({
                           setSelectedDish(dish);
                           setPortion('single');
                         }}
-                        className="min-h-[44px] px-5 rounded-xl bg-[#3F523B] hover:bg-[#31412E] dark:bg-[#8EA888] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium"
+                        className="min-h-[44px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium"
                       >
                         افزودن
                       </button>
@@ -461,7 +461,7 @@ export function EditorialOrderView({
                   onClick={() => setPortion('single')}
                   className={`min-h-[56px] p-3 rounded-xl border text-right transition-colors ${
                     portion === 'single'
-                      ? 'border-[#3F523B] bg-[#3F523B]/8 dark:border-[#8EA888]'
+                      ? 'border-[#B54B1F] bg-[#B54B1F]/8 dark:border-[#E29A6F]'
                       : 'border-[#E5E1D6] dark:border-[#2F2D27]'
                   }`}
                 >
@@ -475,7 +475,7 @@ export function EditorialOrderView({
                   onClick={() => setPortion('double')}
                   className={`min-h-[56px] p-3 rounded-xl border text-right transition-colors ${
                     portion === 'double'
-                      ? 'border-[#3F523B] bg-[#3F523B]/8 dark:border-[#8EA888]'
+                      ? 'border-[#B54B1F] bg-[#B54B1F]/8 dark:border-[#E29A6F]'
                       : 'border-[#E5E1D6] dark:border-[#2F2D27]'
                   }`}
                 >
@@ -504,7 +504,7 @@ export function EditorialOrderView({
             <button
               type="button"
               onClick={() => addToCart(selectedDish, portion, kitchenNote)}
-              className="w-full min-h-[48px] rounded-xl bg-[#3F523B] hover:bg-[#31412E] dark:bg-[#8EA888] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium tabular-nums"
+              className="w-full min-h-[48px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium tabular-nums"
             >
               افزودن به سبد — {formatToman(portion === 'double' ? selectedDish.doublePrice : selectedDish.singlePrice)}
             </button>
@@ -533,8 +533,8 @@ export function EditorialOrderView({
             </div>
 
             {confirmedOrder ? (
-              <div className="rounded-2xl border border-[#3F523B]/30 bg-[#FFFFFF] dark:bg-[#1C1B18] p-6 space-y-4">
-                <CheckCircle2 className="w-10 h-10 text-[#3F523B] dark:text-[#8EA888]" />
+              <div className="rounded-2xl border border-[#B54B1F]/30 bg-[#FFFFFF] dark:bg-[#1C1B18] p-6 space-y-4">
+                <CheckCircle2 className="w-10 h-10 text-[#B54B1F] dark:text-[#E29A6F]" />
                 <div className="space-y-1">
                   <h3 className="text-lg font-bold">سفارش با موفقیت تایید شد</h3>
                   <p className="text-sm text-[#615E55] dark:text-[#A9A497]">
@@ -560,7 +560,7 @@ export function EditorialOrderView({
                 <button
                   type="button"
                   onClick={() => setCheckoutOpen(false)}
-                  className="w-full min-h-[48px] rounded-xl bg-[#3F523B] text-[#F9F8F4] text-sm font-medium"
+                  className="w-full min-h-[48px] rounded-xl bg-[#B54B1F] text-[#F9F8F4] text-sm font-medium"
                 >
                   بازگشت به منو
                 </button>
@@ -680,7 +680,7 @@ export function EditorialOrderView({
                     <span className="text-[#615E55] dark:text-[#A9A497]">
                       هزینه ارسال (رایگان بالای {formatToman(freeThreshold)})
                     </span>
-                    <span className={deliveryFee === 0 ? 'text-[#3F523B] dark:text-[#8EA888] font-medium' : ''}>
+                    <span className={deliveryFee === 0 ? 'text-[#B54B1F] dark:text-[#E29A6F] font-medium' : ''}>
                       {deliveryFee === 0 ? 'رایگان' : formatToman(deliveryFee)}
                     </span>
                   </div>
@@ -693,7 +693,7 @@ export function EditorialOrderView({
                 <button
                   type="submit"
                   disabled={submitting || cart.length === 0}
-                  className="w-full min-h-[50px] rounded-xl bg-[#3F523B] hover:bg-[#31412E] dark:bg-[#8EA888] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium disabled:opacity-40"
+                  className="w-full min-h-[50px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium disabled:opacity-40"
                 >
                   {submitting ? 'در حال ثبت سفارش...' : `تایید و ثبت سفارش (${formatToman(total)})`}
                 </button>

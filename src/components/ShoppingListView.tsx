@@ -96,7 +96,7 @@ export function ShoppingListView({
         <span
           className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
             item.checked
-              ? 'bg-[#3F523B] border-[#3F523B] text-white dark:bg-[#8EA888] dark:border-[#8EA888] dark:text-[#141412]'
+              ? 'bg-[#B54B1F] border-[#B54B1F] text-white dark:bg-[#E29A6F] dark:border-[#E29A6F] dark:text-[#141412]'
               : 'border-[#615E55]/40'
           }`}
         >
@@ -251,7 +251,7 @@ export function ShoppingListView({
         <button
           type="submit"
           aria-label="افزودن به لیست"
-          className="sm:col-span-1 min-h-[46px] rounded-xl bg-[#3F523B] hover:bg-[#31412E] dark:bg-[#8EA888] dark:text-[#141412] text-[#F9F8F4] flex items-center justify-center"
+          className="sm:col-span-1 min-h-[46px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] flex items-center justify-center"
         >
           <Plus className="w-5 h-5" />
         </button>
@@ -290,7 +290,7 @@ export function ShoppingListView({
                 onClick={() => setSelectedCategory('همه')}
                 className={`min-h-[38px] px-3.5 rounded-lg text-xs whitespace-nowrap shrink-0 ${
                   selectedCategory === 'همه'
-                    ? 'bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412]'
+                    ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
                     : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
                 }`}
               >
@@ -303,7 +303,7 @@ export function ShoppingListView({
                   onClick={() => setSelectedCategory(cat)}
                   className={`min-h-[38px] px-3.5 rounded-lg text-xs whitespace-nowrap shrink-0 ${
                     selectedCategory === cat
-                      ? 'bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412]'
+                      ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
                       : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
                   }`}
                 >
@@ -347,12 +347,12 @@ export function ShoppingListView({
       {ecosystemConfig.shoppingDeliveryCardEnabled && deliveryPartner && (
         <div className="rounded-2xl border border-[#E5E1D6] dark:border-[#2F2D27] bg-[#FFFFFF] dark:bg-[#1C1B18] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            <Truck className="w-5 h-5 text-[#3F523B] dark:text-[#8EA888] shrink-0 mt-0.5" />
+            <Truck className="w-5 h-5 text-[#B54B1F] dark:text-[#E29A6F] shrink-0 mt-0.5" />
             <div className="space-y-1">
               <div className="text-xs text-[#615E55] dark:text-[#A9A497]">تامین و ارسال فوری لیست خرید</div>
               <div className="text-sm font-bold">{deliveryPartner.name}</div>
               {deliveryPartner.promoLabel && (
-                <div className="text-xs text-[#3F523B] dark:text-[#8EA888]">{deliveryPartner.promoLabel}</div>
+                <div className="text-xs text-[#B54B1F] dark:text-[#E29A6F]">{deliveryPartner.promoLabel}</div>
               )}
             </div>
           </div>

@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
-import {ChevronLeft, ChevronRight, Pause, Play, RotateCcw, Timer, Volume2, X} from 'lucide-react';
+import {ChevronLeft, ChevronRight, Pause, Play, RotateCcw, Share2, Timer, Volume2, X} from 'lucide-react';
+import {shareRecipeWithWebShare} from '../lib/webShare.ts';
 import {formatQuantity, toFaDigits} from '../shared/persianEngine.ts';
 import type {Recipe} from '../shared/types.ts';
 
@@ -7,6 +8,7 @@ interface CookModeOverlayProps {
   recipe: Recipe;
   servings: number;
   onClose: () => void;
+  onNotify?: (msg: string) => void;
 }
 
 interface ActiveTimer {
@@ -37,7 +39,7 @@ function playGentleChime() {
   }
 }
 
-export function CookModeOverlay({recipe, servings, onClose}: CookModeOverlayProps) {
+export function CookModeOverlay({recipe, servings, onClose, onNotify}: CookModeOverlayProps) {
   const [stepIdx, setStepIdx] = useState(0);
   const [timers, setTimers] = useState<ActiveTimer[]>([]);
   const [wakeLockActive, setWakeLockActive] = useState(false);
@@ -137,20 +139,34 @@ export function CookModeOverlay({recipe, servings, onClose}: CookModeOverlayProp
           </p>
           <h2 className="text-base font-bold truncate">{recipe.title}</h2>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="خروج از حالت آشپزی"
-          className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl border border-[#E5E1D6] dark:border-[#2F2D27] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={async () => {
+              const res = await shareRecipeWithWebShare(recipe, {servings, includeIngredients: true});
+              if (res.message && onNotify) onNotify(res.message);
+            }}
+            aria-label="اشتراک‌گذاری دستور پخت"
+            className="min-h-[48px] px-3.5 rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F] inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap"
+          >
+            <Share2 className="w-4 h-4" />
+            <span className="hidden sm:inline">اشتراک‌گذاری</span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="خروج از حالت آشپزی"
+            className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F]"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Progress Hairline */}
       <div className="h-1 w-full bg-[#E5E1D6] dark:bg-[#2F2D27]">
         <div
-          className="h-full bg-[#3F523B] dark:bg-[#8EA888] transition-all duration-300"
+          className="h-full bg-[#B54B1F] dark:bg-[#E29A6F] transition-all duration-300"
           style={{width: `${progress}%`}}
         />
       </div>
@@ -158,7 +174,7 @@ export function CookModeOverlay({recipe, servings, onClose}: CookModeOverlayProp
       {/* Main Step Content */}
       <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-8 max-w-3xl w-full mx-auto flex flex-col justify-between gap-8">
         <div className="space-y-8">
-          <div className="text-sm font-medium text-[#3F523B] dark:text-[#8EA888]">
+          <div className="text-sm font-medium text-[#B54B1F] dark:text-[#E29A6F]">
             گام {toFaDigits(currentStep?.order || stepIdx + 1)}
           </div>
 
@@ -189,7 +205,7 @@ export function CookModeOverlay({recipe, servings, onClose}: CookModeOverlayProp
               <button
                 type="button"
                 onClick={() => startStepTimer(currentStep.timerMinutes!, currentStep.order)}
-                className="inline-flex items-center gap-2.5 min-h-[48px] px-5 rounded-xl bg-[#3F523B] hover:bg-[#31412E] dark:bg-[#8EA888] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium transition-colors"
+                className="inline-flex items-center gap-2.5 min-h-[48px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium transition-colors"
               >
                 <Timer className="w-4 h-4" />
                 <span>شروع تایمر {toFaDigits(currentStep.timerMinutes)} دقیقه‌ای این مرحله</span>
@@ -212,7 +228,7 @@ export function CookModeOverlay({recipe, servings, onClose}: CookModeOverlayProp
                     <div className="text-xs text-[#615E55] dark:text-[#A9A497] flex items-center gap-1.5">
                       <span>{t.label}</span>
                       {t.remainingSeconds === 0 && (
-                        <span className="text-[#3F523B] dark:text-[#8EA888] font-semibold flex items-center gap-1">
+                        <span className="text-[#B54B1F] dark:text-[#E29A6F] font-semibold flex items-center gap-1">
                           <Volume2 className="w-3.5 h-3.5" /> زمان پایان یافت
                         </span>
                       )}
@@ -275,19 +291,32 @@ export function CookModeOverlay({recipe, servings, onClose}: CookModeOverlayProp
             <button
               type="button"
               onClick={() => setStepIdx((i) => Math.min(recipe.steps.length - 1, i + 1))}
-              className="flex-1 sm:flex-none min-h-[48px] px-8 rounded-xl bg-[#3F523B] hover:bg-[#31412E] dark:bg-[#8EA888] dark:text-[#141412] text-[#F9F8F4] flex items-center justify-center gap-2 text-sm font-medium"
+              className="flex-1 sm:flex-none min-h-[48px] px-8 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] flex items-center justify-center gap-2 text-sm font-medium"
             >
               <span>مرحله بعد</span>
               <ChevronLeft className="w-4 h-4" />
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 sm:flex-none min-h-[48px] px-8 rounded-xl bg-[#3F523B] hover:bg-[#31412E] dark:bg-[#8EA888] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium"
-            >
-              پایان آشپزی — نوش جان
-            </button>
+            <div className="flex items-center gap-2.5 flex-1 sm:flex-none justify-end">
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await shareRecipeWithWebShare(recipe, {servings, includeIngredients: true});
+                  if (res.message && onNotify) onNotify(res.message);
+                }}
+                className="min-h-[48px] px-4 sm:px-5 rounded-full border border-[#E5E1D6] dark:border-[#2F2D27] hover:bg-[#F1EFE8] dark:hover:bg-[#24231F] inline-flex items-center gap-1.5 text-sm font-medium whitespace-nowrap"
+              >
+                <Share2 className="w-4 h-4" />
+                <span className="hidden sm:inline">اشتراک‌گذاری</span>
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 sm:flex-none min-h-[48px] px-7 rounded-full bg-[#111110] hover:bg-[#292825] dark:bg-[#F4F1EA] dark:text-[#111110] text-[#FFFFFF] text-sm font-semibold whitespace-nowrap"
+              >
+                پایان آشپزی — نوش جان
+              </button>
+            </div>
           )}
         </div>
       </div>

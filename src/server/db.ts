@@ -290,9 +290,68 @@ export function initDatabase(): void {
       used INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS recipe_photos (
+      id TEXT PRIMARY KEY,
+      recipe_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      user_name TEXT NOT NULL,
+      image_url TEXT NOT NULL,
+      caption TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pending',
+      is_cover INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS wallet_transactions (
+      id TEXT PRIMARY KEY,
+      account_type TEXT NOT NULL,
+      account_id TEXT NOT NULL,
+      account_name TEXT NOT NULL,
+      currency TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      balance_after INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS sponsor_campaigns (
+      id TEXT PRIMARY KEY,
+      partner_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      subtitle TEXT NOT NULL DEFAULT '',
+      placement TEXT NOT NULL,
+      promo_code TEXT,
+      cta_label TEXT NOT NULL DEFAULT 'مشاهده پیشنهاد',
+      budget_toman INTEGER NOT NULL DEFAULT 0,
+      spent_toman INTEGER NOT NULL DEFAULT 0,
+      impressions INTEGER NOT NULL DEFAULT 0,
+      clicks INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      starts_at TEXT,
+      ends_at TEXT,
+      created_at TEXT NOT NULL
+    );
   `);
 
+  ensureSchemaUpgrades();
   seedInitialData();
+  seedV2Content();
+}
+
+function ensureColumn(table: string, column: string, definition: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as {name: string}[];
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+function ensureSchemaUpgrades(): void {
+  ensureColumn('users', 'wallet_balance', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('users', 'is_suspended', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('recipes', 'photo_credit_name', 'TEXT');
+  ensureColumn('partners', 'business_balance', 'INTEGER NOT NULL DEFAULT 0');
 }
 
 export function getEcosystemConfig(): EcosystemConfig {
@@ -1066,4 +1125,174 @@ function seedInitialData(): void {
   insertEvent.run('ev-5', 'prt-castiron', 'impression', now);
   insertEvent.run('ev-6', 'prt-castiron', 'affiliate_click', now);
   insertEvent.run('ev-7', 'prt-express', 'impression', now);
+}
+
+function seedV2Content(): void {
+  const now = new Date().toISOString();
+
+  // Seed 2 authentic Iranian recipes WITHOUT photos yet (to demonstrate crowdsourced real dish photography)
+  const insertRecipe = db.prepare(`
+    INSERT OR IGNORE INTO recipes (
+      id, slug, title, subtitle, description, image_url, category, region, season, meal_type,
+      diet_tags_json, prep_minutes, cook_minutes, servings, difficulty, nutrition_json,
+      is_vip, vip_gem_cost, parent_recipe_id, variation_note, author_id, status,
+      ingredients_json, steps_json, tools_json, linked_menu_dish_id, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  insertRecipe.run(
+    'rec-kuku-sabzi',
+    'kuku-sabzi-majlesi',
+    'کوکو سبزی مجلسی با گردو و زرشک',
+    'عطر سبزی تازه ایرانی با بافت پفکی در ماهیتابه چدنی (در انتظار عکس واقعی شما)',
+    'یکی از محبوب‌ترین و اصیل‌ترین غذاهای خانگی ایران که با سبزی ریزخردشده، تخم‌مرغ تازه، گردوی خردشده و زرشک تفت‌خورده در لاقلی آماده می‌شود. اگر این دستور را پختید، اولین عکس واقعی آن را ثبت کنید و ۴۰ جِم هدیه بگیرید.',
+    '',
+    'ناهار و شام',
+    'تهران',
+    'بهار',
+    'شام',
+    JSON.stringify(['سنتی', 'گیاهی', 'سریع', 'اقتصادی']),
+    20,
+    25,
+    4,
+    'آسان',
+    JSON.stringify({calories: 320, protein: 14, carbs: 16, fat: 22, fiber: 5}),
+    0,
+    0,
+    null,
+    null,
+    'chef-mahsa',
+    'published',
+    JSON.stringify([
+      {name: 'سبزی کوکو (تره، جعفری، گشنیز، شوید)', amount: 400, unit: 'گرم'},
+      {name: 'تخم‌مرغ', amount: 5, unit: 'عدد'},
+      {name: 'گردو خردشده', amount: 50, unit: 'گرم'},
+      {name: 'زرشک', amount: 2, unit: 'قاشق غذاخوری'},
+      {name: 'آرد سفید', amount: 1, unit: 'قاشق غذاخوری'},
+      {name: 'زردچوبه', amount: 1, unit: 'قاشق چای‌خوری'},
+      {name: 'روغن مایع', amount: 4, unit: 'قاشق غذاخوری'},
+    ]),
+    JSON.stringify([
+      {order: 1, instruction: 'سبزی کوکو را شسته و کاملاً خشک کنید تا هنگام سرخ شدن آب نیندازد، سپس خیلی ریز خرد کنید.'},
+      {order: 2, instruction: 'تخم‌مرغ‌ها را با آرد، زردچوبه، نمک و فلفل سیاه خوب هم بزنید تا کف سبک ایجاد شود.'},
+      {order: 3, instruction: 'سبزی، گردو و زرشک را اضافه کرده و آرام مخلوط کنید تا مایه‌ای یکدست به‌دست آید.'},
+      {order: 4, instruction: 'ماهیتابه چدنی (لاقلی) را با روغن گرم کنید، مایه را پهن کرده و با درِ بسته روی حرارت ملایم بپزید.', timerMinutes: 12},
+      {order: 5, instruction: 'کوکو را برش داده و برگردانید تا طرف دیگر نیز برشته و طلایی شود (این بار بدون در).', timerMinutes: 8},
+    ]),
+    JSON.stringify(['ماهیتابه چدنی', 'کفگیر']),
+    null,
+    now
+  );
+
+  insertRecipe.run(
+    'rec-adas-polo',
+    'adas-polo-majlesi',
+    'عدس‌پلو مجلسی با کشمش، خرما و پیازداغ طلایی',
+    'پلوی مقوی و ساده ایرانی با عطر دارچین و زیره (در انتظار اولین عکس کاربران)',
+    'ترکیبی متعادل از عدس نیم‌پز، برنج ایرانی قدکشیده، کشمش پلویی و پیازداغ کاراملی. این دستور از آرشیو پایه لاقلی بارگذاری شده و منتظر ثبت تصویر واقعی غذای پخته‌شده توسط کاربران است.',
+    '',
+    'ناهار و شام',
+    'اصفهان',
+    'چهارفصل',
+    'ناهار',
+    JSON.stringify(['سنتی', 'گیاهی', 'اقتصادی']),
+    20,
+    50,
+    4,
+    'آسان',
+    JSON.stringify({calories: 485, protein: 16, carbs: 74, fat: 13, fiber: 9}),
+    0,
+    0,
+    null,
+    null,
+    'chef-parisa',
+    'published',
+    JSON.stringify([
+      {name: 'برنج ایرانی', amount: 3, unit: 'پیمانه'},
+      {name: 'عدس سبز', amount: 1.5, unit: 'پیمانه'},
+      {name: 'پیاز', amount: 2, unit: 'عدد'},
+      {name: 'کشمش پلویی', amount: 100, unit: 'گرم'},
+      {name: 'خرما بدون هسته', amount: 10, unit: 'عدد'},
+      {name: 'دارچین', amount: 1, unit: 'قاشق چای‌خوری'},
+      {name: 'کره', amount: 40, unit: 'گرم'},
+    ]),
+    JSON.stringify([
+      {order: 1, instruction: 'عدس را ۲ ساعت خیس کنید و سپس با کمی نمک حدود ۲۰ دقیقه بپزید تا نرم شود ولی له نشود.', timerMinutes: 20},
+      {order: 2, instruction: 'پیازها را خلالی کرده و با حرارت ملایم تا طلایی شدن سرخ کنید؛ کشمش و دارچین را در ۲ دقیقه آخر بیفزایید.', timerMinutes: 10},
+      {order: 3, instruction: 'برنج آبکش‌شده را لایه‌لایه با عدس و کمی پودر دارچین در قابلمه ریخته و دم بگذارید.', timerMinutes: 35},
+      {order: 4, instruction: 'هنگام سرو، عدس‌پلو را با پیازداغ، کشمش و خرمای تفت‌خورده در کره تزیین کنید.'},
+    ]),
+    JSON.stringify(['قابلمه نچسب', 'ماهیتابه چدنی']),
+    null,
+    now
+  );
+
+  // Give seeded sponsor partners initial commercial wallet balances if 0
+  db.prepare('UPDATE partners SET business_balance = 5000000 WHERE id = ? AND business_balance = 0').run('prt-zaferan');
+  db.prepare('UPDATE partners SET business_balance = 3200000 WHERE id = ? AND business_balance = 0').run('prt-express');
+  db.prepare('UPDATE partners SET business_balance = 1800000 WHERE id = ? AND business_balance = 0').run('prt-castiron');
+
+  // Seed initial sponsor campaigns if empty
+  const campCount = (db.prepare('SELECT COUNT(*) as c FROM sponsor_campaigns').get() as {c: number}).c;
+  if (campCount === 0) {
+    const insertCamp = db.prepare(`
+      INSERT INTO sponsor_campaigns (
+        id, partner_id, title, subtitle, placement, promo_code, cta_label,
+        budget_toman, spent_toman, impressions, clicks, status, starts_at, ends_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertCamp.run(
+      'camp-zaferan-autumn',
+      'prt-zaferan',
+      'برداشت تازه زعفران سرگل قائنات — ۱۵٪ ویژه کاربران لاقلی',
+      'مستقیم از کشاورز با برگه آزمایش خلوص برای ته‌چین‌ها و پلوهای اصیل ایرانی.',
+      'explore_showcase',
+      'LAGHELI15',
+      'مشاهده فروشگاه زعفران',
+      2500000,
+      420000,
+      1420,
+      98,
+      'active',
+      '۱۴۰۵/۰۸/۰۱',
+      '۱۴۰۵/۰۹/۳۰',
+      now
+    );
+    insertCamp.run(
+      'camp-sabz-delivery',
+      'prt-express',
+      'ارسال رایگان اولین سبد لیست خرید در زیر ۴۵ دقیقه',
+      'سبزی تازه پاک‌شده، لبنیات محلی و مواد اولیه دستور پخت شما درب منزل.',
+      'shopping_delivery',
+      'FREESABZ',
+      'تکمیل سبد با پیک سبز',
+      1800000,
+      310000,
+      960,
+      74,
+      'active',
+      '۱۴۰۵/۰۸/۱۰',
+      '۱۴۰۵/۱۰/۱۵',
+      now
+    );
+  }
+
+  // Seed 1 sample pending user photo so Admin Photo Moderation queue is testable immediately
+  const photoCount = (db.prepare('SELECT COUNT(*) as c FROM recipe_photos').get() as {c: number}).c;
+  if (photoCount === 0) {
+    db.prepare(`
+      INSERT INTO recipe_photos (id, recipe_id, user_id, user_name, image_url, caption, status, is_cover, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      'photo-seed-1',
+      'rec-fesenjan',
+      'chef-parisa',
+      'سرآشپز پریسا بهرامی',
+      '/src/assets/images/dish_fesenjan_editorial_1795554313427.jpg',
+      'با گردوی تازه تویسرکان و ۴ ساعت جاافتادن آرام؛ روغن‌انداختن بی‌نظیری داشت.',
+      'pending',
+      0,
+      now
+    );
+  }
 }

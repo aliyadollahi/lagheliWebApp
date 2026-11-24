@@ -13,6 +13,10 @@ import {
   initDatabase,
 } from './src/server/db.ts';
 import {
+  registerAdminAndMediaRoutes,
+  saveUploadedRecipeImage,
+} from './src/server/adminAndMediaRoutes.ts';
+import {
   PANTRY_STAPLES,
   PARTNER_ROLES,
   canonicalizeIngredient,
@@ -37,7 +41,7 @@ import type {
 initDatabase();
 
 const app = express();
-app.use(express.json({limit: '1mb'}));
+app.use(express.json({limit: '5mb'}));
 
 // Simple in-memory rate limiter for auth / mutations
 const rateLimitMap = new Map<string, {count: number; resetAt: number}>();
@@ -77,7 +81,13 @@ function verifyPassword(password: string, stored: string): boolean {
 function isSafeUrl(url: string | undefined): boolean {
   if (!url || !url.trim()) return true;
   const trimmed = url.trim();
-  if (trimmed.startsWith('/src/assets/') || trimmed.startsWith('/assets/')) return true;
+  if (
+    trimmed.startsWith('/src/assets/') ||
+    trimmed.startsWith('/assets/') ||
+    trimmed.startsWith('/uploads/recipe-photos/')
+  ) {
+    return true;
+  }
   try {
     const parsed = new URL(trimmed);
     return parsed.protocol === 'https:' || parsed.protocol === 'http:';
@@ -144,6 +154,8 @@ function buildUserProfile(userId: string): UserProfile | null {
     levelName: level.levelName,
     nextLevelXp: level.nextLevelXp,
     gems: Number(row.gems),
+    walletBalance: Number(row.wallet_balance || 0),
+    isSuspended: Number(row.is_suspended || 0) === 1,
     followersCount: followers,
     followingCount: following,
   };
@@ -213,6 +225,12 @@ function mapRecipeRow(row: Record<string, unknown>, viewerId?: string): Recipe {
     linkedMenuDishId: row.linked_menu_dish_id ? String(row.linked_menu_dish_id) : null,
     createdAt: String(row.created_at),
     isBookmarked,
+    photoCreditName: row.photo_credit_name ? String(row.photo_credit_name) : null,
+    communityPhotosCount: (
+      db
+        .prepare("SELECT COUNT(*) as c FROM recipe_photos WHERE recipe_id = ? AND status = 'approved'")
+        .get(String(row.id)) as {c: number}
+    ).c,
   };
 }
 
@@ -241,6 +259,7 @@ function mapPartnerRow(row: Record<string, unknown>, viewerId?: string): Partner
     verified: Number(row.verified) === 1,
     claimStatus: row.claim_status as Partner['claimStatus'],
     tier: row.tier as Partner['tier'],
+    businessBalance: Number(row.business_balance || 0),
     promoCode: row.promo_code ? String(row.promo_code) : undefined,
     promoLabel: row.promo_label ? String(row.promo_label) : undefined,
     affiliateCode: row.affiliate_code ? String(row.affiliate_code) : undefined,
@@ -603,7 +622,25 @@ app.get('/api/recipes/:id', (req, res) => {
     contextualPartners = scored;
   }
 
-  res.json({recipe, variations, questions, contextualPartners});
+  const communityPhotos = (
+    db
+      .prepare(
+        `SELECT * FROM recipe_photos WHERE recipe_id = ? AND status = 'approved' ORDER BY is_cover DESC, created_at DESC`
+      )
+      .all(recipe.id) as Record<string, unknown>[]
+  ).map((p) => ({
+    id: String(p.id),
+    recipeId: String(p.recipe_id),
+    userId: String(p.user_id),
+    userName: String(p.user_name),
+    imageUrl: String(p.image_url),
+    caption: String(p.caption || ''),
+    status: p.status as 'approved',
+    isCover: Number(p.is_cover) === 1,
+    createdAt: String(p.created_at),
+  }));
+
+  res.json({recipe, variations, questions, contextualPartners, communityPhotos});
 });
 
 const createRecipeSchema = z.object({
@@ -611,6 +648,7 @@ const createRecipeSchema = z.object({
   subtitle: z.string().min(3).max(180),
   description: z.string().min(10).max(1000),
   imageUrl: z.string().optional(),
+  imageDataUrl: z.string().optional(),
   category: z.string().min(2).max(50),
   region: z.string().min(2).max(50),
   season: z.string().min(2).max(30),
@@ -650,13 +688,19 @@ app.post('/api/recipes', (req, res) => {
   if (!parsed.success) return res.status(400).json({error: 'لطفاً تمام بخش‌های ضروری دستور پخت را کامل کنید.'});
   if (!isSafeUrl(parsed.data.imageUrl)) return res.status(400).json({error: 'آدرس تصویر معتبر نیست.'});
 
+  let finalImg = parsed.data.imageUrl?.trim() || '';
+  if (parsed.data.imageDataUrl && parsed.data.imageDataUrl.startsWith('data:image/')) {
+    const saved = saveUploadedRecipeImage(parsed.data.imageDataUrl);
+    if (!saved.ok) return res.status(400).json({error: saved.error});
+    finalImg = saved.url;
+  }
+
   const user = db.prepare('SELECT is_verified_chef FROM users WHERE id = ?').get(session.userId) as
     | {is_verified_chef: number}
     | undefined;
   const id = `rec-${crypto.randomUUID().slice(0, 8)}`;
   const slug = `recipe-${Date.now()}`;
   const status = user?.is_verified_chef === 1 ? 'published' : 'pending';
-  const defaultImg = '/src/assets/images/hero_tahchin_saffron_1795554313371.jpg';
   const now = new Date().toISOString();
 
   db.prepare(
@@ -672,7 +716,7 @@ app.post('/api/recipes', (req, res) => {
     parsed.data.title,
     parsed.data.subtitle,
     parsed.data.description,
-    parsed.data.imageUrl?.trim() || defaultImg,
+    finalImg,
     parsed.data.category,
     parsed.data.region,
     parsed.data.season,
@@ -1784,6 +1828,69 @@ app.post('/api/admin/chefs/:id/approve', (req, res) => {
     req.params.id
   );
   res.json({ok: true});
+});
+
+// Register expanded Desktop Admin CMS, Bulk Import, Photo Moderation, Wallets & Sponsor Campaigns routes
+registerAdminAndMediaRoutes(app, {
+  getSession,
+  requireAdmin,
+  isSafeUrl,
+  mapRecipeRow,
+  mapPartnerRow,
+  awardXpAndGems,
+  checkRateLimit,
+});
+
+// =========================================================================
+// TECHNICAL SEO ENDPOINTS (/robots.txt & DYNAMIC /sitemap.xml)
+// =========================================================================
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+app.get('/robots.txt', (req, res) => {
+  const baseUrl = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  res.type('text/plain; charset=utf-8').send(
+    [
+      'User-agent: *',
+      'Allow: /',
+      'Disallow: /api/',
+      'Disallow: /?tab=admin',
+      '',
+      `Sitemap: ${baseUrl}/sitemap.xml`,
+    ].join('\n')
+  );
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  const baseUrl = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  const recipes = db
+    .prepare("SELECT slug, created_at FROM recipes WHERE status = 'published' ORDER BY created_at DESC LIMIT 5000")
+    .all() as {slug: string; created_at: string}[];
+
+  const today = new Date().toISOString().slice(0, 10);
+  const urls: string[] = [
+    `<url><loc>${escapeXml(baseUrl)}/</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>`,
+    `<url><loc>${escapeXml(baseUrl)}/?tab=kitchen</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`,
+    `<url><loc>${escapeXml(baseUrl)}/?tab=order</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>`,
+    `<url><loc>${escapeXml(baseUrl)}/?tab=marketplace</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>`,
+  ];
+
+  for (const r of recipes) {
+    const lastmod = (r.created_at || today).slice(0, 10);
+    const loc = `${baseUrl}/?recipe=${encodeURIComponent(r.slug)}`;
+    urls.push(
+      `<url><loc>${escapeXml(loc)}</loc><lastmod>${escapeXml(lastmod)}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>`
+    );
+  }
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>`;
+  res.type('application/xml; charset=utf-8').send(xml);
 });
 
 // =========================================================================

@@ -95,6 +95,60 @@ export interface Recipe {
   createdAt: string;
   isBookmarked?: boolean;
   linkedMenuDishId?: string | null;
+  photoCreditName?: string | null;
+  communityPhotosCount?: number;
+}
+
+export interface RecipePhoto {
+  id: string;
+  recipeId: string;
+  recipeTitle?: string;
+  recipeHasCover?: boolean;
+  userId: string;
+  userName: string;
+  imageUrl: string;
+  caption: string;
+  status: 'pending' | 'approved' | 'rejected';
+  isCover: boolean;
+  createdAt: string;
+}
+
+export interface WalletTransaction {
+  id: string;
+  accountType: 'user' | 'partner';
+  accountId: string;
+  accountName: string;
+  currency: 'toman' | 'gem';
+  amount: number;
+  balanceAfter: number;
+  reason: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export type CampaignPlacement =
+  | 'explore_showcase'
+  | 'recipe_context'
+  | 'shopping_delivery'
+  | 'marketplace_banner';
+
+export interface SponsorCampaign {
+  id: string;
+  partnerId: string;
+  partnerName: string;
+  title: string;
+  subtitle: string;
+  placement: CampaignPlacement;
+  promoCode?: string;
+  ctaLabel: string;
+  budgetToman: number;
+  spentToman: number;
+  impressions: number;
+  clicks: number;
+  status: 'active' | 'paused' | 'ended';
+  startsAt?: string;
+  endsAt?: string;
+  createdAt: string;
 }
 
 export interface SubstitutionSuggestion {
@@ -209,6 +263,7 @@ export interface Partner {
   verified: boolean;
   claimStatus: 'unclaimed' | 'pending' | 'verified';
   tier: 'free' | 'featured' | 'sponsor';
+  businessBalance: number;
   promoCode?: string;
   promoLabel?: string;
   affiliateCode?: string;
@@ -247,8 +302,29 @@ export interface UserProfile {
   levelName: string;
   nextLevelXp: number;
   gems: number;
+  walletBalance: number;
+  isSuspended?: boolean;
   followersCount: number;
   followingCount: number;
+}
+
+export interface AdminUserRow {
+  id: string;
+  phone: string;
+  name: string;
+  city: string;
+  neighborhood: string;
+  specialty: string;
+  role: UserRole;
+  isVerifiedChef: boolean;
+  chefVerificationStatus: 'none' | 'pending' | 'approved';
+  xp: number;
+  gems: number;
+  walletBalance: number;
+  isSuspended: boolean;
+  recipesCount: number;
+  photosCount: number;
+  createdAt: string;
 }
 
 export interface BadgeItem {
@@ -302,4 +378,20 @@ export interface PartnerAnalyticsSummary {
     couponCopies: number;
     affiliateClicks: number;
   }[];
+}
+
+export interface AdminDashboardStats {
+  totalRecipes: number;
+  recipesWithoutPhoto: number;
+  pendingRecipesCount: number;
+  pendingPhotosCount: number;
+  approvedPhotosCount: number;
+  totalUsers: number;
+  verifiedChefsCount: number;
+  totalPartners: number;
+  pendingPartnersCount: number;
+  activeCampaignsCount: number;
+  totalOrdersCount: number;
+  totalUserWalletToman: number;
+  totalPartnerWalletToman: number;
 }

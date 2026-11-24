@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useState} from 'react';
 import {WifiOff} from 'lucide-react';
+import {AdminDashboard} from './components/AdminDashboard.tsx';
 import {AuthModal} from './components/AuthModal.tsx';
 import {ChefProfileModal} from './components/ChefProfileModal.tsx';
 import {type CartEntry, EditorialOrderView} from './components/EditorialOrderView.tsx';
@@ -29,7 +30,15 @@ import {
   normalizePersian,
   toFaDigits,
 } from './shared/persianEngine.ts';
-import type {EcosystemConfig, Partner, Recipe, ShoppingCategory, ShoppingItem, UserProfile} from './shared/types.ts';
+import type {
+  EcosystemConfig,
+  Partner,
+  Recipe,
+  ShoppingCategory,
+  ShoppingItem,
+  SponsorCampaign,
+  UserProfile,
+} from './shared/types.ts';
 
 const INITIAL_CONFIG: EcosystemConfig = {
   marketplaceTabEnabled: true,
@@ -65,6 +74,7 @@ export default function App() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loadingRecipes, setLoadingRecipes] = useState(true);
   const [showcasePartners, setShowcasePartners] = useState<Partner[]>([]);
+  const [activeCampaigns, setActiveCampaigns] = useState<SponsorCampaign[]>([]);
 
   // Filters
   const [filters, setFilters] = useState<RecipeFilterState>({
@@ -76,6 +86,7 @@ export default function App() {
     verifiedOnly: false,
     followedOnly: false,
     bookmarkedOnly: false,
+    needsPhotoOnly: false,
   });
 
   // Guest Local-First / Synced Bookmarks & Shopping List
@@ -113,7 +124,10 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab') as AppTab | null;
-    if (tabParam && ['explore', 'kitchen', 'order', 'shopping', 'marketplace', 'profile'].includes(tabParam)) {
+    if (
+      tabParam &&
+      ['explore', 'kitchen', 'order', 'shopping', 'marketplace', 'profile', 'admin'].includes(tabParam)
+    ) {
       setActiveTab(tabParam);
     }
     const recipeParam = params.get('recipe');
@@ -135,6 +149,15 @@ export default function App() {
     try {
       const data = await apiRequest<{partners: Partner[]}>('/api/partners');
       setShowcasePartners(data.partners);
+    } catch {
+      // Ignore offline
+    }
+  }, []);
+
+  const loadActiveCampaigns = useCallback(async () => {
+    try {
+      const data = await apiRequest<{campaigns: SponsorCampaign[]}>('/api/campaigns/active');
+      setActiveCampaigns(data.campaigns || []);
     } catch {
       // Ignore offline
     }
@@ -189,7 +212,8 @@ export default function App() {
   useEffect(() => {
     loadConfig();
     loadShowcasePartners();
-  }, [loadConfig, loadShowcasePartners]);
+    loadActiveCampaigns();
+  }, [loadConfig, loadShowcasePartners, loadActiveCampaigns]);
 
   useEffect(() => {
     loadRecipes();
@@ -358,7 +382,11 @@ export default function App() {
       />
 
       {/* Main Content Canvas */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 pt-8 pb-24 md:pb-16">
+      <main
+        className={`flex-1 w-full mx-auto px-4 sm:px-6 pt-8 pb-24 md:pb-16 ${
+          activeTab === 'admin' ? 'max-w-[1440px]' : 'max-w-6xl'
+        }`}
+      >
         {activeTab === 'explore' && (
           <RecipeFeed
             recipes={recipes}
@@ -381,8 +409,10 @@ export default function App() {
               )
             }
             onJumpToOrder={() => setActiveTab('order')}
+            onJumpToKitchen={() => setActiveTab('kitchen')}
             ecosystemConfig={ecosystemConfig}
             showcasePartners={showcasePartners}
+            activeCampaigns={activeCampaigns}
             onOpenPartner={(p) => {
               setSelectedPartner(p);
               setActiveTab('marketplace');
@@ -444,6 +474,7 @@ export default function App() {
             theme={theme}
             onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
             onReplaySplash={() => setShowSplash(true)}
+            onOpenAdminPanel={() => setActiveTab('admin')}
             onOpenAuth={() => setAuthOpen(true)}
             onLogout={handleLogout}
             onOpenRecipe={(rec) => setOpenRecipeId(rec.id)}
@@ -455,11 +486,20 @@ export default function App() {
               setVariationParent(null);
               setSubmitOpen(true);
             }}
-            onRefreshConfig={() => {
+            onRefreshUser={refreshUser}
+            onNotify={notify}
+          />
+        )}
+
+        {activeTab === 'admin' && (
+          <AdminDashboard
+            onRefreshAppConfig={() => {
               loadConfig();
               loadShowcasePartners();
+              loadActiveCampaigns();
             }}
-            onRefreshUser={refreshUser}
+            onRefreshAppRecipes={loadRecipes}
+            onBackToApp={() => setActiveTab('explore')}
             onNotify={notify}
           />
         )}

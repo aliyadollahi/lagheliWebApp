@@ -183,7 +183,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
                       onClick={() => toggleIngredient(item)}
                       className={`min-h-[40px] px-3.5 rounded-lg text-xs font-medium transition-colors ${
                         selected
-                          ? 'bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412]'
+                          ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
                           : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
                       }`}
                     >
@@ -228,7 +228,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
                   type="checkbox"
                   checked={includePantryStaples}
                   onChange={(e) => setIncludePantryStaples(e.target.checked)}
-                  className="w-4 h-4 accent-[#3F523B]"
+                  className="w-4 h-4 accent-[#B54B1F]"
                 />
                 <span className="text-xs text-[#615E55] dark:text-[#A9A497]">
                   مواد پایه همیشگی خانه (نمک، فلفل، زردچوبه، روغن) موجود فرض شوند
@@ -240,7 +240,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
                   type="checkbox"
                   checked={exactOnly}
                   onChange={(e) => setExactOnly(e.target.checked)}
-                  className="w-4 h-4 accent-[#3F523B]"
+                  className="w-4 h-4 accent-[#B54B1F]"
                 />
                 <span className="text-xs text-[#615E55] dark:text-[#A9A497]">
                   فقط تطابق دقیق (قابل پخت بدون هیچ کمبودی)
@@ -252,7 +252,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
               type="button"
               onClick={runFridgeMatch}
               disabled={loadingMatches || selectedIngredients.length === 0}
-              className="w-full min-h-[48px] rounded-xl bg-[#3F523B] hover:bg-[#31412E] dark:bg-[#8EA888] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium inline-flex items-center justify-center gap-2 disabled:opacity-40"
+              className="w-full min-h-[48px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#141412] text-[#F9F8F4] text-sm font-medium inline-flex items-center justify-center gap-2 disabled:opacity-40"
             >
               <Sparkles className="w-4 h-4" />
               <span>{loadingMatches ? 'در حال بررسی دستورها...' : 'پیشنهاد غذاهای قابل پخت'}</span>
@@ -290,7 +290,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
                   <div className="flex-1 flex flex-col justify-between gap-3">
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between gap-2 text-xs">
-                        <span className="font-semibold text-[#3F523B] dark:text-[#8EA888] tabular-nums">
+                        <span className="font-semibold text-[#B54B1F] dark:text-[#E29A6F] tabular-nums">
                           تطابق {toFaDigits(item.matchPercent)}٪
                         </span>
                         <span className="text-[#615E55] dark:text-[#A9A497] tabular-nums">
@@ -300,7 +300,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
                       <button
                         type="button"
                         onClick={() => onOpenRecipe(item.recipe)}
-                        className="text-base font-bold text-right hover:text-[#3F523B] dark:hover:text-[#8EA888]"
+                        className="text-base font-bold text-right hover:text-[#B54B1F] dark:hover:text-[#E29A6F]"
                       >
                         {item.recipe.title}
                       </button>
@@ -310,7 +310,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
                           {item.missingIngredients.map((m) => m.name).join('، ')}
                         </p>
                       ) : (
-                        <p className="text-xs text-[#3F523B] dark:text-[#8EA888]">
+                        <p className="text-xs text-[#B54B1F] dark:text-[#E29A6F]">
                           تمام مواد این غذا در آشپزخانه شما موجود است.
                         </p>
                       )}
@@ -373,7 +373,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
             </div>
             <button
               type="submit"
-              className="min-h-[48px] px-6 rounded-xl bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412] text-sm font-medium"
+              className="min-h-[48px] px-6 rounded-xl bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412] text-sm font-medium"
             >
               جست‌وجو
             </button>
@@ -387,7 +387,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
                 onClick={() => runSubstituteSearch(item)}
                 className={`min-h-[40px] px-3.5 rounded-lg text-xs font-medium transition-colors ${
                   subQuery === item
-                    ? 'bg-[#3F523B] text-[#F9F8F4] dark:bg-[#8EA888] dark:text-[#141412]'
+                    ? 'bg-[#B54B1F] text-[#F9F8F4] dark:bg-[#E29A6F] dark:text-[#141412]'
                     : 'bg-[#F1EFE8] dark:bg-[#24231F] text-[#615E55] dark:text-[#A9A497]'
                 }`}
               >
@@ -407,7 +407,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <ArrowLeftRight className="w-4 h-4 text-[#3F523B] dark:text-[#8EA888]" />
+                      <ArrowLeftRight className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
                       <h3 className="text-base font-bold">{s.substitute}</h3>
                     </div>
                     <div className="text-xs text-[#615E55] dark:text-[#A9A497] tabular-nums">
@@ -415,7 +415,7 @@ export function KitchenHub({onOpenRecipe, onAddShoppingItems}: KitchenHubProps) 
                       {s.isVegan ? ' · گیاهی/وگان' : ''}
                     </div>
                   </div>
-                  <p className="text-sm font-medium text-[#3F523B] dark:text-[#8EA888]">
+                  <p className="text-sm font-medium text-[#B54B1F] dark:text-[#E29A6F]">
                     نسبت جایگزینی: {s.ratio}
                   </p>
                   <p className="text-sm text-[#615E55] dark:text-[#A9A497] leading-relaxed">{s.flavorNote}</p>
