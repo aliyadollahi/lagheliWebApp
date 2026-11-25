@@ -1,0 +1,87 @@
+name: Release Lagheli PWA
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Type-check & Build PWA bundle
+        run: |
+          npm run lint
+          npm run build
+
+      - name: Determine release tag
+        id: meta
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ -n "${{ github.event.inputs.tag }}" ]]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            PKG_VER=$(node -p "require('./package.json').version || '1.0.0'")
+            TAG="v${PKG_VER}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Package PWA Release Artifacts
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          mkdir -p release-staging/lagheli-pwa-${TAG}
+          cp -r dist release-staging/lagheli-pwa-${TAG}/dist
+          cp package.json package-lock.json server.ts RELEASE_NOTES.md release-staging/lagheli-pwa-${TAG}/ 2>/dev/null || true
+          mkdir -p release-artifacts
+          (cd release-staging && zip -rq "../release-artifacts/lagheli-pwa-${TAG}.zip" "lagheli-pwa-${TAG}")
+          tar -czf "release-artifacts/lagheli-pwa-${TAG}.tar.gz" -C release-staging "lagheli-pwa-${TAG}"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          TITLE="لاقلی (Lagheli PWA) ${TAG}"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" \
+              "release-artifacts/lagheli-pwa-${TAG}.zip" \
+              "release-artifacts/lagheli-pwa-${TAG}.tar.gz" \
+              --clobber
+            gh release edit "${TAG}" --title "${TITLE}" --notes-file RELEASE_NOTES.md
+          else
+            gh release create "${TAG}" \
+              "release-artifacts/lagheli-pwa-${TAG}.zip" \
+              "release-artifacts/lagheli-pwa-${TAG}.tar.gz" \
+              --title "${TITLE}" \
+              --notes-file RELEASE_NOTES.md \
+              --latest
+          fi

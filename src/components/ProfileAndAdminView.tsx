@@ -1,16 +1,23 @@
 import {useEffect, useState} from 'react';
+import {AnimatePresence, motion} from 'motion/react';
 import {
   Award,
   BadgeCheck,
+  CheckCircle2,
   Copy,
   Download,
   Gem,
   LogOut,
   Moon,
+  MoreVertical,
   PlayCircle,
+  PlusSquare,
+  Share,
   Shield,
+  Smartphone,
   Sun,
   Wallet,
+  X,
 } from 'lucide-react';
 import {usePWAInstall} from '../hooks/usePWA.ts';
 import {apiRequest} from '../lib/api.ts';
@@ -54,8 +61,35 @@ export function ProfileAndAdminView({
   onNotify,
 }: ProfileAndAdminViewProps) {
   const [profileTab, setProfileTab] = useState<'recipes' | 'questions' | 'badges' | 'gems'>('recipes');
-  const {isInstallable, isInstalled, isIOS, install} = usePWAInstall();
-  const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const {isInstallable, isInstalled, isIOS, isAndroid, install} = usePWAInstall();
+  const [installGuideOpen, setInstallGuideOpen] = useState(false);
+  const [guidePlatform, setGuidePlatform] = useState<'android' | 'ios'>('android');
+  const [installingPWA, setInstallingPWA] = useState(false);
+
+  const handleInstallMobile = async () => {
+    if (isInstalled) {
+      onNotify('اپلیکیشن لاقلی همین الان روی دستگاه شما نصب است.');
+      return;
+    }
+
+    if (isInstallable) {
+      setInstallingPWA(true);
+      const outcome = await install();
+      setInstallingPWA(false);
+      if (outcome === 'accepted') {
+        onNotify('لاقلی با موفقیت روی موبایل شما نصب شد!');
+        return;
+      }
+      if (outcome === 'dismissed') {
+        onNotify('نصب لغو شد؛ هر زمان خواستی دوباره روی «نصب در موبایل» بزن.');
+        return;
+      }
+    }
+
+    // Fallback for iOS Safari (no beforeinstallprompt) or browsers where native prompt is unavailable
+    setGuidePlatform(isIOS ? 'ios' : isAndroid ? 'android' : 'ios');
+    setInstallGuideOpen(true);
+  };
 
   const [myRecipes, setMyRecipes] = useState<Recipe[]>([]);
   const [bookmarkedRecipes, setBookmarkedRecipes] = useState<Recipe[]>([]);
@@ -141,24 +175,15 @@ export function ProfileAndAdminView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {!isInstalled && isInstallable && (
+          {!isInstalled && (
             <button
               type="button"
-              onClick={install}
-              className="min-h-[42px] px-4 rounded-full bg-[#111110] text-white dark:bg-[#FAFAFA] dark:text-[#111110] text-xs font-medium inline-flex items-center gap-1.5"
+              onClick={handleInstallMobile}
+              disabled={installingPWA}
+              className="min-h-[42px] px-4 rounded-full bg-[#0D0D0D] hover:bg-[#242422] dark:bg-[#FAFAFA] dark:hover:bg-[#E6E6E3] text-[#FFFFFF] dark:text-[#0B0B0B] text-xs font-bold inline-flex items-center gap-1.5 shadow-sm active:scale-[0.98] transition-all disabled:opacity-60"
             >
-              <Download className="w-4 h-4" />
-              <span>نصب وب‌اپ لاقلی</span>
-            </button>
-          )}
-          {!isInstalled && !isInstallable && isIOS && (
-            <button
-              type="button"
-              onClick={() => setShowIOSGuide(true)}
-              className="min-h-[42px] px-4 rounded-full border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium inline-flex items-center gap-1.5"
-            >
-              <Download className="w-4 h-4" />
-              <span>نصب روی آیفون</span>
+              <Smartphone className="w-4 h-4 text-[#E29A6F] dark:text-[#B54B1F]" />
+              <span>{installingPWA ? 'در حال آماده‌سازی...' : 'نصب در موبایل'}</span>
             </button>
           )}
 
@@ -192,24 +217,193 @@ export function ProfileAndAdminView({
         </div>
       </div>
 
-      {/* iOS Safari Install Guide */}
-      {showIOSGuide && (
-        <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 flex items-start justify-between gap-4">
-          <div className="space-y-1 text-xs">
-            <p className="font-bold text-sm">راهنمای نصب لاقلی روی آیفون (Safari)</p>
-            <p className="text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
-              ۱. دکمه Share در نوار پایین مرورگر Safari را لمس کنید. ۲. گزینه «Add to Home Screen» را انتخاب و روی Add بزنید.
-            </p>
+      {/* Dedicated Native Mobile Install Card (Automatically hidden once installed in standalone mode) */}
+      {!isInstalled && (
+        <section
+          aria-label="نصب اپلیکیشن لاقلی در موبایل"
+          className="rounded-[24px] border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[0_12px_34px_-22px_rgba(0,0,0,0.2)]"
+        >
+          <div className="flex items-start gap-3.5 min-w-0">
+            <div className="w-11 h-11 rounded-2xl bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] flex items-center justify-center shrink-0">
+              <Download className="w-5 h-5 text-[#E29A6F] dark:text-[#B54B1F]" />
+            </div>
+            <div className="space-y-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm sm:text-base font-extrabold text-[#0D0D0D] dark:text-[#FAFAFA]">
+                  نصب لاقلی روی گوشی (اندروید و iOS)
+                </h2>
+                {isInstallable && (
+                  <span className="px-2 py-0.5 rounded-full bg-[#B54B1F]/12 text-[#B54B1F] dark:text-[#E29A6F] text-[10px] font-bold">
+                    نصب مستقیم آماده است
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
+                اجرای تمام‌صفحه بدون نوار مرورگر، دسترسی سریع از صفحه اصلی گوشی و مرور آفلاین دستورهای پخت.
+              </p>
+            </div>
           </div>
+
           <button
             type="button"
-            onClick={() => setShowIOSGuide(false)}
-            className="text-xs text-[#5C5C58] px-2 py-1"
+            onClick={handleInstallMobile}
+            disabled={installingPWA}
+            className="min-h-[44px] px-5 rounded-full bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FFFFFF] text-xs font-extrabold inline-flex items-center justify-center gap-1.5 shrink-0 active:scale-[0.98] transition-all whitespace-nowrap"
           >
-            بستن
+            <Smartphone className="w-4 h-4" />
+            <span>{installingPWA ? 'در حال نصب...' : 'نصب در موبایل'}</span>
           </button>
-        </div>
+        </section>
       )}
+
+      {/* Guided Mobile Install Modal (iOS Safari & Android Chrome Fallback) */}
+      <AnimatePresence>
+        {installGuideOpen && (
+          <motion.div
+            initial={{opacity: 0}}
+            animate={{opacity: 1}}
+            exit={{opacity: 0}}
+            transition={{duration: 0.18}}
+            role="dialog"
+            aria-modal="true"
+            aria-label="راهنمای نصب اپلیکیشن لاقلی در موبایل"
+            onClick={() => setInstallGuideOpen(false)}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-[3px] p-0 sm:p-4"
+          >
+            <motion.div
+              initial={{y: 36, opacity: 0.6}}
+              animate={{y: 0, opacity: 1}}
+              exit={{y: 28, opacity: 0}}
+              transition={{type: 'spring', stiffness: 380, damping: 32}}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-t-[28px] sm:rounded-[28px] bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] p-5 sm:p-6 space-y-5 shadow-[0_28px_72px_-20px_rgba(0,0,0,0.55)]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] flex items-center justify-center shrink-0">
+                    <Smartphone className="w-5 h-5 text-[#E29A6F] dark:text-[#B54B1F]" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-[#0D0D0D] dark:text-[#FAFAFA]">
+                      نصب لاقلی در موبایل
+                    </h3>
+                    <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] mt-0.5">
+                      مانند اپلیکیشن نیتیو روی صفحه اصلی گوشی
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  aria-label="بستن راهنما"
+                  onClick={() => setInstallGuideOpen(false)}
+                  className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#EFEFED] dark:hover:bg-[#20201E] text-[#5C5C58] dark:text-[#A3A39E]"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Platform Switcher: iOS vs Android */}
+              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-full bg-[#F6F6F5] dark:bg-[#20201E] border border-[#E6E6E3] dark:border-[#2C2C29]">
+                <button
+                  type="button"
+                  onClick={() => setGuidePlatform('ios')}
+                  className={`min-h-[38px] rounded-full text-xs font-bold transition-all ${
+                    guidePlatform === 'ios'
+                      ? 'bg-[#0D0D0D] text-[#FFFFFF] dark:bg-[#FAFAFA] dark:text-[#0B0B0B]'
+                      : 'text-[#5C5C58] dark:text-[#A3A39E]'
+                  }`}
+                >
+                  آیفون (iOS / Safari)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGuidePlatform('android')}
+                  className={`min-h-[38px] rounded-full text-xs font-bold transition-all ${
+                    guidePlatform === 'android'
+                      ? 'bg-[#0D0D0D] text-[#FFFFFF] dark:bg-[#FAFAFA] dark:text-[#0B0B0B]'
+                      : 'text-[#5C5C58] dark:text-[#A3A39E]'
+                  }`}
+                >
+                  اندروید (Chrome)
+                </button>
+              </div>
+
+              {guidePlatform === 'ios' ? (
+                <ol className="space-y-3 text-xs sm:text-sm text-[#0D0D0D] dark:text-[#FAFAFA]">
+                  <li className="flex items-start gap-3 rounded-2xl bg-[#F6F6F5] dark:bg-[#20201E] p-3.5">
+                    <span className="w-7 h-7 rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] text-xs font-bold flex items-center justify-center shrink-0">
+                      ۱
+                    </span>
+                    <div className="space-y-1 leading-relaxed">
+                      <p className="font-bold inline-flex items-center gap-1.5">
+                        <span>دکمه اشتراک‌گذاری (Share) را بزنید</span>
+                        <Share className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
+                      </p>
+                      <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
+                        در نوار پایین مرورگر Safari روی آیکون مربع و فلش رو به بالا بزنید.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3 rounded-2xl bg-[#F6F6F5] dark:bg-[#20201E] p-3.5">
+                    <span className="w-7 h-7 rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] text-xs font-bold flex items-center justify-center shrink-0">
+                      ۲
+                    </span>
+                    <div className="space-y-1 leading-relaxed">
+                      <p className="font-bold inline-flex items-center gap-1.5">
+                        <span>گزینه «Add to Home Screen» را انتخاب کنید</span>
+                        <PlusSquare className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
+                      </p>
+                      <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
+                        در نهایت دکمه <strong>Add</strong> در بالا را بزنید تا آیکون لاقلی اضافه شود.
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+              ) : (
+                <ol className="space-y-3 text-xs sm:text-sm text-[#0D0D0D] dark:text-[#FAFAFA]">
+                  <li className="flex items-start gap-3 rounded-2xl bg-[#F6F6F5] dark:bg-[#20201E] p-3.5">
+                    <span className="w-7 h-7 rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] text-xs font-bold flex items-center justify-center shrink-0">
+                      ۱
+                    </span>
+                    <div className="space-y-1 leading-relaxed">
+                      <p className="font-bold inline-flex items-center gap-1.5">
+                        <span>منوی سه‌نقطه مرورگر Chrome را باز کنید</span>
+                        <MoreVertical className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
+                      </p>
+                      <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
+                        در گوشه بالای مرورگر Chrome روی آیکون سه‌نقطه بزنید.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3 rounded-2xl bg-[#F6F6F5] dark:bg-[#20201E] p-3.5">
+                    <span className="w-7 h-7 rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] text-xs font-bold flex items-center justify-center shrink-0">
+                      ۲
+                    </span>
+                    <div className="space-y-1 leading-relaxed">
+                      <p className="font-bold inline-flex items-center gap-1.5">
+                        <span>«Install app» یا «Add to Home screen» را بزنید</span>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
+                      </p>
+                      <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
+                        پس از تایید، لاقلی بدون نوار آدرس مرورگر و با آیکون اختصاصی نصب می‌شود.
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setInstallGuideOpen(false)}
+                className="w-full min-h-[46px] rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] text-sm font-bold"
+              >
+                متوجه شدم
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {!user ? (
         <div className="rounded-3xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-10 text-center space-y-4">

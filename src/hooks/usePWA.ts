@@ -1,58 +1,123 @@
 import {useEffect, useState} from 'react';
 
-interface BeforeInstallPromptEvent extends Event {
+export interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{outcome: 'accepted' | 'dismissed'; platform: string}>;
 }
 
+type InstallListener = () => void;
+
+let globalDeferredPrompt: BeforeInstallPromptEvent | null = null;
+let globalIsInstalled = false;
+let initialized = false;
+const listeners = new Set<InstallListener>();
+
+function emitChange() {
+  listeners.forEach((fn) => fn());
+}
+
+function detectStandalone(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as unknown as {standalone?: boolean}).standalone === true
+  );
+}
+
+/**
+ * Attaches window-level `beforeinstallprompt` and `appinstalled` listeners once at app startup
+ * so the native Chromium/Android install prompt is never missed before the user visits Profile.
+ */
+export function initPWAInstallListener() {
+  if (initialized || typeof window === 'undefined') return;
+  initialized = true;
+  globalIsInstalled = detectStandalone();
+
+  const handleBeforeInstallPrompt = (e: Event) => {
+    e.preventDefault();
+    globalDeferredPrompt = e as BeforeInstallPromptEvent;
+    emitChange();
+  };
+
+  const handleAppInstalled = () => {
+    globalIsInstalled = true;
+    globalDeferredPrompt = null;
+    emitChange();
+  };
+
+  window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  window.addEventListener('appinstalled', handleAppInstalled);
+
+  // Sync if user launches/switches display-mode dynamically
+  const standaloneMedia = window.matchMedia('(display-mode: standalone)');
+  if (standaloneMedia.addEventListener) {
+    standaloneMedia.addEventListener('change', (ev) => {
+      if (ev.matches) {
+        globalIsInstalled = true;
+        globalDeferredPrompt = null;
+        emitChange();
+      }
+    });
+  }
+}
+
+// Initialize immediately on module import
+initPWAInstallListener();
+
 export function usePWAInstall() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(
+    () => globalDeferredPrompt
+  );
+  const [isInstalled, setIsInstalled] = useState<boolean>(() => globalIsInstalled || detectStandalone());
   const [isIOS, setIsIOS] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
 
   useEffect(() => {
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as unknown as {standalone?: boolean}).standalone === true;
-    setIsInstalled(isStandalone);
+    initPWAInstallListener();
 
     const ua = window.navigator.userAgent.toLowerCase();
-    setIsIOS(/iphone|ipad|ipod/.test(ua));
+    const iosDevice =
+      /iphone|ipad|ipod/.test(ua) ||
+      (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
+    setIsIOS(iosDevice);
+    setIsAndroid(/android/.test(ua));
 
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+    const sync = () => {
+      setDeferredPrompt(globalDeferredPrompt);
+      setIsInstalled(globalIsInstalled || detectStandalone());
     };
 
-    const handleAppInstalled = () => {
-      setIsInstalled(true);
-      setDeferredPrompt(null);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
+    sync();
+    listeners.add(sync);
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
+      listeners.delete(sync);
     };
   }, []);
 
-  const install = async () => {
-    if (!deferredPrompt) return false;
-    await deferredPrompt.prompt();
-    const {outcome} = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setIsInstalled(true);
-      setDeferredPrompt(null);
-      return true;
+  const install = async (): Promise<'accepted' | 'dismissed' | 'unavailable'> => {
+    const promptEvent = globalDeferredPrompt || deferredPrompt;
+    if (!promptEvent) return 'unavailable';
+
+    try {
+      await promptEvent.prompt();
+      const {outcome} = await promptEvent.userChoice;
+      if (outcome === 'accepted') {
+        globalIsInstalled = true;
+        globalDeferredPrompt = null;
+        emitChange();
+        return 'accepted';
+      }
+      return 'dismissed';
+    } catch {
+      return 'unavailable';
     }
-    return false;
   };
 
   return {
     isInstallable: Boolean(deferredPrompt),
     isInstalled,
     isIOS,
+    isAndroid,
     install,
   };
 }
