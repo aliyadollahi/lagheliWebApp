@@ -1,7 +1,10 @@
 import {useEffect, useState} from 'react';
+import {AnimatePresence, motion} from 'motion/react';
 import {
   AlertCircle,
+  ArrowLeft,
   BadgeCheck,
+  Check,
   CheckCircle2,
   Clock,
   MapPin,
@@ -9,6 +12,9 @@ import {
   Plus,
   Search,
   ShoppingBag,
+  Sparkles,
+  Trash2,
+  Truck,
   X,
 } from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
@@ -71,6 +77,17 @@ export function EditorialOrderView({
   const [confirmedOrder, setConfirmedOrder] = useState<OrderRecord | null>(null);
   const [orderHistory, setOrderHistory] = useState<OrderRecord[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [confirmClearCart, setConfirmClearCart] = useState(false);
+
+  // Lock background page scroll while either dish sheet or cart drawer is open
+  useEffect(() => {
+    if (!checkoutOpen && !selectedDish) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [checkoutOpen, selectedDish]);
 
   useEffect(() => {
     setLoadingMenu(true);
@@ -420,307 +437,591 @@ export function EditorialOrderView({
         </>
       )}
 
-      {/* Quiet Floating Cart Summary Bar */}
-      {totalCount > 0 && !checkoutOpen && (
-        <div className="fixed bottom-[86px] md:bottom-6 inset-x-4 z-30 flex justify-center pointer-events-none">
-          <button
-            type="button"
-            onClick={() => {
-              setConfirmedOrder(null);
-              setCheckoutOpen(true);
-            }}
-            className="pointer-events-auto w-full max-w-xl min-h-[54px] px-5 rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] flex items-center justify-between gap-4 shadow-[0_14px_34px_-10px_rgba(0,0,0,0.45)] active:scale-[0.99] transition-transform"
+      {/* Elevated Floating Cart Bar — Mobile-First with Dish Thumbnails & Free-Delivery Status */}
+      <AnimatePresence>
+        {totalCount > 0 && !checkoutOpen && (
+          <motion.div
+            initial={{opacity: 0, y: 28, scale: 0.96}}
+            animate={{opacity: 1, y: 0, scale: 1}}
+            exit={{opacity: 0, y: 24, scale: 0.96}}
+            transition={{type: 'spring', stiffness: 380, damping: 30}}
+            className="fixed bottom-[86px] md:bottom-6 inset-x-3 sm:inset-x-4 z-30 flex justify-center pointer-events-none"
           >
-            <div className="flex items-center gap-2.5 text-sm font-medium">
-              <ShoppingBag className="w-4 h-4" />
-              <span>سبد سفارش ({toFaDigits(totalCount)} پرس)</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-bold tabular-nums">{formatToman(total)}</span>
-              <span className="text-xs underline">تکمیل سفارش</span>
-            </div>
-          </button>
-        </div>
-      )}
-
-      {/* Dish Customization Modal */}
-      {selectedDish && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4"
-        >
-          <div className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] p-6 space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">{selectedDish.chefName}</p>
-                <h3 className="text-xl font-bold mt-0.5">{selectedDish.title}</h3>
-              </div>
-              <button
-                type="button"
-                aria-label="بستن"
-                onClick={() => setSelectedDish(null)}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">{selectedDish.story}</p>
-
-            <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
-              مواد منتخب: {selectedDish.keyIngredients.join(' · ')}
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium">انتخاب حجم پرس</p>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setPortion('single')}
-                  className={`min-h-[56px] p-3 rounded-xl border text-right transition-colors ${
-                    portion === 'single'
-                      ? 'border-[#B54B1F] bg-[#B54B1F]/8 dark:border-[#E29A6F]'
-                      : 'border-[#E6E6E3] dark:border-[#282825]'
-                  }`}
-                >
-                  <div className="text-sm font-semibold">پرس تک‌نفره</div>
-                  <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E] tabular-nums mt-0.5">
-                    {formatToman(selectedDish.singlePrice)}
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPortion('double')}
-                  className={`min-h-[56px] p-3 rounded-xl border text-right transition-colors ${
-                    portion === 'double'
-                      ? 'border-[#B54B1F] bg-[#B54B1F]/8 dark:border-[#E29A6F]'
-                      : 'border-[#E6E6E3] dark:border-[#282825]'
-                  }`}
-                >
-                  <div className="text-sm font-semibold">پرس دونفره</div>
-                  <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E] tabular-nums mt-0.5">
-                    {formatToman(selectedDish.doublePrice)}
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="kitchen-note" className="block text-sm font-medium mb-1.5">
-                توضیحات اختیاری برای آشپزخانه
-              </label>
-              <input
-                id="kitchen-note"
-                type="text"
-                value={kitchenNote}
-                onChange={(e) => setKitchenNote(e.target.value)}
-                placeholder="مثلاً بدون پیازداغ، یا کشک جداگانه..."
-                className="w-full min-h-[46px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3.5 text-sm"
-              />
-            </div>
-
             <button
               type="button"
-              onClick={() => addToCart(selectedDish, portion, kitchenNote)}
-              className="w-full min-h-[48px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] text-sm font-medium tabular-nums"
+              onClick={() => {
+                setConfirmedOrder(null);
+                setConfirmClearCart(false);
+                setCheckoutOpen(true);
+              }}
+              className="pointer-events-auto w-full max-w-xl rounded-full bg-[#0D0D0D]/95 dark:bg-[#FAFAFA]/95 text-[#FFFFFF] dark:text-[#0B0B0B] backdrop-blur-xl border border-white/14 dark:border-black/10 p-1.5 pl-2 pr-2.5 flex items-center justify-between gap-2.5 shadow-[0_18px_42px_-12px_rgba(0,0,0,0.52)] active:scale-[0.985] transition-transform"
             >
-              افزودن به سبد — {formatToman(portion === 'double' ? selectedDish.doublePrice : selectedDish.singlePrice)}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Checkout Drawer */}
-      {checkoutOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs"
-        >
-          <div className="w-full max-w-lg bg-[#F6F6F5] dark:bg-[#0B0B0B] h-full overflow-y-auto p-6 space-y-6 border-r border-[#E6E6E3] dark:border-[#282825]">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold">{confirmedOrder ? 'سفارش شما ثبت شد' : 'تکمیل سفارش'}</h2>
-              <button
-                type="button"
-                aria-label="بستن"
-                onClick={() => setCheckoutOpen(false)}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-[#EFEFED] dark:hover:bg-[#20201E]"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {confirmedOrder ? (
-              <div className="rounded-2xl border border-[#B54B1F]/30 bg-[#FFFFFF] dark:bg-[#151514] p-6 space-y-4">
-                <CheckCircle2 className="w-10 h-10 text-[#B54B1F] dark:text-[#E29A6F]" />
-                <div className="space-y-1">
-                  <h3 className="text-lg font-bold">سفارش با موفقیت تایید شد</h3>
-                  <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E]">
-                    آشپزخانه لاقلی آماده‌سازی غذای شما را آغاز کرده است.
-                  </p>
-                </div>
-                <div className="border-t border-[#E6E6E3] dark:border-[#282825] pt-4 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-[#5C5C58] dark:text-[#A3A39E]">کد پیگیری</span>
-                    <span dir="ltr" className="font-mono font-bold">
-                      {confirmedOrder.trackingCode}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#5C5C58] dark:text-[#A3A39E]">بازه تحویل</span>
-                    <span>{confirmedOrder.deliverySlot}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#5C5C58] dark:text-[#A3A39E]">مبلغ نهایی</span>
-                    <span className="font-bold tabular-nums">{formatToman(confirmedOrder.total)}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setCheckoutOpen(false)}
-                  className="w-full min-h-[48px] rounded-xl bg-[#B54B1F] text-[#FAFAFA] text-sm font-medium"
-                >
-                  بازگشت به منو
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handlePlaceOrder} className="space-y-6">
-                {/* Cart Lines */}
-                <div className="space-y-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
-                  {cart.map((item, idx) => (
+              <div className="flex items-center gap-2.5 min-w-0">
+                {/* Overlapping Dish Thumbnails */}
+                <div className="flex items-center -space-x-2 space-x-reverse shrink-0">
+                  {cart.slice(0, 2).map((entry) => (
                     <div
-                      key={`${item.dish.id}-${item.portion}`}
-                      className="flex items-center justify-between gap-3 py-2 border-b last:border-b-0 border-[#E6E6E3]/70 dark:border-[#282825]"
+                      key={`${entry.dish.id}-${entry.portion}`}
+                      className="w-9 h-9 rounded-full overflow-hidden border-2 border-[#0D0D0D] dark:border-[#FAFAFA] bg-[#20201E] shrink-0"
                     >
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold truncate">{item.dish.title}</div>
-                        <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
-                          {item.portion === 'double' ? 'دونفره' : 'تک‌نفره'} ·{' '}
-                          {formatToman(item.portion === 'double' ? item.dish.doublePrice : item.dish.singlePrice)}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          type="button"
-                          aria-label="کاهش تعداد"
-                          onClick={() => updateCartQty(idx, -1)}
-                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg border border-[#E6E6E3] dark:border-[#282825]"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="w-6 text-center text-sm tabular-nums">{toFaDigits(item.quantity)}</span>
-                        <button
-                          type="button"
-                          aria-label="افزایش تعداد"
-                          onClick={() => updateCartQty(idx, 1)}
-                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg border border-[#E6E6E3] dark:border-[#282825]"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      <EditorialImage
+                        src={entry.dish.imageUrl}
+                        alt={entry.dish.title}
+                        aspectClass="w-full h-full"
+                        compactEmpty
+                      />
                     </div>
                   ))}
                 </div>
 
-                {/* Delivery Details */}
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="ord-slot" className="block text-sm font-medium mb-1.5">
-                      بازه زمانی تحویل
-                    </label>
-                    <select
-                      id="ord-slot"
-                      value={deliverySlot}
-                      onChange={(e) => setDeliverySlot(e.target.value)}
-                      className="w-full min-h-[48px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] px-3.5 text-sm"
-                    >
-                      {DELIVERY_SLOTS.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label htmlFor="ord-phone" className="block text-sm font-medium mb-1.5">
-                      شماره موبایل گیرنده
-                    </label>
-                    <input
-                      id="ord-phone"
-                      type="tel"
-                      dir="ltr"
-                      required
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="09123456789"
-                      className="w-full min-h-[48px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] px-4 text-left text-sm tabular-nums"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="ord-address" className="block text-sm font-medium mb-1.5">
-                      نشانی دقیق تحویل ({city}، {neighborhood})
-                    </label>
-                    <textarea
-                      id="ord-address"
-                      rows={3}
-                      required
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      placeholder="خیابان، کوچه، پلاک، طبقه و واحد..."
-                      className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-3.5 text-sm"
-                    />
-                  </div>
-                </div>
-
-                {checkoutError && (
-                  <div
-                    role="alert"
-                    className="flex items-start gap-2 rounded-xl border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-800 dark:text-red-200"
-                  >
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>{checkoutError}</span>
-                  </div>
-                )}
-
-                {/* Transparent Invoice Breakdown */}
-                <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 space-y-2.5 text-sm tabular-nums">
-                  <div className="flex justify-between">
-                    <span className="text-[#5C5C58] dark:text-[#A3A39E]">جمع غذاها</span>
-                    <span>{formatToman(subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#5C5C58] dark:text-[#A3A39E]">بسته‌بندی گرم‌نگه‌دار</span>
-                    <span>{formatToman(packagingFee)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#5C5C58] dark:text-[#A3A39E]">
-                      هزینه ارسال (رایگان بالای {formatToman(freeThreshold)})
-                    </span>
-                    <span className={deliveryFee === 0 ? 'text-[#B54B1F] dark:text-[#E29A6F] font-medium' : ''}>
-                      {deliveryFee === 0 ? 'رایگان' : formatToman(deliveryFee)}
+                <div className="text-right min-w-0">
+                  <div className="text-xs sm:text-sm font-extrabold leading-tight flex items-center gap-1.5">
+                    <span>سبد سفارش</span>
+                    <span className="px-1.5 py-0.5 rounded-full bg-[#B54B1F] text-[#FFFFFF] text-[10px] font-bold tabular-nums">
+                      {toFaDigits(totalCount)} پرس
                     </span>
                   </div>
-                  <div className="flex justify-between pt-3 border-t border-[#E6E6E3] dark:border-[#282825] text-base font-bold">
-                    <span>مبلغ قابل پرداخت</span>
-                    <span>{formatToman(total)}</span>
+                  <div className="text-[11px] opacity-75 leading-tight mt-0.5 tabular-nums truncate">
+                    {deliveryFee === 0
+                      ? 'ارسال رایگان فعال شد'
+                      : `${formatToman(Math.max(0, freeThreshold - subtotal))} تا ارسال رایگان`}
                   </div>
                 </div>
+              </div>
 
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs sm:text-sm font-extrabold tabular-nums whitespace-nowrap">
+                  {formatToman(total)}
+                </span>
+                <span className="min-h-[38px] px-3 sm:px-3.5 rounded-full bg-[#FFFFFF] dark:bg-[#0D0D0D] text-[#0D0D0D] dark:text-[#FAFAFA] text-xs font-extrabold inline-flex items-center gap-1 whitespace-nowrap">
+                  <span>تکمیل</span>
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                </span>
+              </div>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Refined Dish Customization Bottom Sheet / Modal */}
+      <AnimatePresence>
+        {selectedDish && (
+          <motion.div
+            initial={{opacity: 0}}
+            animate={{opacity: 1}}
+            exit={{opacity: 0}}
+            transition={{duration: 0.18}}
+            role="dialog"
+            aria-modal="true"
+            aria-label={selectedDish.title}
+            onClick={() => setSelectedDish(null)}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-[3px] p-0 sm:p-4"
+          >
+            <motion.div
+              initial={{y: 36, opacity: 0.6}}
+              animate={{y: 0, opacity: 1}}
+              exit={{y: 32, opacity: 0}}
+              transition={{type: 'spring', stiffness: 380, damping: 32}}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-lg rounded-t-[28px] sm:rounded-[28px] bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] overflow-hidden max-h-[92vh] flex flex-col shadow-[0_28px_72px_-20px_rgba(0,0,0,0.55)]"
+            >
+              {/* Compact Visual Header */}
+              <div className="relative h-44 sm:h-48 shrink-0 bg-[#EFEFED] dark:bg-[#20201E]">
+                <EditorialImage
+                  src={selectedDish.imageUrl}
+                  alt={selectedDish.title}
+                  aspectClass="w-full h-full"
+                  priority
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/65 to-transparent"
+                />
                 <button
-                  type="submit"
-                  disabled={submitting || cart.length === 0}
-                  className="w-full min-h-[50px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] text-sm font-medium disabled:opacity-40"
+                  type="button"
+                  aria-label="بستن"
+                  onClick={() => setSelectedDish(null)}
+                  className="absolute top-3 left-3 w-10 h-10 rounded-full bg-[#0D0D0D]/72 text-white backdrop-blur-md border border-white/15 flex items-center justify-center hover:bg-[#0D0D0D] transition-colors"
                 >
-                  {submitting ? 'در حال ثبت سفارش...' : `تایید و ثبت سفارش (${formatToman(total)})`}
+                  <X className="w-4 h-4" />
                 </button>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
+                <div className="absolute bottom-3 right-4 left-4 text-white">
+                  <p className="text-[11px] text-white/80 font-medium">{selectedDish.chefName}</p>
+                  <h3 className="text-lg sm:text-xl font-extrabold leading-snug">{selectedDish.title}</h3>
+                </div>
+              </div>
+
+              <div className="p-5 sm:p-6 space-y-5 overflow-y-auto">
+                <p className="text-xs sm:text-sm text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
+                  {selectedDish.story}
+                </p>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedDish.keyIngredients.map((ing) => (
+                    <span
+                      key={ing}
+                      className="px-2.5 py-1 rounded-full bg-[#F6F6F5] dark:bg-[#20201E] border border-[#E6E6E3] dark:border-[#2C2C29] text-[11px] font-medium text-[#5C5C58] dark:text-[#A3A39E]"
+                    >
+                      {ing}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-[#0D0D0D] dark:text-[#FAFAFA]">انتخاب حجم پرس</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      {id: 'single' as const, label: 'پرس تک‌نفره', price: selectedDish.singlePrice},
+                      {id: 'double' as const, label: 'پرس دونفره', price: selectedDish.doublePrice},
+                    ].map((opt) => {
+                      const active = portion === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setPortion(opt.id)}
+                          className={`min-h-[64px] p-3.5 rounded-2xl border text-right transition-all flex items-start justify-between gap-2 ${
+                            active
+                              ? 'border-[#0D0D0D] dark:border-[#FAFAFA] bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B]'
+                              : 'border-[#E6E6E3] dark:border-[#2C2C29] bg-[#F6F6F5] dark:bg-[#20201E] text-[#0D0D0D] dark:text-[#FAFAFA]'
+                          }`}
+                        >
+                          <div>
+                            <div className="text-sm font-bold">{opt.label}</div>
+                            <div className="text-xs opacity-80 tabular-nums mt-0.5">
+                              {formatToman(opt.price)}
+                            </div>
+                          </div>
+                          {active && (
+                            <span className="w-5 h-5 rounded-full bg-[#B54B1F] text-white flex items-center justify-center shrink-0 mt-0.5">
+                              <Check className="w-3 h-3" strokeWidth={3} />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="kitchen-note"
+                    className="block text-xs font-bold text-[#0D0D0D] dark:text-[#FAFAFA] mb-1.5"
+                  >
+                    توضیحات اختیاری برای سرآشپز
+                  </label>
+                  <input
+                    id="kitchen-note"
+                    type="text"
+                    value={kitchenNote}
+                    onChange={(e) => setKitchenNote(e.target.value)}
+                    placeholder="مثلاً بدون پیازداغ، یا کشک جداگانه..."
+                    className="w-full min-h-[46px] rounded-2xl border border-[#E6E6E3] dark:border-[#2C2C29] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3.5 text-sm focus:outline-none focus:border-[#0D0D0D] dark:focus:border-[#FAFAFA]"
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-5 border-t border-[#E6E6E3] dark:border-[#242422] bg-[#FFFFFF] dark:bg-[#151514]">
+                <button
+                  type="button"
+                  onClick={() => addToCart(selectedDish, portion, kitchenNote)}
+                  className="w-full min-h-[50px] rounded-full bg-[#0D0D0D] hover:bg-[#242422] dark:bg-[#FAFAFA] dark:hover:bg-[#E6E6E3] text-[#FFFFFF] dark:text-[#0B0B0B] text-sm font-extrabold tabular-nums active:scale-[0.985] transition-all"
+                >
+                  افزودن به سبد سفارش · {formatToman(portion === 'double' ? selectedDish.doublePrice : selectedDish.singlePrice)}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Luxury Editorial Checkout & Cart Slide-Over Drawer */}
+      <AnimatePresence>
+        {checkoutOpen && (
+          <motion.div
+            initial={{opacity: 0}}
+            animate={{opacity: 1}}
+            exit={{opacity: 0}}
+            transition={{duration: 0.2}}
+            role="dialog"
+            aria-modal="true"
+            aria-label="سبد سفارش و تکمیل خرید"
+            onClick={() => setCheckoutOpen(false)}
+            className="fixed inset-0 z-50 flex justify-end bg-black/55 backdrop-blur-[3px]"
+          >
+            <motion.div
+              initial={{x: -44, opacity: 0.5}}
+              animate={{x: 0, opacity: 1}}
+              exit={{x: -44, opacity: 0}}
+              transition={{type: 'spring', stiffness: 360, damping: 34}}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-lg bg-[#F6F6F5] dark:bg-[#0B0B0B] h-full flex flex-col border-r border-[#E6E6E3] dark:border-[#242422] shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
+            >
+              {/* Sticky Cart Header */}
+              <div className="shrink-0 flex items-center justify-between gap-3 px-5 h-16 bg-[#FFFFFF]/92 dark:bg-[#151514]/92 backdrop-blur-md border-b border-[#E6E6E3] dark:border-[#242422]">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] flex items-center justify-center shrink-0">
+                    <ShoppingBag className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-base font-extrabold text-[#0D0D0D] dark:text-[#FAFAFA] leading-tight">
+                      {confirmedOrder ? 'تایید سفارش لاقلی' : 'سبد سفارش شما'}
+                    </h2>
+                    {!confirmedOrder && (
+                      <p className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
+                        {totalCount > 0 ? `${toFaDigits(totalCount)} پرس انتخاب‌شده` : 'سبد خالی است'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {!confirmedOrder && cart.length > 0 && !confirmClearCart && (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmClearCart(true)}
+                      className="min-h-[36px] px-3 rounded-full text-xs font-medium text-[#B54B1F] dark:text-[#E29A6F] hover:bg-[#B54B1F]/10 transition-colors"
+                    >
+                      خالی‌کردن
+                    </button>
+                  )}
+                  {!confirmedOrder && confirmClearCart && (
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-[#B54B1F]/10 border border-[#B54B1F]/30 px-2.5 py-1 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onChangeCart([]);
+                          setConfirmClearCart(false);
+                        }}
+                        className="font-bold text-[#B54B1F] dark:text-[#E29A6F]"
+                      >
+                        حذف همه
+                      </button>
+                      <span className="opacity-35">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmClearCart(false)}
+                        className="text-[#5C5C58] dark:text-[#A3A39E]"
+                      >
+                        لغو
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    aria-label="بستن سبد سفارش"
+                    onClick={() => setCheckoutOpen(false)}
+                    className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[#EFEFED] dark:hover:bg-[#20201E] text-[#0D0D0D] dark:text-[#FAFAFA] transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable Body */}
+              <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-5">
+                {confirmedOrder ? (
+                  <div className="rounded-[24px] border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-6 space-y-5">
+                    <div className="w-12 h-12 rounded-2xl bg-[#B54B1F]/12 text-[#B54B1F] dark:text-[#E29A6F] flex items-center justify-center">
+                      <CheckCircle2 className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h3 className="text-lg font-extrabold text-[#0D0D0D] dark:text-[#FAFAFA]">
+                        سفارش شما با موفقیت ثبت شد
+                      </h3>
+                      <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
+                        آشپزخانه لاقلی آماده‌سازی غذای تازه شما را آغاز کرده است.
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-[#F6F6F5] dark:bg-[#20201E] p-4 space-y-2.5 text-sm">
+                      <div className="flex justify-between gap-3">
+                        <span className="text-[#5C5C58] dark:text-[#A3A39E]">کد پیگیری</span>
+                        <span dir="ltr" className="font-mono font-bold text-[#0D0D0D] dark:text-[#FAFAFA]">
+                          {confirmedOrder.trackingCode}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <span className="text-[#5C5C58] dark:text-[#A3A39E]">بازه تحویل</span>
+                        <span className="font-medium text-[#0D0D0D] dark:text-[#FAFAFA]">
+                          {confirmedOrder.deliverySlot}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-3 pt-2 border-t border-[#E6E6E3] dark:border-[#2C2C29]">
+                        <span className="font-bold text-[#0D0D0D] dark:text-[#FAFAFA]">مبلغ نهایی</span>
+                        <span className="font-extrabold tabular-nums text-[#B54B1F] dark:text-[#E29A6F]">
+                          {formatToman(confirmedOrder.total)}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCheckoutOpen(false)}
+                      className="w-full min-h-[48px] rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] text-sm font-bold"
+                    >
+                      بازگشت به منوی امروز
+                    </button>
+                  </div>
+                ) : cart.length === 0 ? (
+                  /* Graceful Empty Cart View */
+                  <div className="rounded-[24px] border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-8 text-center space-y-4 my-6">
+                    <div className="w-12 h-12 mx-auto rounded-2xl bg-[#F6F6F5] dark:bg-[#20201E] flex items-center justify-center text-[#5C5C58] dark:text-[#A3A39E]">
+                      <ShoppingBag className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-base font-bold text-[#0D0D0D] dark:text-[#FAFAFA]">
+                        سبد سفارش شما خالی است
+                      </h3>
+                      <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
+                        از منوی دست‌ساز امروز، غذای دلخواهتان را انتخاب کنید تا اینجا آماده ثبت شود.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCheckoutOpen(false)}
+                      className="min-h-[44px] px-6 rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] text-xs font-bold"
+                    >
+                      مشاهده منوی امروز
+                    </button>
+                  </div>
+                ) : (
+                  <form id="lagheli-checkout-form" onSubmit={handlePlaceOrder} className="space-y-5">
+                    {/* Free-Delivery Progress Card */}
+                    <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="inline-flex items-center gap-1.5 font-semibold text-[#0D0D0D] dark:text-[#FAFAFA]">
+                          {deliveryFee === 0 ? (
+                            <Sparkles className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
+                          ) : (
+                            <Truck className="w-3.5 h-3.5 text-[#A97222] dark:text-[#D8A85B]" />
+                          )}
+                          <span>
+                            {deliveryFee === 0
+                              ? 'ارسال رایگان برای این سفارش فعال شد'
+                              : `${formatToman(Math.max(0, freeThreshold - subtotal))} تا ارسال رایگان`}
+                          </span>
+                        </span>
+                        <span className="font-bold tabular-nums text-[#B54B1F] dark:text-[#E29A6F]">
+                          {toFaDigits(Math.min(100, Math.round((subtotal / Math.max(1, freeThreshold)) * 100)))}٪
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-[#EFEFED] dark:bg-[#242422] overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full bg-gradient-to-l from-[#B54B1F] to-[#A97222] dark:from-[#E29A6F] dark:to-[#D8A85B]"
+                          initial={{width: 0}}
+                          animate={{
+                            width: `${Math.min(100, Math.round((subtotal / Math.max(1, freeThreshold)) * 100))}%`,
+                          }}
+                          transition={{duration: 0.35}}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Cart Lines — Crisp Dish Thumbnails & Zero Clipped Titles */}
+                    <div className="rounded-[22px] border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] divide-y divide-[#E6E6E3]/80 dark:divide-[#242422] overflow-hidden">
+                      {cart.map((item, idx) => {
+                        const unitPrice =
+                          item.portion === 'double' ? item.dish.doublePrice : item.dish.singlePrice;
+                        return (
+                          <div key={`${item.dish.id}-${item.portion}`} className="p-4 flex items-start gap-3.5">
+                            <div className="w-16 h-16 rounded-2xl overflow-hidden border border-[#E6E6E3]/80 dark:border-[#282825] shrink-0 bg-[#EFEFED] dark:bg-[#20201E]">
+                              <EditorialImage
+                                src={item.dish.imageUrl}
+                                alt={item.dish.title}
+                                aspectClass="w-full h-full"
+                                compactEmpty
+                              />
+                            </div>
+
+                            <div className="flex-1 min-w-0 space-y-2">
+                              <div className="space-y-0.5">
+                                <h3 className="text-sm font-bold text-[#0D0D0D] dark:text-[#FAFAFA] leading-snug break-words">
+                                  {item.dish.title}
+                                </h3>
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
+                                  <span>{item.portion === 'double' ? 'پرس دونفره' : 'پرس تک‌نفره'}</span>
+                                  <span aria-hidden="true">·</span>
+                                  <span>هر پرس {formatToman(unitPrice)}</span>
+                                </div>
+                                {item.note && (
+                                  <p className="text-[11px] text-[#B54B1F] dark:text-[#E29A6F] leading-relaxed pt-0.5">
+                                    یادداشت: {item.note}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="flex items-center justify-between gap-2 pt-0.5">
+                                <span className="text-sm font-extrabold text-[#0D0D0D] dark:text-[#FAFAFA] tabular-nums">
+                                  {formatToman(unitPrice * item.quantity)}
+                                </span>
+
+                                <div className="inline-flex items-center rounded-full border border-[#E6E6E3] dark:border-[#2C2C29] bg-[#F6F6F5] dark:bg-[#20201E] p-0.5">
+                                  <button
+                                    type="button"
+                                    aria-label={item.quantity === 1 ? 'حذف از سبد' : 'کاهش تعداد'}
+                                    onClick={() => updateCartQty(idx, -1)}
+                                    className="w-8 h-8 rounded-full flex items-center justify-center text-[#0D0D0D] dark:text-[#FAFAFA] hover:bg-[#FFFFFF] dark:hover:bg-[#151514] transition-colors"
+                                  >
+                                    {item.quantity === 1 ? (
+                                      <Trash2 className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
+                                    ) : (
+                                      <Minus className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                  <span className="min-w-[28px] text-center text-xs font-extrabold tabular-nums">
+                                    {toFaDigits(item.quantity)}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    aria-label="افزایش تعداد"
+                                    onClick={() => updateCartQty(idx, 1)}
+                                    className="w-8 h-8 rounded-full flex items-center justify-center text-[#0D0D0D] dark:text-[#FAFAFA] hover:bg-[#FFFFFF] dark:hover:bg-[#151514] transition-colors"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Tactile Delivery Slot Pills */}
+                    <div className="rounded-[22px] border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 space-y-3">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-[#0D0D0D] dark:text-[#FAFAFA]">
+                        <Clock className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
+                        <span>انتخاب بازه زمانی تحویل</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {DELIVERY_SLOTS.map((slot) => {
+                          const active = deliverySlot === slot;
+                          return (
+                            <button
+                              key={slot}
+                              type="button"
+                              onClick={() => setDeliverySlot(slot)}
+                              className={`min-h-[42px] px-3.5 rounded-xl border text-xs font-semibold text-right flex items-center justify-between gap-2 transition-all ${
+                                active
+                                  ? 'border-[#0D0D0D] dark:border-[#FAFAFA] bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B]'
+                                  : 'border-[#E6E6E3] dark:border-[#2C2C29] bg-[#F6F6F5] dark:bg-[#20201E] text-[#0D0D0D] dark:text-[#FAFAFA]'
+                              }`}
+                            >
+                              <span>{slot}</span>
+                              {active && <Check className="w-3.5 h-3.5 shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Recipient Details */}
+                    <div className="rounded-[22px] border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 space-y-3.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0D0D0D] dark:text-[#FAFAFA]">
+                          <MapPin className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
+                          <span>اطلاعات تحویل</span>
+                        </span>
+                        <span className="text-[11px] font-medium text-[#5C5C58] dark:text-[#A3A39E]">
+                          {city} · {neighborhood}
+                        </span>
+                      </div>
+
+                      <div>
+                        <label htmlFor="ord-phone" className="block text-xs font-semibold text-[#5C5C58] dark:text-[#A3A39E] mb-1.5">
+                          شماره موبایل گیرنده
+                        </label>
+                        <input
+                          id="ord-phone"
+                          type="tel"
+                          dir="ltr"
+                          required
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="09123456789"
+                          className="w-full min-h-[46px] rounded-xl border border-[#E6E6E3] dark:border-[#2C2C29] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3.5 text-left text-sm tabular-nums focus:outline-none focus:border-[#0D0D0D] dark:focus:border-[#FAFAFA]"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="ord-address" className="block text-xs font-semibold text-[#5C5C58] dark:text-[#A3A39E] mb-1.5">
+                          نشانی دقیق تحویل
+                        </label>
+                        <textarea
+                          id="ord-address"
+                          rows={2}
+                          required
+                          value={address}
+                          onChange={(e) => setAddress(e.target.value)}
+                          placeholder="خیابان، کوچه، پلاک، طبقه و واحد..."
+                          className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#2C2C29] bg-[#F6F6F5] dark:bg-[#0B0B0B] p-3.5 text-sm leading-relaxed focus:outline-none focus:border-[#0D0D0D] dark:focus:border-[#FAFAFA]"
+                        />
+                      </div>
+                    </div>
+
+                    {checkoutError && (
+                      <div
+                        role="alert"
+                        className="flex items-start gap-2 rounded-2xl border border-[#B54B1F]/35 bg-[#B54B1F]/10 p-3.5 text-xs sm:text-sm text-[#B54B1F] dark:text-[#E29A6F] leading-relaxed"
+                      >
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>{checkoutError}</span>
+                      </div>
+                    )}
+
+                    {/* Receipt-Style Transparent Invoice */}
+                    <div className="rounded-[22px] border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 space-y-2.5 text-xs sm:text-sm tabular-nums">
+                      <div className="flex justify-between gap-2">
+                        <span className="text-[#5C5C58] dark:text-[#A3A39E]">جمع غذاها ({toFaDigits(totalCount)} پرس)</span>
+                        <span className="font-semibold text-[#0D0D0D] dark:text-[#FAFAFA]">{formatToman(subtotal)}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-[#5C5C58] dark:text-[#A3A39E]">بسته‌بندی گرم‌نگه‌دار</span>
+                        <span className="font-semibold text-[#0D0D0D] dark:text-[#FAFAFA]">{formatToman(packagingFee)}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-[#5C5C58] dark:text-[#A3A39E]">هزینه ارسال</span>
+                        <span
+                          className={
+                            deliveryFee === 0
+                              ? 'text-[#B54B1F] dark:text-[#E29A6F] font-bold'
+                              : 'font-semibold text-[#0D0D0D] dark:text-[#FAFAFA]'
+                          }
+                        >
+                          {deliveryFee === 0 ? 'رایگان' : formatToman(deliveryFee)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-2 pt-3 border-t border-dashed border-[#E6E6E3] dark:border-[#2C2C29] text-sm sm:text-base font-extrabold text-[#0D0D0D] dark:text-[#FAFAFA]">
+                        <span>مبلغ قابل پرداخت</span>
+                        <span>{formatToman(total)}</span>
+                      </div>
+                    </div>
+                  </form>
+                )}
+              </div>
+
+              {/* Sticky Bottom Checkout Action Bar */}
+              {!confirmedOrder && cart.length > 0 && (
+                <div className="shrink-0 p-4 bg-[#FFFFFF]/95 dark:bg-[#151514]/95 backdrop-blur-md border-t border-[#E6E6E3] dark:border-[#242422] flex items-center justify-between gap-3">
+                  <div className="text-right tabular-nums">
+                    <div className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E]">قابل پرداخت</div>
+                    <div className="text-base font-extrabold text-[#0D0D0D] dark:text-[#FAFAFA]">
+                      {formatToman(total)}
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    form="lagheli-checkout-form"
+                    disabled={submitting || cart.length === 0}
+                    className="flex-1 max-w-[260px] min-h-[48px] px-5 rounded-full bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FFFFFF] text-sm font-extrabold disabled:opacity-40 active:scale-[0.98] transition-all"
+                  >
+                    {submitting ? 'در حال ثبت سفارش...' : 'تایید و ثبت سفارش'}
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 
 interface NetworkInformationLike {
   saveData?: boolean;
@@ -23,10 +23,14 @@ interface UseLazyImageOptions {
 /**
  * Viewport-aware Lazy Loading + Network Data-Saver hook.
  * Defers network requests until images approach the viewport (220px margin),
+ * immediately reveals browser-cached / prefetched images (via img.complete check),
  * respects browser Save-Data / slow-2g signals, and resets state cleanly on src change.
  */
 export function useLazyImage({src, priority = false, rootMargin = '220px 0px'}: UseLazyImageOptions) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const imgElementRef = useRef<HTMLImageElement | null>(null);
+  const prevSrcRef = useRef<string>(src);
+
   const [dataSaver, setDataSaver] = useState<boolean>(() => getNetworkDataSaverMode());
   const [manualLoadAllowed, setManualLoadAllowed] = useState(false);
   const [inView, setInView] = useState<boolean>(priority);
@@ -42,13 +46,30 @@ export function useLazyImage({src, priority = false, rootMargin = '220px 0px'}: 
     return () => conn.removeEventListener?.('change', onChange);
   }, []);
 
-  // Reset image load/error flags whenever src changes
+  // Only reset load/error flags when src actually changes — never wipe a synchronously cached image!
   useEffect(() => {
-    setLoaded(false);
-    setFailed(false);
-    setManualLoadAllowed(false);
     if (priority) {
       setInView(true);
+    }
+
+    if (prevSrcRef.current !== src) {
+      prevSrcRef.current = src;
+      setFailed(false);
+      setManualLoadAllowed(false);
+
+      const img = imgElementRef.current;
+      if (img && img.complete && img.naturalWidth > 0) {
+        setLoaded(true);
+      } else {
+        setLoaded(false);
+      }
+      return;
+    }
+
+    // Even on initial mount, if the image is already cached in memory/disk, reveal immediately
+    const img = imgElementRef.current;
+    if (img && img.complete && img.naturalWidth > 0) {
+      setLoaded(true);
     }
   }, [src, priority]);
 
@@ -83,8 +104,17 @@ export function useLazyImage({src, priority = false, rootMargin = '220px 0px'}: 
   const deferredByDataSaver = Boolean(!priority && dataSaver && !manualLoadAllowed);
   const shouldLoad = Boolean(src && src.trim().length > 0 && !failed && inView && !deferredByDataSaver);
 
+  // Callback ref on <img> catches cached / prefetched images synchronously upon DOM attachment
+  const imgRef = useCallback((node: HTMLImageElement | null) => {
+    imgElementRef.current = node;
+    if (node && node.complete && node.naturalWidth > 0) {
+      setLoaded(true);
+    }
+  }, []);
+
   return {
     containerRef,
+    imgRef,
     shouldLoad,
     loaded,
     failed,

@@ -89,6 +89,7 @@ export default function App() {
     followedOnly: false,
     bookmarkedOnly: false,
     needsPhotoOnly: false,
+    maxTotalMinutes: null,
   });
 
   // Guest Local-First / Synced Bookmarks & Shopping List
@@ -403,6 +404,18 @@ export default function App() {
         shoppingRemainingCount={shoppingRemainingCount}
         cartCount={cartCount}
         ecosystemConfig={ecosystemConfig}
+        theme={theme}
+        onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+        onQuickSearch={() => {
+          setActiveTab('explore');
+          window.setTimeout(() => {
+            const input = document.getElementById('lagheli-recipe-search') as HTMLInputElement | null;
+            if (input) {
+              input.scrollIntoView({behavior: 'smooth', block: 'center'});
+              input.focus();
+            }
+          }, 80);
+        }}
         onOpenAuth={() => setAuthOpen(true)}
         onOpenSubmitRecipe={() => {
           setVariationParent(null);
@@ -412,7 +425,7 @@ export default function App() {
 
       {/* Main Content Canvas */}
       <main
-        className={`flex-1 w-full mx-auto px-4 sm:px-6 pt-8 pb-28 md:pb-16 ${
+        className={`flex-1 w-full mx-auto px-3 sm:px-6 pt-3 md:pt-8 pb-28 md:pb-16 ${
           activeTab === 'admin' ? 'max-w-[1440px]' : 'max-w-6xl'
         }`}
       >

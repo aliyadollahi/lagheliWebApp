@@ -1,4 +1,10 @@
-import type {PartnerRoleId, ShoppingCategory, SubstitutionSuggestion} from './types.ts';
+import type {
+  IngredientItem,
+  PartnerRoleId,
+  RecipeEstimatedCost,
+  ShoppingCategory,
+  SubstitutionSuggestion,
+} from './types.ts';
 
 const PERSIAN_DIGITS = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
 
@@ -174,6 +180,118 @@ export function classifyIngredientCategory(name: string): ShoppingCategory {
     return 'روغن و چربی‌ها';
   }
   return 'سایر مواد';
+}
+
+interface IngredientPriceRule {
+  pattern: RegExp;
+  /** میانگین قیمت هر کیلوگرم/لیتر به تومان */
+  pricePerKg: number;
+  /** میانگین قیمت هر عدد/واحد استاندارد (در صورت استفاده از واحد عددی) */
+  pricePerPiece?: number;
+}
+
+const INGREDIENT_PRICE_RULES: IngredientPriceRule[] = [
+  {pattern: /(ماهیچه|گوسفندی|بره|راسته|فیله گوساله)/, pricePerKg: 860000, pricePerPiece: 290000},
+  {pattern: /(گوشت|چرخ کرده|چرخ‌کرده|گوساله)/, pricePerKg: 690000, pricePerPiece: 160000},
+  {pattern: /(میگو|سالمون|ماهی)/, pricePerKg: 590000, pricePerPiece: 180000},
+  {pattern: /(زعفران)/, pricePerKg: 95000000, pricePerPiece: 38000},
+  {pattern: /(پسته|بادام|خلال|فندق)/, pricePerKg: 880000, pricePerPiece: 45000},
+  {pattern: /(گردو)/, pricePerKg: 740000, pricePerPiece: 12000},
+  {pattern: /(روغن زیتون)/, pricePerKg: 540000, pricePerPiece: 18000},
+  {pattern: /(کره)/, pricePerKg: 380000, pricePerPiece: 22000},
+  {pattern: /(زرشک|کشمش)/, pricePerKg: 310000, pricePerPiece: 18000},
+  {pattern: /(رب انار)/, pricePerKg: 280000, pricePerPiece: 14000},
+  {pattern: /(مرغ|بوقلمون|بلدرچین)/, pricePerKg: 175000, pricePerPiece: 55000},
+  {pattern: /(کشک|پنیر|خامه)/, pricePerKg: 190000, pricePerPiece: 24000},
+  {pattern: /(ماست|شیر|دوغ)/, pricePerKg: 110000, pricePerPiece: 18000},
+  {pattern: /(برنج)/, pricePerKg: 155000, pricePerPiece: 26000},
+  {pattern: /(قارچ)/, pricePerKg: 155000, pricePerPiece: 8000},
+  {pattern: /(تخم مرغ|تخم‌مرغ)/, pricePerKg: 135000, pricePerPiece: 7500},
+  {pattern: /(نخود|لوبیا|عدس|لپه|باقالی|ماش)/, pricePerKg: 140000, pricePerPiece: 22000},
+  {pattern: /(رب گوجه|رب)/, pricePerKg: 98000, pricePerPiece: 6000},
+  {pattern: /(رشته|آرد|نان|پاستا|ماکارونی)/, pricePerKg: 75000, pricePerPiece: 12000},
+  {pattern: /(سبزی|شوید|جعفری|گشنیز|تره|نعنا|اسفناج|کرفس)/, pricePerKg: 68000, pricePerPiece: 18000},
+  {pattern: /(سیر)/, pricePerKg: 130000, pricePerPiece: 3500},
+  {pattern: /(پیاز|گوجه|بادمجان|سیب زمینی|هویج|کدو|خیار|فلفل دلمه)/, pricePerKg: 36000, pricePerPiece: 6000},
+  {pattern: /(روغن)/, pricePerKg: 120000, pricePerPiece: 5000},
+  {pattern: /(نمک|فلفل|زردچوبه|دارچین|هل|زیره|سماق|گلپر|ادویه|آویشن|پاپریکا)/, pricePerKg: 420000, pricePerPiece: 4000},
+];
+
+const CATEGORY_FALLBACK_KG_PRICE: Record<ShoppingCategory, number> = {
+  'پروتئین و تخم‌مرغ': 320000,
+  'خشکبار و مغزها': 650000,
+  'ادویه و معطرها': 350000,
+  'لبنیات': 150000,
+  'روغن و چربی‌ها': 150000,
+  'چاشنی و رب‌ها': 140000,
+  'غلات و آرد': 125000,
+  'حبوبات': 135000,
+  'میوه و دانه‌ها': 130000,
+  'سبزیجات و صیفی‌جات': 48000,
+  'سایر مواد': 110000,
+};
+
+function estimateSingleIngredientToman(item: IngredientItem): number {
+  const normName = normalizePersian(item.name);
+  const normUnit = normalizePersian(item.unit || '');
+  const amount = Math.max(0.1, Number(item.amount) || 1);
+
+  const rule = INGREDIENT_PRICE_RULES.find((r) => r.pattern.test(normName));
+  const category = item.category || classifyIngredientCategory(item.name);
+  const pricePerKg = rule?.pricePerKg ?? CATEGORY_FALLBACK_KG_PRICE[category] ?? 110000;
+
+  // Special handling for brewed saffron (زعفران دم‌کرده) measured in spoons
+  if (normName.includes('زعفران') && /(قاشق|پیمانه)/.test(normUnit)) {
+    return Math.round(amount * 24000);
+  }
+
+  if (/(کیلو|کیلوگرم|لیتر)/.test(normUnit)) {
+    return Math.round(amount * pricePerKg);
+  }
+  if (/(گرم|میلی)/.test(normUnit)) {
+    return Math.round((amount / 1000) * pricePerKg);
+  }
+  if (/(پیمانه|لیوان)/.test(normUnit)) {
+    const kgEquivalent = category === 'سبزیجات و صیفی‌جات' ? 0.08 : 0.17;
+    return Math.round(amount * kgEquivalent * pricePerKg);
+  }
+  if (/(قاشق غذاخوری|قاشق سوپ|قاشق)/.test(normUnit)) {
+    const isTea = /(چای|مربا)/.test(normUnit);
+    const kgEquivalent = isTea ? 0.006 : 0.018;
+    return Math.round(amount * kgEquivalent * pricePerKg);
+  }
+  if (/(حبه)/.test(normUnit)) {
+    return Math.round(amount * (rule?.pricePerPiece ?? 3500));
+  }
+  if (/(بسته|دسته|تکه|شاخه)/.test(normUnit)) {
+    return Math.round(amount * Math.min(pricePerKg * 0.28, 65000));
+  }
+  if (/(مقدار لازم|دلخواه|کمی)/.test(normUnit)) {
+    return 4500;
+  }
+
+  // Default piece-based unit (عدد, etc.)
+  const piecePrice = rule?.pricePerPiece ?? Math.round(pricePerKg * 0.14);
+  return Math.round(amount * piecePrice);
+}
+
+/**
+ * Computes estimated ingredient cost in Toman and economical tier based on
+ * average Iranian market ingredient prices.
+ */
+export function estimateRecipeCost(ingredients: IngredientItem[], servings = 4): RecipeEstimatedCost {
+  const safeServings = Math.max(1, Number(servings) || 4);
+  const rawTotal = (ingredients || []).reduce((sum, item) => sum + estimateSingleIngredientToman(item), 0);
+  const totalToman = Math.max(25000, Math.round(rawTotal / 5000) * 5000);
+  const perServingToman = Math.max(10000, Math.round(totalToman / safeServings / 1000) * 1000);
+
+  if (perServingToman <= 90000) {
+    return {totalToman, perServingToman, tier: 'اقتصادی', level: 1};
+  }
+  if (perServingToman <= 150000) {
+    return {totalToman, perServingToman, tier: 'متوسط', level: 2};
+  }
+  return {totalToman, perServingToman, tier: 'مجلسی', level: 3};
 }
 
 export function computeUserLevel(xp: number): {levelName: string; nextLevelXp: number} {

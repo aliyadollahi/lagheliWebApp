@@ -5,6 +5,7 @@ import {
   ChefHat,
   Moon,
   Plus,
+  Search,
   Shield,
   ShoppingBag,
   Sparkles,
@@ -25,6 +26,9 @@ interface NavigationProps {
   shoppingRemainingCount: number;
   cartCount: number;
   ecosystemConfig: EcosystemConfig;
+  theme: 'light' | 'dark';
+  onToggleTheme: () => void;
+  onQuickSearch: () => void;
   onOpenAuth: () => void;
   onOpenSubmitRecipe: () => void;
 }
@@ -45,6 +49,9 @@ export function TopHeader({
   shoppingRemainingCount,
   cartCount,
   ecosystemConfig,
+  theme,
+  onToggleTheme,
+  onQuickSearch,
   onOpenAuth,
   onOpenSubmitRecipe,
 }: NavigationProps) {
@@ -60,17 +67,17 @@ export function TopHeader({
   ];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[#E6E6E3] dark:border-[#242422] bg-[#FFFFFF]/90 dark:bg-[#0B0B0B]/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-[#E6E6E3]/80 dark:border-[#242422] bg-[#FFFFFF]/92 dark:bg-[#0B0B0B]/92 backdrop-blur-xl">
       <div
         className={`${
           activeTab === 'admin' ? 'max-w-[1440px]' : 'max-w-6xl'
-        } mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-6 transition-all`}
+        } mx-auto px-3.5 sm:px-6 h-[52px] md:h-16 flex items-center justify-between gap-2 sm:gap-6 transition-all`}
       >
         {/* Zone 1: Editorial Single-line Brand Wordmark */}
         <button
           type="button"
           onClick={() => onSelectTab('explore')}
-          className="text-xl sm:text-2xl font-extrabold tracking-tight text-[#0D0D0D] dark:text-[#FAFAFA] whitespace-nowrap shrink-0 min-h-[44px] flex items-center gap-2"
+          className="text-lg md:text-2xl font-extrabold tracking-tight text-[#0D0D0D] dark:text-[#FAFAFA] whitespace-nowrap shrink-0 min-h-[44px] flex items-center gap-2"
         >
           <span>لاقلی</span>
         </button>
@@ -126,28 +133,58 @@ export function TopHeader({
           </button>
         </nav>
 
-        {/* Zone 3: Desktop Admin Shortcut + Sculptural Black & White Primary Action */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        {/* Zone 3 (Mobile): Useful Minimalist Quick Search + Theme/Account Triggers */}
+        <div className="flex md:hidden items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={onQuickSearch}
+            aria-label="جست‌وجوی دستور پخت"
+            className="min-h-[40px] min-w-[40px] rounded-full border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#151514] flex items-center justify-center text-[#0D0D0D] dark:text-[#FAFAFA] active:scale-95 transition-transform"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            aria-label={theme === 'dark' ? 'تغییر به حالت روشن' : 'تغییر به حالت تاریک'}
+            className="min-h-[40px] min-w-[40px] rounded-full border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#151514] flex items-center justify-center text-[#0D0D0D] dark:text-[#FAFAFA] active:scale-95 transition-transform"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+
+          {!user && (
+            <button
+              type="button"
+              onClick={onOpenAuth}
+              className="min-h-[38px] px-3.5 rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] text-xs font-bold active:scale-95 transition-transform whitespace-nowrap"
+            >
+              ورود
+            </button>
+          )}
+        </div>
+
+        {/* Zone 3 (Desktop): Admin Shortcut + Sculptural Black & White Primary Action */}
+        <div className="hidden md:flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => onSelectTab(activeTab === 'admin' ? 'explore' : 'admin')}
             aria-label="پنل مدیریت"
-            className={`min-h-[40px] sm:min-h-[42px] px-2.5 sm:px-3.5 rounded-full border text-xs font-medium inline-flex items-center gap-1.5 transition-all active:scale-[0.97] whitespace-nowrap ${
+            className={`min-h-[42px] px-3.5 rounded-full border text-xs font-medium inline-flex items-center gap-1.5 transition-all active:scale-[0.97] whitespace-nowrap ${
               activeTab === 'admin'
                 ? 'border-[#0D0D0D] bg-[#0D0D0D] text-white dark:border-[#FAFAFA] dark:bg-[#FAFAFA] dark:text-[#0B0B0B]'
                 : 'border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA] hover:bg-[#EFEFED] dark:hover:bg-[#20201E]'
             }`}
           >
             <Shield className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline">پنل مدیریت</span>
-            <span className="sm:hidden">مدیریت</span>
+            <span>پنل مدیریت</span>
           </button>
 
           {user ? (
             <button
               type="button"
               onClick={onOpenSubmitRecipe}
-              className="min-h-[40px] sm:min-h-[42px] px-4 sm:px-5 rounded-full bg-[#0D0D0D] hover:bg-[#242422] active:scale-[0.97] dark:bg-[#FAFAFA] dark:hover:bg-[#E6E6E3] text-[#FFFFFF] dark:text-[#0B0B0B] text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0"
+              className="min-h-[42px] px-5 rounded-full bg-[#0D0D0D] hover:bg-[#242422] active:scale-[0.97] dark:bg-[#FAFAFA] dark:hover:bg-[#E6E6E3] text-[#FFFFFF] dark:text-[#0B0B0B] text-sm font-semibold transition-all whitespace-nowrap shrink-0"
             >
               ثبت دستور
             </button>
@@ -155,7 +192,7 @@ export function TopHeader({
             <button
               type="button"
               onClick={onOpenAuth}
-              className="min-h-[40px] sm:min-h-[42px] px-4 sm:px-5 rounded-full bg-[#0D0D0D] hover:bg-[#242422] active:scale-[0.97] dark:bg-[#FAFAFA] dark:hover:bg-[#E6E6E3] text-[#FFFFFF] dark:text-[#0B0B0B] text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0"
+              className="min-h-[42px] px-5 rounded-full bg-[#0D0D0D] hover:bg-[#242422] active:scale-[0.97] dark:bg-[#FAFAFA] dark:hover:bg-[#E6E6E3] text-[#FFFFFF] dark:text-[#0B0B0B] text-sm font-semibold transition-all whitespace-nowrap shrink-0"
             >
               ورود
             </button>
@@ -274,6 +311,17 @@ export function MobileBottomNav({
 
               <button
                 type="button"
+                onClick={() => handleSelect(activeTab === 'admin' ? 'explore' : 'admin')}
+                className="w-full min-h-[44px] px-3.5 rounded-2xl flex items-center gap-3 text-xs font-medium text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA] hover:bg-[#F2F2F0] dark:hover:bg-[#232320] active:scale-[0.98] transition-all"
+              >
+                <span className="w-8 h-8 rounded-full bg-[#EFEFED] dark:bg-[#232320] flex items-center justify-center shrink-0">
+                  <Shield className="w-4 h-4" />
+                </span>
+                <span>{activeTab === 'admin' ? 'بازگشت به کاوش' : 'پنل مدیریت'}</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => {
                   triggerHaptic();
                   onToggleTheme();
@@ -298,7 +346,7 @@ export function MobileBottomNav({
       >
         <div className="max-w-md mx-auto flex items-center gap-2 pointer-events-auto">
           {/* Primary Floating Pill Bar */}
-          <div className="flex-1 h-[60px] rounded-full bg-[#0D0D0D]/95 dark:bg-[#F5F5F4]/95 backdrop-blur-xl border border-white/10 dark:border-black/10 shadow-[0_14px_34px_-10px_rgba(0,0,0,0.45)] px-1.5 flex items-center justify-between gap-0.5">
+          <div className="min-w-0 flex-1 h-[56px] rounded-full bg-[#0D0D0D]/95 dark:bg-[#F5F5F4]/95 backdrop-blur-xl border border-white/10 dark:border-black/10 shadow-[0_14px_34px_-10px_rgba(0,0,0,0.45)] px-1 flex items-center justify-between gap-0.5">
             {items.map((item) => {
               const Icon = item.icon;
               const active = activeTab === item.id;
@@ -310,10 +358,10 @@ export function MobileBottomNav({
                   onClick={() => handleSelect(item.id)}
                   aria-label={item.label}
                   aria-current={active ? 'page' : undefined}
-                  className={`relative h-[48px] rounded-full flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`relative h-[46px] rounded-full flex items-center justify-center gap-1.5 transition-colors ${
                     active
-                      ? 'px-3.5 text-[#0D0D0D] dark:text-[#FAFAFA] font-bold flex-none'
-                      : 'flex-1 min-w-[44px] text-[#A3A39E] dark:text-[#5C5C58] hover:text-white dark:hover:text-[#0D0D0D]'
+                      ? 'px-3 text-[#0D0D0D] dark:text-[#FAFAFA] font-bold flex-none'
+                      : 'flex-1 min-w-[36px] text-[#A3A39E] dark:text-[#5C5C58] hover:text-white dark:hover:text-[#0D0D0D]'
                   }`}
                 >
                   {active && (
@@ -326,11 +374,11 @@ export function MobileBottomNav({
                   )}
 
                   <motion.span
-                    animate={active ? {scale: 1.06} : {scale: 1}}
+                    animate={active ? {scale: 1.05} : {scale: 1}}
                     transition={{type: 'spring', stiffness: 500, damping: 28}}
                     className="relative z-10 flex items-center justify-center"
                   >
-                    <Icon className="w-[19px] h-[19px]" strokeWidth={active ? 2.25 : 1.8} />
+                    <Icon className="w-[18px] h-[18px]" strokeWidth={active ? 2.25 : 1.8} />
                     {item.count !== undefined && (
                       <motion.span
                         key={item.count}
@@ -373,7 +421,7 @@ export function MobileBottomNav({
             onClick={toggleQuickMenu}
             aria-label={quickOpen ? 'بستن منوی دسترسی سریع' : 'باز کردن منوی دسترسی سریع'}
             aria-expanded={quickOpen}
-            className={`w-[56px] h-[56px] rounded-full shrink-0 flex items-center justify-center border shadow-[0_14px_30px_-10px_rgba(0,0,0,0.4)] transition-colors ${
+            className={`w-[52px] h-[52px] rounded-full shrink-0 flex items-center justify-center border shadow-[0_14px_30px_-10px_rgba(0,0,0,0.4)] transition-colors ${
               quickOpen
                 ? 'bg-[#FFFFFF] text-[#0D0D0D] border-[#0D0D0D]/15 dark:bg-[#0D0D0D] dark:text-[#FAFAFA] dark:border-white/20'
                 : 'bg-[#0D0D0D] text-[#FFFFFF] border-white/10 dark:bg-[#FAFAFA] dark:text-[#0B0B0B] dark:border-black/10'

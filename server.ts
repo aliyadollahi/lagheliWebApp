@@ -28,6 +28,7 @@ import {
   canonicalizeIngredient,
   classifyIngredientCategory,
   computeUserLevel,
+  estimateRecipeCost,
   findNativeSubstitutions,
   normalizePersian,
   toEnDigits,
@@ -199,6 +200,9 @@ function mapRecipeRow(row: Record<string, unknown>, viewerId?: string): Recipe {
         )
       : false);
 
+  const parsedIngredients = JSON.parse(String(row.ingredients_json || '[]'));
+  const servings = Number(row.servings) || 4;
+
   return {
     id: String(row.id),
     slug: String(row.slug),
@@ -213,7 +217,7 @@ function mapRecipeRow(row: Record<string, unknown>, viewerId?: string): Recipe {
     dietTags: JSON.parse(String(row.diet_tags_json || '[]')),
     prepMinutes: Number(row.prep_minutes),
     cookMinutes: Number(row.cook_minutes),
-    servings: Number(row.servings),
+    servings,
     difficulty: row.difficulty as Recipe['difficulty'],
     nutrition: JSON.parse(String(row.nutrition_json)),
     isVip: Number(row.is_vip) === 1,
@@ -225,7 +229,7 @@ function mapRecipeRow(row: Record<string, unknown>, viewerId?: string): Recipe {
     authorName: author?.name || 'آشپز لاقلی',
     authorVerified: author?.is_verified_chef === 1,
     status: row.status as Recipe['status'],
-    ingredients: JSON.parse(String(row.ingredients_json || '[]')),
+    ingredients: parsedIngredients,
     steps: JSON.parse(String(row.steps_json || '[]')),
     tools: JSON.parse(String(row.tools_json || '[]')),
     linkedMenuDishId: row.linked_menu_dish_id ? String(row.linked_menu_dish_id) : null,
@@ -237,6 +241,7 @@ function mapRecipeRow(row: Record<string, unknown>, viewerId?: string): Recipe {
         .prepare("SELECT COUNT(*) as c FROM recipe_photos WHERE recipe_id = ? AND status = 'approved'")
         .get(String(row.id)) as {c: number}
     ).c,
+    estimatedCost: estimateRecipeCost(parsedIngredients, servings),
   };
 }
 

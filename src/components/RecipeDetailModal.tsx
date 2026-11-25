@@ -164,6 +164,15 @@ export function RecipeDetailModal({
     [city, applyDetailPayload, onNotify]
   );
 
+  // Lock underlying page scroll while RecipeDetailModal is open to prevent double scrollbars
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
+
   useEffect(() => {
     prefetchedNextRef.current = false;
     loadDetail(recipeId);
@@ -507,16 +516,16 @@ export function RecipeDetailModal({
       role="dialog"
       aria-modal="true"
       aria-label="جزئیات دستور پخت"
-      className="fixed inset-0 z-50 bg-black/45 overflow-y-auto"
+      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] overflow-y-auto overscroll-contain"
     >
       <div className="min-h-screen flex items-start justify-center p-0 sm:p-6 lg:p-10">
-        <div className="w-full max-w-[1020px] bg-[#FFFFFF]/84 dark:bg-[#0B0B0B]/78 backdrop-blur-[12px] backdrop-saturate-150 sm:rounded-[32px] border border-[rgba(255,255,255,0.1)] shadow-[0_32px_90px_-28px_rgba(17,17,16,0.38),inset_0_1px_0_rgba(255,255,255,0.35)] dark:shadow-[0_32px_90px_-28px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.1)] overflow-hidden my-0 sm:my-4">
-          {/* Sticky Frosted Glass Reading Bar */}
-          <div className="sticky top-0 z-20 flex items-center justify-between gap-4 px-5 sm:px-10 h-16 bg-[#FFFFFF]/72 dark:bg-[#0B0B0B]/72 backdrop-blur-[12px] backdrop-saturate-150 border-b border-[rgba(255,255,255,0.1)] shadow-[0_1px_0_rgba(17,17,16,0.05)] dark:shadow-none">
+        <div className="w-full max-w-[1020px] bg-[#F6F6F5] dark:bg-[#0B0B0B] sm:bg-[#FFFFFF]/94 sm:dark:bg-[#0B0B0B]/92 sm:backdrop-blur-[14px] sm:rounded-[32px] sm:border sm:border-[#E6E6E3] sm:dark:border-[#282825] shadow-[0_32px_90px_-28px_rgba(17,17,16,0.38)] dark:shadow-[0_32px_90px_-28px_rgba(0,0,0,0.75)] overflow-hidden my-0 sm:my-4">
+          {/* Sticky Reading Bar */}
+          <div className="sticky top-0 z-20 flex items-center justify-between gap-3 px-4 sm:px-10 h-14 sm:h-16 bg-[#FFFFFF]/92 dark:bg-[#0B0B0B]/92 backdrop-blur-[12px] border-b border-[#E6E6E3] dark:border-[#242422]">
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[44px] px-3.5 rounded-full text-sm font-medium inline-flex items-center gap-1.5 hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07] transition-colors whitespace-nowrap shrink-0"
+              className="min-h-[42px] px-3 rounded-full text-sm font-semibold inline-flex items-center gap-1.5 hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07] transition-colors whitespace-nowrap shrink-0"
             >
               <X className="w-4 h-4" />
               <span>بستن</span>
@@ -534,7 +543,7 @@ export function RecipeDetailModal({
                   type="button"
                   onClick={handleShareText}
                   aria-label="اشتراک‌گذاری دستور پخت"
-                  className="min-h-[44px] px-3.5 rounded-full text-sm inline-flex items-center justify-center gap-1.5 hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07] transition-colors whitespace-nowrap shrink-0"
+                  className="min-h-[42px] px-3 rounded-full text-sm inline-flex items-center justify-center gap-1.5 hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07] transition-colors whitespace-nowrap shrink-0"
                 >
                   <Share2 className="w-4 h-4" />
                   <span className="hidden sm:inline">اشتراک‌گذاری</span>
@@ -544,7 +553,7 @@ export function RecipeDetailModal({
                   onClick={() => onToggleBookmark(recipe.id)}
                   aria-label={isBookmarked ? 'حذف نشانک' : 'ذخیره در نشانک‌ها'}
                   aria-pressed={isBookmarked}
-                  className={`min-h-[44px] px-4 rounded-full text-sm inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
+                  className={`min-h-[42px] px-3.5 rounded-full text-sm inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
                     isBookmarked
                       ? 'bg-[#B54B1F]/12 text-[#B54B1F] dark:text-[#E29A6F] font-medium'
                       : 'hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07]'
@@ -560,22 +569,23 @@ export function RecipeDetailModal({
           {loading || !recipe ? (
             <RecipeDetailSkeleton />
           ) : (
-            <div className="px-5 sm:px-10 lg:px-14 pt-6 sm:pt-10 pb-14 sm:pb-20 space-y-14 sm:space-y-16">
-              {/* Hero Photograph + Overlapping Glassmorphism Primary Dish Info Panel */}
+            <div className="px-4 sm:px-10 lg:px-14 pt-4 sm:pt-10 pb-14 sm:pb-20 space-y-10 sm:space-y-14">
+              {/* Hero Photograph + Cleanly Layered Primary Dish Info Panel */}
               <div className="relative">
-                <div className="rounded-[26px] overflow-hidden border border-[rgba(255,255,255,0.1)] bg-[#EFEFED] dark:bg-[#151514]">
+                <div className="rounded-[22px] sm:rounded-[26px] overflow-hidden border border-[#E6E6E3] dark:border-[#282825] bg-[#EFEFED] dark:bg-[#151514]">
                   <EditorialImage
                     src={recipe.imageUrl}
                     alt={recipe.title}
                     category={recipe.category}
                     photoCreditName={recipe.photoCreditName}
-                    aspectClass="aspect-[16/10] sm:aspect-[16/9]"
+                    creditPosition="top"
+                    aspectClass="aspect-[4/3] sm:aspect-[16/9]"
                     priority
                   />
                 </div>
 
-                {/* Glassmorphism Primary Dish Information Panel — Elevated over Hero Edge for Visual Depth */}
-                <div className="relative z-10 -mt-10 sm:-mt-16 mx-2 sm:mx-6 lg:mx-8 rounded-[28px] bg-[#FFFFFF]/74 dark:bg-[#151514]/72 backdrop-blur-[12px] backdrop-saturate-150 border border-[rgba(255,255,255,0.1)] shadow-[0_24px_60px_-24px_rgba(17,17,16,0.24),inset_0_1px_0_rgba(255,255,255,0.4)] dark:shadow-[0_28px_70px_-24px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.1)] p-6 sm:p-9 lg:p-10 space-y-6">
+                {/* Primary Dish Information Panel — Cleanly Framed Without Clipping Photo Credit */}
+                <div className="relative z-10 -mt-5 sm:-mt-14 mx-1.5 sm:mx-6 lg:mx-8 rounded-[24px] sm:rounded-[28px] bg-[#FFFFFF] dark:bg-[#151514] sm:bg-[#FFFFFF]/90 sm:dark:bg-[#151514]/90 sm:backdrop-blur-[14px] border border-[#E6E6E3] dark:border-[#282825] shadow-[0_18px_48px_-22px_rgba(17,17,16,0.22)] dark:shadow-[0_24px_60px_-24px_rgba(0,0,0,0.72)] p-5 sm:p-9 lg:p-10 space-y-5 sm:space-y-6">
                   {/* Quiet Unboxed Editorial Metadata Line */}
                   <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                     <span>{recipe.category}</span>

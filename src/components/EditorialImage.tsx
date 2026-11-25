@@ -11,6 +11,8 @@ interface EditorialImageProps {
   photoCreditName?: string | null;
   compactEmpty?: boolean;
   sizes?: string;
+  loading?: 'lazy' | 'eager';
+  creditPosition?: 'bottom' | 'top';
 }
 
 export function EditorialImage({
@@ -23,9 +25,12 @@ export function EditorialImage({
   photoCreditName,
   compactEmpty = false,
   sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw',
+  loading,
+  creditPosition = 'bottom',
 }: EditorialImageProps) {
   const {
     containerRef,
+    imgRef,
     shouldLoad,
     loaded,
     failed,
@@ -121,10 +126,11 @@ export function EditorialImage({
 
           {shouldLoad && (
             <img
+              ref={imgRef}
               src={src}
               alt={alt}
               sizes={sizes}
-              loading={priority ? 'eager' : 'lazy'}
+              loading={loading ?? (priority ? 'eager' : 'lazy')}
               decoding="async"
               fetchPriority={priority ? 'high' : 'low'}
               referrerPolicy="no-referrer"
@@ -139,7 +145,11 @@ export function EditorialImage({
       )}
 
       {photoCreditName && (
-        <div className="absolute bottom-2.5 right-2.5 rounded-full bg-[#0B0B0B]/72 backdrop-blur-md border border-white/10 px-3 py-1 text-[11px] text-[#FAFAFA] flex items-center gap-1.5">
+        <div
+          className={`absolute ${
+            creditPosition === 'top' ? 'top-2.5 right-2.5' : 'bottom-2.5 right-2.5'
+          } rounded-full bg-[#0B0B0B]/72 backdrop-blur-md border border-white/12 px-3 py-1 text-[11px] text-[#FAFAFA] flex items-center gap-1.5`}
+        >
           <Camera className="w-3 h-3 text-[#D8A85B]" />
           <span>عکس واقعی از {photoCreditName}</span>
         </div>

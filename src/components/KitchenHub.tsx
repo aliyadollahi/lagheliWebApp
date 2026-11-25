@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react';
-import {ArrowLeftRight, Plus, Search, ShoppingBag, Sparkles, X} from 'lucide-react';
+import {AnimatePresence, motion} from 'motion/react';
+import {ArrowLeftRight, Clock, Eye, Flame, Plus, Search, ShoppingBag, Sparkles, Users, X} from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
 import {prefetchRecipeDetail} from '../lib/recipePrefetch.ts';
 import {findNativeSubstitutions, toFaDigits} from '../shared/persianEngine.ts';
@@ -56,6 +57,7 @@ export function KitchenHub({city = 'تهران', onOpenRecipe, onAddShoppingItem
   const [exactOnly, setExactOnly] = useState(false);
   const [matches, setMatches] = useState<FridgeMatchResult[] | null>(null);
   const [loadingMatches, setLoadingMatches] = useState(false);
+  const [previewItem, setPreviewItem] = useState<FridgeMatchResult | null>(null);
 
   // Substitution state
   const [subQuery, setSubQuery] = useState('رب انار');
@@ -63,6 +65,15 @@ export function KitchenHub({city = 'تهران', onOpenRecipe, onAddShoppingItem
     findNativeSubstitutions('رب انار', 'native')
   );
   const [loadingSub, setLoadingSub] = useState(false);
+
+  useEffect(() => {
+    if (!previewItem) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPreviewItem(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [previewItem]);
 
   useEffect(() => {
     let active = true;
@@ -320,11 +331,53 @@ export function KitchenHub({city = 'تهران', onOpenRecipe, onAddShoppingItem
                   }
                   className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 sm:p-5 flex flex-col sm:flex-row gap-5"
                 >
-                  <div
-                    onClick={() => onOpenRecipe(item.recipe)}
-                    className="sm:w-44 shrink-0 rounded-xl overflow-hidden cursor-pointer"
-                  >
-                    <EditorialImage src={item.recipe.imageUrl} alt={item.recipe.title} aspectClass="aspect-[4/3]" />
+                  {/* Compact Image Preview Mini-Card */}
+                  <div className="sm:w-48 shrink-0 flex flex-col rounded-xl overflow-hidden border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] group">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => onOpenRecipe(item.recipe)}
+                        aria-label={`باز کردن دستور ${item.recipe.title}`}
+                        className="block w-full text-right cursor-pointer focus-visible:outline-none"
+                      >
+                        <EditorialImage
+                          src={item.recipe.imageUrl}
+                          alt={item.recipe.title}
+                          category={item.recipe.category}
+                          aspectClass="aspect-[4/3]"
+                          compactEmpty
+                        />
+                      </button>
+
+                      {/* Measured Scrim & Quick Visual Preview Trigger */}
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
+                      <div className="absolute bottom-2 inset-x-2 flex items-center justify-between gap-1.5">
+                        <span className="text-[10px] font-medium text-white/90 truncate">
+                          پیش‌نمایش تصویر
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewItem(item);
+                          }}
+                          aria-label={`پیش‌نمایش بزرگ تصویر ${item.recipe.title}`}
+                          className="min-h-[30px] px-2.5 rounded-lg bg-[#0B0B0B]/75 hover:bg-[#0B0B0B]/95 text-[#FAFAFA] backdrop-blur-md border border-white/15 text-[10px] font-semibold inline-flex items-center gap-1 transition-colors"
+                        >
+                          <Eye className="w-3 h-3 text-[#D8A85B]" />
+                          <span>بزرگ‌نمایی</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Clean Unboxed Visual Snapshot Metadata */}
+                    <div className="px-2.5 py-2 flex items-center justify-between gap-1.5 text-[11px] text-[#5C5C58] dark:text-[#A3A39E] tabular-nums border-t border-[#E6E6E3]/80 dark:border-[#282825]">
+                      <span className="truncate">{item.recipe.difficulty}</span>
+                      <span aria-hidden="true">·</span>
+                      <span className="truncate">{item.recipe.region}</span>
+                      <span aria-hidden="true">·</span>
+                      <span className="shrink-0">{toFaDigits(item.recipe.servings)} نفر</span>
+                    </div>
                   </div>
                   <div className="flex-1 flex flex-col justify-between gap-3">
                     <div className="space-y-1.5">
@@ -493,6 +546,108 @@ export function KitchenHub({city = 'تهران', onOpenRecipe, onAddShoppingItem
           )}
         </div>
       )}
+
+      {/* Quick Visual Result Preview Modal */}
+      <AnimatePresence>
+        {previewItem && (
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`پیش‌نمایش تصویر ${previewItem.recipe.title}`}
+            initial={{opacity: 0}}
+            animate={{opacity: 1}}
+            exit={{opacity: 0}}
+            transition={{duration: 0.16}}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setPreviewItem(null);
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{opacity: 0, scale: 0.96, y: 12}}
+              animate={{opacity: 1, scale: 1, y: 0}}
+              exit={{opacity: 0, scale: 0.96, y: 12}}
+              transition={{duration: 0.2, ease: [0.16, 1, 0.3, 1]}}
+              className="w-full max-w-lg rounded-3xl overflow-hidden bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] shadow-2xl"
+            >
+              <div className="relative">
+                <EditorialImage
+                  src={previewItem.recipe.imageUrl}
+                  alt={previewItem.recipe.title}
+                  category={previewItem.recipe.category}
+                  aspectClass="aspect-[16/10]"
+                  priority
+                />
+                <button
+                  type="button"
+                  aria-label="بستن پیش‌نمایش"
+                  onClick={() => setPreviewItem(null)}
+                  className="absolute top-3 left-3 min-h-[40px] min-w-[40px] rounded-full bg-[#0B0B0B]/75 hover:bg-[#0B0B0B] text-[#FAFAFA] backdrop-blur-md border border-white/15 flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-5 sm:p-6 space-y-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2 text-xs tabular-nums">
+                    <span className="font-bold text-[#B54B1F] dark:text-[#E29A6F]">
+                      تطابق {toFaDigits(previewItem.matchPercent)}٪ با مواد یخچال شما
+                    </span>
+                    <span className="text-[#5C5C58] dark:text-[#A3A39E]">
+                      {previewItem.recipe.category} · {previewItem.recipe.region}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-extrabold text-[#0D0D0D] dark:text-[#FAFAFA]">
+                    {previewItem.recipe.title}
+                  </h3>
+                  {previewItem.recipe.subtitle && (
+                    <p className="text-xs leading-6 text-[#5C5C58] dark:text-[#A3A39E]">
+                      {previewItem.recipe.subtitle}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-4 text-xs text-[#5C5C58] dark:text-[#A3A39E] tabular-nums pt-2 border-t border-[#E6E6E3] dark:border-[#282825]">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-[#A97222] dark:text-[#D8A85B]" />
+                    {toFaDigits(previewItem.recipe.prepMinutes + previewItem.recipe.cookMinutes)} دقیقه
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-[#A97222] dark:text-[#D8A85B]" />
+                    {toFaDigits(previewItem.recipe.servings)} نفر
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Flame className="w-3.5 h-3.5 text-[#A97222] dark:text-[#D8A85B]" />
+                    {previewItem.recipe.difficulty}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = previewItem.recipe;
+                      setPreviewItem(null);
+                      onOpenRecipe(target);
+                    }}
+                    className="flex-1 min-h-[46px] px-5 rounded-full bg-[#0D0D0D] hover:bg-[#20201E] dark:bg-[#FAFAFA] dark:hover:bg-[#EFEFED] text-[#FFFFFF] dark:text-[#0B0B0B] text-xs font-bold transition-colors"
+                  >
+                    مشاهده کامل دستور پخت
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewItem(null)}
+                    className="min-h-[46px] px-4 rounded-full border border-[#E6E6E3] dark:border-[#282825] text-xs font-semibold text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA] transition-colors"
+                  >
+                    بستن
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

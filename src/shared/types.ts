@@ -48,6 +48,15 @@ export interface NutritionInfo {
   fiber: number;
 }
 
+export type CostEconomyTier = 'اقتصادی' | 'متوسط' | 'مجلسی';
+
+export interface RecipeEstimatedCost {
+  totalToman: number;
+  perServingToman: number;
+  tier: CostEconomyTier;
+  level: 1 | 2 | 3;
+}
+
 export interface ChefSummary {
   id: string;
   name: string;
@@ -97,6 +106,7 @@ export interface Recipe {
   linkedMenuDishId?: string | null;
   photoCreditName?: string | null;
   communityPhotosCount?: number;
+  estimatedCost?: RecipeEstimatedCost;
 }
 
 export interface RecipePhoto {

@@ -1,11 +1,12 @@
-import {useEffect, useRef, useState} from 'react';
-import {motion} from 'motion/react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {AnimatePresence, motion} from 'motion/react';
 import {
   ArrowUpLeft,
   BadgeCheck,
   Bookmark,
   Camera,
   Clock,
+  Coins,
   Copy,
   Flame,
   Lock,
@@ -14,15 +15,17 @@ import {
   ShoppingBag,
   SlidersHorizontal,
   Sparkles,
+  Users,
   X,
 } from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
 import {prefetchNextRecipes, prefetchRecipeDetail} from '../lib/recipePrefetch.ts';
 import {shareRecipeWithWebShare} from '../lib/webShare.ts';
-import {PARTNER_ROLE_LABELS, toFaDigits} from '../shared/persianEngine.ts';
+import {PARTNER_ROLE_LABELS, estimateRecipeCost, formatToman, toFaDigits} from '../shared/persianEngine.ts';
 import type {EcosystemConfig, Partner, Recipe, SponsorCampaign} from '../shared/types.ts';
 import {EditorialImage} from './EditorialImage.tsx';
 import {RecipeFeedSkeleton} from './EditorialSkeletons.tsx';
+import {ScrollTastePrompt, type QuickFlyoutFocus} from './ScrollTastePrompt.tsx';
 
 export interface RecipeFilterState {
   q: string;
@@ -34,6 +37,7 @@ export interface RecipeFilterState {
   followedOnly: boolean;
   bookmarkedOnly: boolean;
   needsPhotoOnly?: boolean;
+  maxTotalMinutes?: number | null;
 }
 
 interface RecipeFeedProps {
@@ -71,6 +75,216 @@ const SEASONS = ['بهار', 'تابستان', 'پاییز', 'زمستان', 'چ
 const REGIONS = ['تهران', 'گیلان', 'شیراز', 'اصفهان', 'خراسان'];
 const DIETS = ['سنتی', 'گیاهی', 'رژیمی', 'پرپروتئین', 'بدون گلوتن', 'سریع', 'اقتصادی'];
 
+function getEstimatedCookMinutes(recipe: Recipe): number {
+  const prep = Math.max(0, Number(recipe.prepMinutes) || 0);
+  const cook = Math.max(0, Number(recipe.cookMinutes) || 0);
+  const directTotal = prep + cook;
+  if (directTotal > 0) return directTotal;
+  return (recipe.steps || []).reduce((sum, st) => sum + (Number(st.timerMinutes) || 0), 0);
+}
+
+/**
+ * Custom hook inside RecipeFeed that counts meaningful user scroll steps
+ * and triggers a non-blocking bottom-entry Quick-Filter Flyout (diets / maxTotalMinutes)
+ * after every `interval` (default: 10) scrolls.
+ */
+export function useScrollQuickFilterFlyout({
+  enabled,
+  interval = 10,
+  hasActiveTimeFilter,
+  hasActiveDietFilter,
+}: {
+  enabled: boolean;
+  interval?: number;
+  hasActiveTimeFilter: boolean;
+  hasActiveDietFilter: boolean;
+}) {
+  const [scrollCount, setScrollCount] = useState(0);
+  const [visible, setVisible] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [focus, setFocus] = useState<QuickFlyoutFocus>('maxTotalMinutes');
+  const [muted, setMuted] = useState(false);
+
+  const visibleRef = useRef(false);
+  const expandedRef = useRef(false);
+  const filterStateRef = useRef({hasActiveTimeFilter, hasActiveDietFilter});
+  filterStateRef.current = {hasActiveTimeFilter, hasActiveDietFilter};
+
+  const trackerRef = useRef({
+    count: 0,
+    lastY: typeof window !== 'undefined' ? window.scrollY : 0,
+    accumulatedPx: 0,
+    appearedAtCount: 0,
+    appearedAtY: 0,
+    expandedAtY: 0,
+    suppressUntil: 0,
+  });
+
+  useEffect(() => {
+    visibleRef.current = visible;
+  }, [visible]);
+
+  useEffect(() => {
+    expandedRef.current = expanded;
+  }, [expanded]);
+
+  const suppressScrollCounting = useCallback((durationMs = 650) => {
+    trackerRef.current.suppressUntil = Date.now() + durationMs;
+    trackerRef.current.accumulatedPx = 0;
+  }, []);
+
+  useEffect(() => {
+    if (!enabled || muted) return;
+
+    trackerRef.current.lastY = window.scrollY;
+    let rafId: number | null = null;
+    let gestureTimer: number | null = null;
+
+    const recordScrollStep = (currentY: number) => {
+      const nextCount = trackerRef.current.count + 1;
+      trackerRef.current.count = nextCount;
+      setScrollCount(nextCount);
+
+      // Respect user agency: if they ignore the collapsed Flyout and keep scrolling, hide it smoothly
+      if (visibleRef.current && !expandedRef.current) {
+        if (
+          nextCount - trackerRef.current.appearedAtCount >= 2 ||
+          Math.abs(currentY - trackerRef.current.appearedAtY) >= 240
+        ) {
+          visibleRef.current = false;
+          setVisible(false);
+        }
+        return;
+      }
+
+      // If the user scrolls away while the Flyout is expanded, collapse quietly
+      if (visibleRef.current && expandedRef.current) {
+        if (Math.abs(currentY - trackerRef.current.expandedAtY) >= 220) {
+          visibleRef.current = false;
+          expandedRef.current = false;
+          setExpanded(false);
+          setVisible(false);
+        }
+        return;
+      }
+
+      // Surface the bottom-entry Flyout after every `interval` (10) scrolls
+      if (nextCount > 0 && nextCount % interval === 0 && currentY > 120) {
+        const cycle = Math.floor(nextCount / interval);
+        const {hasActiveTimeFilter: hasTime, hasActiveDietFilter: hasDiet} = filterStateRef.current;
+
+        let nextFocus: QuickFlyoutFocus;
+        if (!hasTime && hasDiet) {
+          nextFocus = 'maxTotalMinutes';
+        } else if (hasTime && !hasDiet) {
+          nextFocus = 'diets';
+        } else {
+          nextFocus = cycle % 2 === 1 ? 'maxTotalMinutes' : 'diets';
+        }
+
+        trackerRef.current.appearedAtCount = nextCount;
+        trackerRef.current.appearedAtY = currentY;
+        visibleRef.current = true;
+        expandedRef.current = false;
+        setFocus(nextFocus);
+        setExpanded(false);
+        setVisible(true);
+      }
+    };
+
+    const onScroll = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        const currentY = window.scrollY;
+        const delta = Math.abs(currentY - trackerRef.current.lastY);
+        trackerRef.current.lastY = currentY;
+
+        if (Date.now() < trackerRef.current.suppressUntil || delta < 2) {
+          return;
+        }
+
+        // Collapse expanded panel immediately if the user scrolls far away mid-gesture
+        if (visibleRef.current && expandedRef.current && Math.abs(currentY - trackerRef.current.expandedAtY) >= 220) {
+          visibleRef.current = false;
+          expandedRef.current = false;
+          setExpanded(false);
+          setVisible(false);
+        }
+
+        trackerRef.current.accumulatedPx += delta;
+
+        if (trackerRef.current.accumulatedPx >= 90) {
+          trackerRef.current.accumulatedPx = 0;
+          if (gestureTimer !== null) {
+            window.clearTimeout(gestureTimer);
+            gestureTimer = null;
+          }
+          recordScrollStep(currentY);
+        } else if (trackerRef.current.accumulatedPx >= 28) {
+          if (gestureTimer !== null) window.clearTimeout(gestureTimer);
+          gestureTimer = window.setTimeout(() => {
+            gestureTimer = null;
+            if (trackerRef.current.accumulatedPx >= 28) {
+              trackerRef.current.accumulatedPx = 0;
+              recordScrollStep(window.scrollY);
+            }
+          }, 140);
+        }
+      });
+    };
+
+    window.addEventListener('scroll', onScroll, {passive: true});
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
+      if (gestureTimer !== null) window.clearTimeout(gestureTimer);
+    };
+  }, [enabled, muted, interval]);
+
+  const expand = useCallback(() => {
+    trackerRef.current.expandedAtY = window.scrollY;
+    expandedRef.current = true;
+    setExpanded(true);
+  }, []);
+
+  const collapse = useCallback(() => {
+    visibleRef.current = false;
+    expandedRef.current = false;
+    setExpanded(false);
+    setVisible(false);
+  }, []);
+
+  const dismiss = useCallback(() => {
+    visibleRef.current = false;
+    expandedRef.current = false;
+    setExpanded(false);
+    setVisible(false);
+  }, []);
+
+  const mute = useCallback(() => {
+    visibleRef.current = false;
+    expandedRef.current = false;
+    setMuted(true);
+    setExpanded(false);
+    setVisible(false);
+  }, []);
+
+  return {
+    scrollCount,
+    visible,
+    expanded,
+    focus,
+    setFocus,
+    expand,
+    collapse,
+    dismiss,
+    mute,
+    suppressScrollCounting,
+  };
+}
+
+
 export function RecipeFeed({
   recipes,
   city = 'تهران',
@@ -91,7 +305,17 @@ export function RecipeFeed({
   onNotify,
 }: RecipeFeedProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [heroEdition, setHeroEdition] = useState<'daily' | 'weekly'>('daily');
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
+  const feedSectionRef = useRef<HTMLElement | null>(null);
+
+  // 10-scroll Quick-Filter Flyout hook (diets & maxTotalMinutes)
+  const quickFlyout = useScrollQuickFilterFlyout({
+    enabled: !loading && recipes.length > 0,
+    interval: 10,
+    hasActiveTimeFilter: Boolean(filters.maxTotalMinutes),
+    hasActiveDietFilter: filters.diets.length > 0,
+  });
 
   const toggleMulti = (key: 'categories' | 'seasons' | 'regions' | 'diets', value: string) => {
     const list = filters[key];
@@ -106,7 +330,8 @@ export function RecipeFeed({
     (filters.verifiedOnly ? 1 : 0) +
     (filters.followedOnly ? 1 : 0) +
     (filters.bookmarkedOnly ? 1 : 0) +
-    (filters.needsPhotoOnly ? 1 : 0);
+    (filters.needsPhotoOnly ? 1 : 0) +
+    (filters.maxTotalMinutes ? 1 : 0);
 
   const clearAllFilters = () => {
     onChangeFilters({
@@ -119,6 +344,7 @@ export function RecipeFeed({
       followedOnly: false,
       bookmarkedOnly: false,
       needsPhotoOnly: false,
+      maxTotalMinutes: null,
     });
   };
 
@@ -130,31 +356,64 @@ export function RecipeFeed({
     }
   };
 
-  const displayedRecipes = filters.needsPhotoOnly
-    ? recipes.filter((r) => !r.imageUrl || r.imageUrl.trim().length === 0)
-    : recipes;
+  const displayedRecipes = useMemo(() => {
+    return recipes.filter((r) => {
+      if (filters.needsPhotoOnly && r.imageUrl && r.imageUrl.trim().length > 0) return false;
+      if (filters.maxTotalMinutes && getEstimatedCookMinutes(r) > filters.maxTotalMinutes) return false;
+      return true;
+    });
+  }, [recipes, filters.needsPhotoOnly, filters.maxTotalMinutes]);
 
   const photoLessCount = recipes.filter((r) => !r.imageUrl || r.imageUrl.trim().length === 0).length;
   const isCleanHome = !filters.q && filters.categories.length === 0 && activeFilterCount === 0;
-  // Prefer a photographed recipe as the editorial cover hero
+
+  // Pick Daily and Weekly photographed Editor's Picks for the cinematic hero
+  const photographedRecipes = useMemo(
+    () => displayedRecipes.filter((r) => r.imageUrl && r.imageUrl.trim().length > 0),
+    [displayedRecipes]
+  );
+  const dailyHero = isCleanHome ? photographedRecipes[0] || displayedRecipes[0] : undefined;
+  const weeklyHero = isCleanHome && photographedRecipes.length > 1 ? photographedRecipes[1] : undefined;
   const heroRecipe = isCleanHome
-    ? displayedRecipes.find((r) => r.imageUrl && r.imageUrl.trim().length > 0) || displayedRecipes[0]
+    ? heroEdition === 'weekly' && weeklyHero
+      ? weeklyHero
+      : dailyHero
     : undefined;
+
   const gridRecipes = heroRecipe
     ? displayedRecipes.filter((r) => r.id !== heroRecipe.id)
     : displayedRecipes;
 
+  const handleFlyoutSelectMaxMinutes = (minutes: number | null, feedback: string) => {
+    onChangeFilters({...filters, maxTotalMinutes: minutes});
+    onNotify(feedback);
+    quickFlyout.dismiss();
+    quickFlyout.suppressScrollCounting(700);
+    window.setTimeout(() => {
+      feedSectionRef.current?.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }, 80);
+  };
+
+  const handleFlyoutToggleDiet = (diet: string) => {
+    const exists = filters.diets.includes(diet);
+    toggleMulti('diets', diet);
+    onNotify(exists ? `فیلتر سبک «${diet}» برداشته شد.` : `فیلتر سریع سبک «${diet}» اعمال شد.`);
+  };
+
   // Prefetch the Editorial Hero recipe + top 2 cards quietly right after mount
   useEffect(() => {
-    if (heroRecipe) {
-      prefetchRecipeDetail(heroRecipe.id, city, {priority: 'low', imageUrl: heroRecipe.imageUrl});
+    if (dailyHero) {
+      prefetchRecipeDetail(dailyHero.id, city, {priority: 'low', imageUrl: dailyHero.imageUrl});
+    }
+    if (weeklyHero) {
+      prefetchRecipeDetail(weeklyHero.id, city, {priority: 'low', imageUrl: weeklyHero.imageUrl});
     }
     if (gridRecipes.length > 0) {
       prefetchNextRecipes(gridRecipes, -1, city, 2);
     }
-  }, [heroRecipe?.id, gridRecipes.length, city]);
+  }, [dailyHero?.id, weeklyHero?.id, gridRecipes.length, city]);
 
-  // Shared IntersectionObserver: prefetch visible cards + next 2 upcoming recipes as user scrolls
+  // IntersectionObserver: prefetch visible cards + upcoming recipes smoothly
   useEffect(() => {
     const container = gridContainerRef.current;
     if (!container || typeof IntersectionObserver === 'undefined' || gridRecipes.length === 0) return;
@@ -176,7 +435,7 @@ export function RecipeFeed({
           observer.unobserve(el);
         }
       },
-      {rootMargin: '420px 0px', threshold: 0.01}
+      {rootMargin: '240px 0px', threshold: 0.1}
     );
 
     const cards = container.querySelectorAll<HTMLElement>('[data-prefetch-id]');
@@ -187,18 +446,18 @@ export function RecipeFeed({
   const exploreCampaign = activeCampaigns.find((c) => c.placement === 'explore_showcase');
 
   return (
-    <div className="space-y-12 sm:space-y-16">
-      {/* Editorial Cover Spread (Magazine-grade First Impression on Clean Feed) */}
+    <div className="space-y-10 sm:space-y-14">
+      {/* Full-Bleed Dramatic Glassmorphic Editor's Pick Cover */}
       {heroRecipe && isCleanHome && (
         <motion.section
-          aria-label="پیشنهاد سردبیر امروز"
-          initial={{opacity: 0, y: 12}}
+          aria-label="انتخاب سردبیر"
+          initial={{opacity: 0, y: 10}}
           animate={{opacity: 1, y: 0}}
-          transition={{duration: 0.55, ease: [0.16, 1, 0.3, 1]}}
-          className="space-y-6 pb-12 border-b border-[#E6E6E3] dark:border-[#282825]"
+          transition={{duration: 0.45, ease: [0.16, 1, 0.3, 1]}}
+          className="space-y-4"
         >
-          {/* Architectural Editorial Masthead Strip */}
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#5C5C58] dark:text-[#A3A39E] pb-3 border-b border-[#E6E6E3]/70 dark:border-[#282825]">
+          {/* Quiet Desktop Editorial Masthead Strip (Hidden on Mobile so Food Cover Leads Immediately) */}
+          <div className="hidden md:flex flex-wrap items-center justify-between gap-3 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
             <div className="flex items-center gap-2.5">
               <span className="font-semibold text-[#0D0D0D] dark:text-[#FAFAFA]">
                 آرشیو مرجع آشپزی لاقلی
@@ -214,14 +473,14 @@ export function RecipeFeed({
                   className="inline-flex items-center gap-1.5 text-[#B54B1F] dark:text-[#E29A6F] font-medium hover:underline min-h-[36px]"
                 >
                   <Camera className="w-3.5 h-3.5" />
-                  <span>{toFaDigits(photoLessCount)} دستور در انتظار عکس واقعی شما (+۴۰ جِم)</span>
+                  <span>{toFaDigits(photoLessCount)} دستور در انتظار عکس واقعی (+۴۰ جِم)</span>
                 </button>
               )}
               {onJumpToKitchen && (
                 <button
                   type="button"
                   onClick={onJumpToKitchen}
-                  className="hidden sm:inline-flex items-center gap-1 hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA] min-h-[36px]"
+                  className="inline-flex items-center gap-1 hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA] min-h-[36px]"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-[#A97222]" />
                   <span>با مواد یخچال چی بپزم؟</span>
@@ -230,97 +489,192 @@ export function RecipeFeed({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-stretch">
+          {/* Immersive Full-Bleed Food Photography Cover — Dish Photo Takes Center Stage */}
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label={`باز کردن انتخاب سردبیر: ${heroRecipe.title}`}
+            onClick={() => onOpenRecipe(heroRecipe)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpenRecipe(heroRecipe);
+              }
+            }}
+            onMouseEnter={() =>
+              prefetchRecipeDetail(heroRecipe.id, city, {priority: 'high', imageUrl: heroRecipe.imageUrl})
+            }
+            onTouchStart={() =>
+              prefetchRecipeDetail(heroRecipe.id, city, {priority: 'high', imageUrl: heroRecipe.imageUrl})
+            }
+            className="relative group cursor-pointer rounded-[26px] sm:rounded-[34px] overflow-hidden h-[72svh] min-h-[480px] max-h-[600px] sm:h-[560px] lg:h-[600px] flex flex-col justify-between border border-[#E6E6E3] dark:border-[#282825] shadow-[0_24px_64px_-28px_rgba(0,0,0,0.5)] bg-[#0B0B0B]"
+          >
+            {/* Full-Bleed Crisp Food Photography */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={heroRecipe.id}
+                initial={{opacity: 0.45, scale: 1.03}}
+                animate={{opacity: 1, scale: 1}}
+                exit={{opacity: 0.35}}
+                transition={{duration: 0.45, ease: [0.16, 1, 0.3, 1]}}
+                className="absolute inset-0"
+              >
+                <EditorialImage
+                  src={heroRecipe.imageUrl}
+                  alt={heroRecipe.title}
+                  category={heroRecipe.category}
+                  aspectClass="w-full h-full"
+                  className="h-full w-full"
+                  priority
+                />
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Crystal-Clear Center Photo Window: Subtle Top Vignette + Clean Bottom Scrim Only */}
             <div
-              onClick={() => onOpenRecipe(heroRecipe)}
-              onMouseEnter={() =>
-                prefetchRecipeDetail(heroRecipe.id, city, {priority: 'high', imageUrl: heroRecipe.imageUrl})
-              }
-              onTouchStart={() =>
-                prefetchRecipeDetail(heroRecipe.id, city, {priority: 'high', imageUrl: heroRecipe.imageUrl})
-              }
-              className="lg:col-span-7 group cursor-pointer rounded-3xl overflow-hidden border border-[#E6E6E3]/80 dark:border-[#282825] shadow-[0_12px_40px_-24px_rgba(28,27,24,0.22)]"
-            >
-              <EditorialImage
-                src={heroRecipe.imageUrl}
-                alt={heroRecipe.title}
-                category={heroRecipe.category}
-                photoCreditName={heroRecipe.photoCreditName}
-                aspectClass="aspect-[16/10] lg:h-full"
-                priority
-              />
-            </div>
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/45 to-transparent"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-[44%] bg-gradient-to-t from-black/82 via-black/32 to-transparent"
+            />
 
-            <div className="lg:col-span-5 flex flex-col justify-between gap-8 py-1">
-              <div className="space-y-5">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
-                  <span className="font-semibold text-[#B54B1F] dark:text-[#E29A6F]">منتخب سردبیر امروز</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{heroRecipe.region}</span>
-                  <span aria-hidden="true">·</span>
-                  <span>سختی {heroRecipe.difficulty}</span>
-                </div>
-
-                <h1 className="text-3xl sm:text-[2.35rem] font-extrabold leading-[1.3] tracking-tight text-[#0D0D0D] dark:text-[#FAFAFA]">
-                  {heroRecipe.title}
-                </h1>
-
-                <p className="text-sm sm:text-base text-[#5C5C58] dark:text-[#A3A39E] leading-[1.85]">
-                  {heroRecipe.description}
-                </p>
-
-                {/* Architectural Tabular Metrics Strip (Zero Pills) */}
-                <div className="grid grid-cols-3 gap-4 py-4 border-y border-[#E6E6E3]/80 dark:border-[#282825] tabular-nums">
-                  <div>
-                    <div className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E]">زمان کل</div>
-                    <div className="text-sm font-bold mt-0.5 inline-flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
-                      <span>{toFaDigits(heroRecipe.prepMinutes + heroRecipe.cookMinutes)} دقیقه</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E]">انرژی هر پرس</div>
-                    <div className="text-sm font-bold mt-0.5 inline-flex items-center gap-1">
-                      <Flame className="w-3.5 h-3.5 text-[#A97222]" />
-                      <span>{toFaDigits(heroRecipe.nutrition.calories)} کالری</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E]">تعداد نفرات</div>
-                    <div className="text-sm font-bold mt-0.5">{toFaDigits(heroRecipe.servings)} نفر</div>
-                  </div>
-                </div>
-
+            {/* Single-Row Slim Floating Top Bar (Never Wraps on Mobile!) */}
+            <div className="relative z-10 p-3 sm:p-6 lg:p-7 flex items-center justify-between gap-2 flex-nowrap">
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center p-0.5 sm:p-1 rounded-full bg-[#0B0B0B]/46 backdrop-blur-[14px] border border-white/20 shrink-0"
+              >
                 <button
                   type="button"
-                  onClick={() => onOpenChef(heroRecipe.authorId)}
-                  className="inline-flex items-center gap-1.5 text-sm font-medium text-[#0D0D0D] dark:text-[#FAFAFA] hover:text-[#B54B1F] dark:hover:text-[#E29A6F] transition-colors min-h-[40px]"
+                  onClick={() => setHeroEdition('daily')}
+                  className={`min-h-[34px] sm:min-h-[36px] px-3 sm:px-4 rounded-full text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap ${
+                    heroEdition === 'daily'
+                      ? 'bg-[#FFFFFF] text-[#0B0B0B] shadow-xs'
+                      : 'text-white/85 hover:text-white'
+                  }`}
                 >
-                  <span>{heroRecipe.authorName}</span>
-                  {heroRecipe.authorVerified && (
-                    <BadgeCheck className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
-                  )}
+                  <span className="sm:hidden">انتخاب روز</span>
+                  <span className="hidden sm:inline">انتخاب روز سردبیر</span>
                 </button>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => onOpenRecipe(heroRecipe)}
-                  className="min-h-[50px] px-7 rounded-full bg-[#0D0D0D] hover:bg-[#242422] active:scale-[0.98] dark:bg-[#FAFAFA] dark:hover:bg-[#E6E6E3] text-[#FFFFFF] dark:text-[#0B0B0B] text-sm font-semibold transition-all inline-flex items-center gap-2 shadow-[0_10px_24px_-12px_rgba(0,0,0,0.45)]"
-                >
-                  <span>شروع مطالعه و آشپزی</span>
-                  <ArrowUpLeft className="w-4 h-4" />
-                </button>
-                {heroRecipe.linkedMenuDishId && (
+                {weeklyHero && (
                   <button
                     type="button"
-                    onClick={() => onJumpToOrder(heroRecipe.linkedMenuDishId)}
-                    className="min-h-[50px] px-5 rounded-full border border-[#D8D8D4] dark:border-[#2E2E2B] bg-white dark:bg-[#151514] hover:bg-[#EFEFED] dark:hover:bg-[#20201E] active:scale-[0.98] text-sm font-medium transition-all"
+                    onClick={() => setHeroEdition('weekly')}
+                    className={`min-h-[34px] sm:min-h-[36px] px-3 sm:px-4 rounded-full text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap ${
+                      heroEdition === 'weekly'
+                        ? 'bg-[#FFFFFF] text-[#0B0B0B] shadow-xs'
+                        : 'text-white/85 hover:text-white'
+                    }`}
                   >
-                    سفارش آماده امروز
+                    <span className="sm:hidden">هفته</span>
+                    <span className="hidden sm:inline">انتخاب ویژه هفته</span>
                   </button>
                 )}
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 sm:gap-3 rounded-full bg-[#0B0B0B]/48 backdrop-blur-[14px] border border-white/20 px-2.5 sm:px-3.5 min-h-[36px] sm:min-h-[38px] text-[11px] sm:text-xs font-semibold text-white tabular-nums shrink-0 whitespace-nowrap">
+                <span className="inline-flex items-center gap-1">
+                  <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#D8A85B]" aria-hidden="true" />
+                  <span>{toFaDigits(getEstimatedCookMinutes(heroRecipe))} دقیقه</span>
+                </span>
+                <span aria-hidden="true" className="text-white/30">·</span>
+                {(() => {
+                  const heroCost =
+                    heroRecipe.estimatedCost ?? estimateRecipeCost(heroRecipe.ingredients, heroRecipe.servings);
+                  return (
+                    <span
+                      title={`سطح اقتصادی: ${heroCost.tier} — حدود ${formatToman(heroCost.perServingToman)} تومان هر پرس`}
+                      className="inline-flex items-center gap-1"
+                    >
+                      <Coins className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#D8A85B]" aria-hidden="true" />
+                      <span>{heroCost.tier}</span>
+                    </span>
+                  );
+                })()}
+                <span aria-hidden="true" className="hidden sm:inline text-white/30">·</span>
+                <span className="hidden sm:inline-flex items-center gap-1">
+                  <Flame className="w-3.5 h-3.5 text-[#E29A6F]" aria-hidden="true" />
+                  <span>{toFaDigits(heroRecipe.nutrition.calories)} کالری</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Sleek Low-Profile Bottom Frosted Glass Card (Leaves Upper ~65% Pure Dish Photography!) */}
+            <div className="relative z-10 p-3 sm:p-6 lg:p-7 mt-auto">
+              <div className="max-w-2xl rounded-[20px] sm:rounded-[26px] bg-[#10100F]/46 backdrop-blur-[18px] border border-white/22 shadow-[0_20px_48px_-18px_rgba(0,0,0,0.72)] p-3.5 sm:p-6 lg:p-7 space-y-2.5 sm:space-y-4 transition-all duration-300 group-hover:bg-[#10100F]/56 group-hover:border-white/32">
+                {/* Single-line Crisp Editorial Kicker */}
+                <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-white/85 tabular-nums truncate">
+                  <span className="font-bold text-[#E29A6F] shrink-0">
+                    {heroEdition === 'weekly' ? 'انتخاب ویژه هفته' : 'پیشنهاد سردبیر'}
+                  </span>
+                  <span aria-hidden="true" className="text-white/35">·</span>
+                  <span className="truncate">{heroRecipe.region}</span>
+                  <span aria-hidden="true" className="text-white/35">·</span>
+                  <span className="inline-flex items-center gap-1 shrink-0">
+                    <Users className="w-3 h-3 text-[#D8A85B]" aria-hidden="true" />
+                    {toFaDigits(heroRecipe.servings)} نفر
+                  </span>
+                  <span aria-hidden="true" className="hidden sm:inline text-white/35">·</span>
+                  <span className="hidden sm:inline shrink-0">سختی {heroRecipe.difficulty}</span>
+                </div>
+
+                {/* Bold Editorial Headline + Desktop Description */}
+                <div className="space-y-1.5">
+                  <h1 className="text-lg sm:text-3xl lg:text-[2.35rem] font-extrabold leading-[1.3] tracking-tight text-white line-clamp-2">
+                    {heroRecipe.title}
+                  </h1>
+                  <p className="hidden sm:block text-sm text-white/82 leading-[1.8] line-clamp-2 max-w-xl">
+                    {heroRecipe.description}
+                  </p>
+                </div>
+
+                {/* Compact Single-Row Action Bar */}
+                <div className="pt-1 sm:pt-2 flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenRecipe(heroRecipe);
+                      }}
+                      className="min-h-[40px] sm:min-h-[46px] px-4 sm:px-6 rounded-full bg-[#FFFFFF] hover:bg-[#EFEFED] active:scale-[0.98] text-[#0B0B0B] text-xs sm:text-sm font-extrabold inline-flex items-center gap-1.5 shadow-md transition-all whitespace-nowrap"
+                    >
+                      <span className="sm:hidden">مشاهده دستور پخت</span>
+                      <span className="hidden sm:inline">مشاهده دستور و شروع آشپزی</span>
+                      <ArrowUpLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 group-hover:-translate-x-0.5 group-hover:-translate-y-0.5" />
+                    </button>
+
+                    {heroRecipe.linkedMenuDishId && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onJumpToOrder(heroRecipe.linkedMenuDishId);
+                        }}
+                        className="min-h-[40px] sm:min-h-[46px] px-3.5 sm:px-5 rounded-full bg-white/14 hover:bg-white/24 active:scale-[0.98] text-white border border-white/24 backdrop-blur-md text-xs sm:text-sm font-semibold transition-all whitespace-nowrap"
+                      >
+                        <span className="sm:hidden">سفارش آماده</span>
+                        <span className="hidden sm:inline">سفارش آماده امروز</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenChef(heroRecipe.authorId);
+                    }}
+                    className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-white/85 hover:text-white min-h-[40px] shrink-0 transition-colors"
+                  >
+                    <span>از {heroRecipe.authorName}</span>
+                    {heroRecipe.authorVerified && (
+                      <BadgeCheck className="w-4 h-4 text-[#D8A85B]" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -333,6 +687,7 @@ export function RecipeFeed({
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-[#5C5C58] dark:text-[#A3A39E] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
+              id="lagheli-recipe-search"
               type="search"
               value={filters.q}
               onChange={(e) => onChangeFilters({...filters, q: e.target.value})}
@@ -416,7 +771,31 @@ export function RecipeFeed({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div>
+                <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] mb-2">حداکثر زمان پخت</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    {label: 'همه زمان‌ها', val: null},
+                    {label: 'زیر ۳۰ دقیقه', val: 30},
+                    {label: 'تا ۶۰ دقیقه', val: 60},
+                  ].map((t) => (
+                    <button
+                      key={t.label}
+                      type="button"
+                      onClick={() => onChangeFilters({...filters, maxTotalMinutes: t.val})}
+                      className={`min-h-[40px] px-3 rounded-lg text-xs transition-colors ${
+                        (filters.maxTotalMinutes ?? null) === t.val
+                          ? 'bg-[#B54B1F] text-[#FAFAFA] dark:bg-[#E29A6F] dark:text-[#0B0B0B]'
+                          : 'bg-[#EFEFED] dark:bg-[#20201E] text-[#5C5C58] dark:text-[#A3A39E]'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] mb-2">فصل مناسب</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -521,23 +900,78 @@ export function RecipeFeed({
       </section>
 
       {/* Minimalist Editorial Recipe Cards Grid */}
-      <section aria-label="فهرست دستورهای پخت" className="space-y-6">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#0D0D0D] dark:text-[#FAFAFA]">
-            {filters.needsPhotoOnly
-              ? `دستورهای در انتظار عکس واقعی شما (${toFaDigits(displayedRecipes.length)})`
-              : filters.q || filters.categories.length > 0 || activeFilterCount > 0
-                ? `نتایج جست‌وجو (${toFaDigits(displayedRecipes.length)})`
-                : 'منتخب آرشیو دستورهای پخت'}
-          </h2>
-          {(filters.q || filters.categories.length > 0 || activeFilterCount > 0) && (
-            <button
-              type="button"
-              onClick={clearAllFilters}
-              className="text-xs text-[#B54B1F] dark:text-[#E29A6F] hover:underline min-h-[44px] px-2"
-            >
-              نمایش همه دستورها
-            </button>
+      <section ref={feedSectionRef} aria-label="فهرست دستورهای پخت" className="space-y-6 scroll-mt-24">
+        <div className="space-y-3">
+          <div className="flex items-baseline justify-between gap-4">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#0D0D0D] dark:text-[#FAFAFA]">
+              {filters.needsPhotoOnly
+                ? `دستورهای در انتظار عکس واقعی شما (${toFaDigits(displayedRecipes.length)})`
+                : filters.q || filters.categories.length > 0 || activeFilterCount > 0
+                  ? `نتایج متناسب با سلیقه شما (${toFaDigits(displayedRecipes.length)})`
+                  : 'منتخب آرشیو دستورهای پخت'}
+            </h2>
+            {(filters.q || filters.categories.length > 0 || activeFilterCount > 0) && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="text-xs text-[#B54B1F] dark:text-[#E29A6F] hover:underline min-h-[44px] px-2 shrink-0"
+              >
+                نمایش همه دستورها
+              </button>
+            )}
+          </div>
+
+          {/* Active Taste/Filter Removable Controls */}
+          {(filters.maxTotalMinutes ||
+            filters.diets.length > 0 ||
+            filters.seasons.length > 0 ||
+            filters.regions.length > 0) && (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {filters.maxTotalMinutes && (
+                <button
+                  type="button"
+                  onClick={() => onChangeFilters({...filters, maxTotalMinutes: null})}
+                  className="min-h-[36px] px-3 rounded-full bg-[#0D0D0D] text-[#FFFFFF] dark:bg-[#FAFAFA] dark:text-[#0B0B0B] font-medium inline-flex items-center gap-1.5"
+                >
+                  <Clock className="w-3 h-3" />
+                  <span>تا {toFaDigits(filters.maxTotalMinutes)} دقیقه</span>
+                  <X className="w-3 h-3 opacity-75" />
+                </button>
+              )}
+              {filters.diets.map((d) => (
+                <button
+                  key={`active-diet-${d}`}
+                  type="button"
+                  onClick={() => toggleMulti('diets', d)}
+                  className="min-h-[36px] px-3 rounded-full bg-[#0D0D0D] text-[#FFFFFF] dark:bg-[#FAFAFA] dark:text-[#0B0B0B] font-medium inline-flex items-center gap-1.5"
+                >
+                  <span>سبک {d}</span>
+                  <X className="w-3 h-3 opacity-75" />
+                </button>
+              ))}
+              {filters.seasons.map((s) => (
+                <button
+                  key={`active-season-${s}`}
+                  type="button"
+                  onClick={() => toggleMulti('seasons', s)}
+                  className="min-h-[36px] px-3 rounded-full bg-[#0D0D0D] text-[#FFFFFF] dark:bg-[#FAFAFA] dark:text-[#0B0B0B] font-medium inline-flex items-center gap-1.5"
+                >
+                  <span>فصل {s}</span>
+                  <X className="w-3 h-3 opacity-75" />
+                </button>
+              ))}
+              {filters.regions.map((r) => (
+                <button
+                  key={`active-region-${r}`}
+                  type="button"
+                  onClick={() => toggleMulti('regions', r)}
+                  className="min-h-[36px] px-3 rounded-full bg-[#0D0D0D] text-[#FFFFFF] dark:bg-[#FAFAFA] dark:text-[#0B0B0B] font-medium inline-flex items-center gap-1.5"
+                >
+                  <span>خطه {r}</span>
+                  <X className="w-3 h-3 opacity-75" />
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
@@ -561,7 +995,11 @@ export function RecipeFeed({
           <div ref={gridContainerRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
             {gridRecipes.map((recipe, idx) => {
               const isBookmarked = bookmarkedIds.has(recipe.id) || Boolean(recipe.isBookmarked);
-              const totalTime = recipe.prepMinutes + recipe.cookMinutes;
+              const totalTime = getEstimatedCookMinutes(recipe);
+              const estimatedCost =
+                recipe.estimatedCost ?? estimateRecipeCost(recipe.ingredients, recipe.servings);
+              const timeBreakdown = `زمان پخت تقریبی: ${toFaDigits(totalTime)} دقیقه (آماده‌سازی ${toFaDigits(recipe.prepMinutes)} + پخت ${toFaDigits(recipe.cookMinutes)} دقیقه)`;
+              const costBreakdown = `سطح اقتصادی: ${estimatedCost.tier} — برآورد میانگین مواد اولیه حدود ${formatToman(estimatedCost.perServingToman)} تومان برای هر پرس (مجموع ${formatToman(estimatedCost.totalToman)} تومان)`;
               return (
                 <article
                   key={recipe.id}
@@ -578,19 +1016,47 @@ export function RecipeFeed({
                   className="group cursor-pointer flex flex-col justify-between space-y-4"
                 >
                   <div className="space-y-4">
-                    {/* Clean Photography OR Kinfolk Typographic Cover for Photo-less Recipes */}
-                    <div className="rounded-2xl overflow-hidden border border-[#E6E6E3]/80 dark:border-[#282825] shadow-[0_8px_28px_-22px_rgba(28,27,24,0.28)] transition-shadow duration-300 group-hover:shadow-[0_14px_34px_-20px_rgba(28,27,24,0.34)]">
+                    {/* Clean Photography OR Kinfolk Typographic Cover with Cooking Time + Economical Cost Indicator */}
+                    <div className="relative rounded-2xl overflow-hidden border border-[#E6E6E3]/80 dark:border-[#282825] shadow-[0_8px_28px_-22px_rgba(28,27,24,0.28)] transition-shadow duration-300 group-hover:shadow-[0_14px_34px_-20px_rgba(28,27,24,0.34)]">
                       <EditorialImage
                         src={recipe.imageUrl}
                         alt={recipe.title}
                         category={recipe.category}
                         photoCreditName={recipe.photoCreditName}
-                        aspectClass="aspect-[4/3]"
+                        aspectClass="aspect-video"
+                        loading="lazy"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       />
+
+                      {/* Unified Visual Cooking Time & Economy Cost Indicator */}
+                      <div className="absolute top-3 left-3 z-10 inline-flex items-center gap-2 rounded-xl bg-[#0B0B0B]/74 dark:bg-[#0B0B0B]/84 backdrop-blur-md border border-white/15 px-2.5 py-1 text-[11px] font-semibold text-[#FAFAFA] tabular-nums shadow-xs">
+                        <span title={timeBreakdown} aria-label={timeBreakdown} className="inline-flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-[#D8A85B] shrink-0" aria-hidden="true" />
+                          <span>{toFaDigits(totalTime)} دقیقه</span>
+                        </span>
+                        <span aria-hidden="true" className="h-3 w-px bg-white/22" />
+                        <span
+                          title={costBreakdown}
+                          aria-label={costBreakdown}
+                          className="inline-flex items-center gap-1"
+                        >
+                          <Coins
+                            className={`w-3.5 h-3.5 shrink-0 ${
+                              estimatedCost.level === 1
+                                ? 'text-[#D8A85B]'
+                                : estimatedCost.level === 2
+                                  ? 'text-[#E29A6F]'
+                                  : 'text-[#FAFAFA]'
+                            }`}
+                            aria-hidden="true"
+                          />
+                          <span>{estimatedCost.tier}</span>
+                        </span>
+                      </div>
                     </div>
 
                     {/* Unboxed Clean Metadata Line */}
-                    <div className="flex items-center justify-between text-xs text-[#5C5C58] dark:text-[#A3A39E]">
+                    <div className="flex items-center justify-between gap-2 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
                       <div className="flex items-center gap-1.5 truncate">
                         <span>{recipe.category}</span>
                         <span aria-hidden="true">·</span>
@@ -604,10 +1070,9 @@ export function RecipeFeed({
                           </>
                         )}
                       </div>
-                      <div className="inline-flex items-center gap-1 tabular-nums shrink-0">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>{toFaDigits(totalTime)} دقیقه</span>
-                      </div>
+                      <span className="text-[#5C5C58] dark:text-[#A3A39E] shrink-0">
+                        {recipe.difficulty}
+                      </span>
                     </div>
 
                     {/* Title & Short Editorial Subtitle */}
@@ -686,7 +1151,7 @@ export function RecipeFeed({
       {ecosystemConfig.exploreShowcaseEnabled && exploreCampaign && (
         <section
           aria-label="کمپین اسپانسر منتخب"
-          className="rounded-3xl border border-[#E6E6E3] dark:border-[#282825] bg-gradient-to-l from-[#FFFFFF] via-[#F6F6F5] to-[#EFEFED] dark:from-[#1C1B18] dark:via-[#151514] dark:to-[#0B0B0B] p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6"
+          className="rounded-3xl border border-[#E6E6E3] dark:border-[#282825] bg-gradient-to-l from-[#FFFFFF] via-[#F6F6F5] to-[#EFEFED] dark:from-[#151514] dark:via-[#151514] dark:to-[#0B0B0B] p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6"
         >
           <div className="space-y-2 max-w-2xl">
             <div className="flex items-center gap-2 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
@@ -781,6 +1246,21 @@ export function RecipeFeed({
           </div>
         </section>
       )}
+
+      {/* 10-Scroll Bottom-Entry Quick-Filter Flyout (diets & maxTotalMinutes) */}
+      <ScrollTastePrompt
+        visible={quickFlyout.visible}
+        expanded={quickFlyout.expanded}
+        focus={quickFlyout.focus}
+        filters={filters}
+        onChangeFocus={quickFlyout.setFocus}
+        onExpand={quickFlyout.expand}
+        onCollapse={quickFlyout.collapse}
+        onSelectMaxMinutes={handleFlyoutSelectMaxMinutes}
+        onToggleDiet={handleFlyoutToggleDiet}
+        onDismiss={quickFlyout.dismiss}
+        onMuteSession={quickFlyout.mute}
+      />
     </div>
   );
 }
