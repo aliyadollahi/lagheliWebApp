@@ -9,6 +9,7 @@ import {
 } from '../shared/behavioralEngine.ts';
 import {toFaDigits} from '../shared/persianEngine.ts';
 import type {
+  AdminBehavioralChartsReportPayload,
   AdminPermission,
   ApprovedExecutiveInsightReport,
   DietaryTagId,
@@ -714,6 +715,318 @@ function computeExecutiveBehavioralReport(): ExecutiveBehavioralReportPayload {
   };
 }
 
+function shortenRecipeTitle(title: string, maxLen = 22): string {
+  const clean = title.trim();
+  return clean.length > maxLen ? `${clean.slice(0, maxLen - 1)}…` : clean;
+}
+
+function computeBehavioralChartsReport(): AdminBehavioralChartsReportPayload {
+  const sessions = db
+    .prepare(
+      'SELECT id, duration_seconds, visit_hour FROM behavior_sessions ORDER BY last_seen_at DESC LIMIT 3000'
+    )
+    .all() as {id: string; duration_seconds: number; visit_hour: number}[];
+
+  const events = db
+    .prepare(
+      `SELECT session_id, event_type, section_name, target_type, target_id, target_label, category, numeric_value, created_at
+       FROM behavior_events
+       ORDER BY created_at DESC LIMIT 10000`
+    )
+    .all() as {
+    session_id: string | null;
+    event_type: string;
+    section_name: string;
+    target_type: string;
+    target_id: string;
+    target_label: string;
+    category: string;
+    numeric_value: number;
+    created_at: string;
+  }[];
+
+  const sessionHourMap = new Map<string, number>();
+  const hourBuckets = Array.from({length: 24}, (_, hour) => ({
+    hour,
+    visits: 0,
+    totalDwell: 0,
+    interactions: 0,
+  }));
+
+  for (const s of sessions) {
+    const h = Math.max(0, Math.min(23, Number(s.visit_hour || 0)));
+    sessionHourMap.set(s.id, h);
+    hourBuckets[h].visits += 1;
+    hourBuckets[h].totalDwell += Math.max(0, Number(s.duration_seconds || 0));
+  }
+
+  const recipeMap = new Map<
+    string,
+    {
+      id: string;
+      title: string;
+      category: string;
+      views: number;
+      totalDwell: number;
+      cookStarts: number;
+      scrollSum: number;
+      scrollSamples: number;
+      clickIntervalSumMs: number;
+      clickIntervalSamples: number;
+    }
+  >();
+
+  const ensureRecipe = (id: string, title: string, category: string) => {
+    let rec = recipeMap.get(id);
+    if (!rec) {
+      rec = {
+        id,
+        title: title || 'دستورپخت',
+        category: category || 'عمومی',
+        views: 0,
+        totalDwell: 0,
+        cookStarts: 0,
+        scrollSum: 0,
+        scrollSamples: 0,
+        clickIntervalSumMs: 0,
+        clickIntervalSamples: 0,
+      };
+      recipeMap.set(id, rec);
+    } else {
+      if (title && rec.title === 'دستورپخت') rec.title = title;
+      if (category && rec.category === 'عمومی') rec.category = category;
+    }
+    return rec;
+  };
+
+  const scrollByDepth = new Map<number, Set<string>>([
+    [25, new Set()],
+    [50, new Set()],
+    [75, new Set()],
+    [100, new Set()],
+  ]);
+
+  const clickBuckets = {
+    rapid: 0, // < 3s
+    active: 0, // 3s - 10s
+    deep: 0, // 10s - 30s
+    cooking: 0, // > 30s
+  };
+
+  let totalClickIntervalMs = 0;
+  let totalClickIntervalCount = 0;
+  let totalScrollValues = 0;
+  let totalScrollCount = 0;
+
+  for (const ev of events) {
+    const h =
+      ev.session_id && sessionHourMap.has(ev.session_id)
+        ? sessionHourMap.get(ev.session_id)!
+        : new Date(ev.created_at).getHours();
+
+    if (
+      ev.event_type === 'recipe_view' ||
+      ev.event_type === 'recipe_cook_start' ||
+      ev.event_type === 'click_interval' ||
+      ev.event_type === 'fridge_search' ||
+      ev.event_type === 'shopping_add'
+    ) {
+      if (h >= 0 && h < 24) hourBuckets[h].interactions += 1;
+    }
+
+    if (ev.event_type === 'recipe_view' && ev.target_id) {
+      const rec = ensureRecipe(ev.target_id, ev.target_label, ev.category);
+      rec.views += 1;
+      rec.totalDwell += Math.max(10, Number(ev.numeric_value || 90));
+    } else if (ev.event_type === 'recipe_cook_start' && ev.target_id) {
+      const rec = ensureRecipe(ev.target_id, ev.target_label, ev.category);
+      rec.cookStarts += 1;
+    } else if (ev.event_type === 'scroll_depth') {
+      const d = Math.max(0, Math.min(100, Number(ev.numeric_value || 0)));
+      totalScrollValues += d;
+      totalScrollCount += 1;
+      const bucket = d >= 95 ? 100 : d >= 70 ? 75 : d >= 45 ? 50 : 25;
+      for (const milestone of [25, 50, 75, 100]) {
+        if (milestone <= bucket) {
+          scrollByDepth.get(milestone)!.add(ev.session_id || `${ev.target_id}:${ev.created_at}`);
+        }
+      }
+      if (ev.target_type === 'recipe' && ev.target_id) {
+        const rec = ensureRecipe(ev.target_id, ev.target_label, ev.category);
+        rec.scrollSum += d;
+        rec.scrollSamples += 1;
+      }
+    } else if (ev.event_type === 'click_interval') {
+      const ms = Math.max(80, Math.min(120_000, Number(ev.numeric_value || 0)));
+      totalClickIntervalMs += ms;
+      totalClickIntervalCount += 1;
+      if (ms < 3000) clickBuckets.rapid += 1;
+      else if (ms < 10_000) clickBuckets.active += 1;
+      else if (ms < 30_000) clickBuckets.deep += 1;
+      else clickBuckets.cooking += 1;
+
+      if (ev.target_id) {
+        const rec = ensureRecipe(ev.target_id, ev.target_label, ev.category);
+        rec.clickIntervalSumMs += ms;
+        rec.clickIntervalSamples += 1;
+      }
+    }
+  }
+
+  const recipePopularity = Array.from(recipeMap.values())
+    .filter((r) => r.views > 0 || r.cookStarts > 0)
+    .map((r) => {
+      const avgDwellSeconds = r.views > 0 ? Math.round(r.totalDwell / r.views) : 0;
+      const avgScrollDepthPercent =
+        r.scrollSamples > 0 ? Math.round(r.scrollSum / r.scrollSamples) : 72;
+      const avgClickIntervalSec =
+        r.clickIntervalSamples > 0
+          ? Number((r.clickIntervalSumMs / r.clickIntervalSamples / 1000).toFixed(1))
+          : 6.4;
+      const popularityScore = Math.round(
+        r.views * 14 + r.cookStarts * 22 + avgDwellSeconds * 0.12 + avgScrollDepthPercent * 0.25
+      );
+      return {
+        id: r.id,
+        title: r.title,
+        shortTitle: shortenRecipeTitle(r.title, 20),
+        category: r.category,
+        views: r.views,
+        avgDwellSeconds,
+        cookStarts: r.cookStarts,
+        avgScrollDepthPercent,
+        avgClickIntervalSec,
+        popularityScore,
+      };
+    })
+    .sort((a, b) => b.views - a.views || b.popularityScore - a.popularityScore)
+    .slice(0, 10);
+
+  const catAgg = new Map<string, {views: number; totalDwell: number}>();
+  let totalRecipeViews = 0;
+  let totalRecipeDwell = 0;
+  for (const r of recipePopularity) {
+    totalRecipeViews += r.views;
+    totalRecipeDwell += r.avgDwellSeconds * r.views;
+    const prev = catAgg.get(r.category) || {views: 0, totalDwell: 0};
+    prev.views += r.views;
+    prev.totalDwell += r.avgDwellSeconds * r.views;
+    catAgg.set(r.category, prev);
+  }
+
+  const catDenom = Math.max(1, totalRecipeViews);
+  const categoryPopularity = Array.from(catAgg.entries())
+    .map(([category, st]) => ({
+      category,
+      views: st.views,
+      avgDwellSeconds: st.views > 0 ? Math.round(st.totalDwell / st.views) : 0,
+      sharePercent: Math.round((st.views / catDenom) * 100),
+    }))
+    .sort((a, b) => b.views - a.views);
+
+  const peakHours = hourBuckets.map((b) => ({
+    hour: b.hour,
+    label: `${toFaDigits(String(b.hour).padStart(2, '0'))}:۰۰`,
+    visits: b.visits,
+    avgDwellSeconds: b.visits > 0 ? Math.round(b.totalDwell / b.visits) : 0,
+    interactions: b.interactions,
+  }));
+
+  let peakHour = 19;
+  let peakHourVisits = -1;
+  for (const b of peakHours) {
+    if (b.visits > peakHourVisits) {
+      peakHourVisits = b.visits;
+      peakHour = b.hour;
+    }
+  }
+
+  let bestWindowStart = 18;
+  let bestWindowSum = -1;
+  for (let start = 0; start < 24; start += 1) {
+    const sum3 =
+      hourBuckets[start].visits +
+      hourBuckets[(start + 1) % 24].visits +
+      hourBuckets[(start + 2) % 24].visits;
+    if (sum3 > bestWindowSum) {
+      bestWindowSum = sum3;
+      bestWindowStart = start;
+    }
+  }
+  const peakWindowLabel = `${toFaDigits(String(bestWindowStart).padStart(2, '0'))}:۰۰ تا ${toFaDigits(
+    String((bestWindowStart + 3) % 24).padStart(2, '0')
+  )}:۰۰`;
+
+  const scrollDenom = Math.max(1, sessions.length);
+  const scrollDepthDistribution = [
+    {depth: 25, label: 'عمق ۲۵٪'},
+    {depth: 50, label: 'عمق ۵۰٪'},
+    {depth: 75, label: 'عمق ۷۵٪'},
+    {depth: 100, label: 'عمق ۱۰۰٪'},
+  ].map((m) => {
+    const cnt = scrollByDepth.get(m.depth)!.size;
+    return {
+      depth: m.depth,
+      label: m.label,
+      sessionsCount: cnt,
+      reachPercent: Math.min(100, Math.round((cnt / scrollDenom) * 100)),
+    };
+  });
+
+  const clickDenom = Math.max(1, totalClickIntervalCount);
+  const clickIntervalDistribution = [
+    {
+      bucketKey: 'rapid',
+      label: 'زیر ۳ ثانیه',
+      description: 'اسکن سریع مواد و کلیدها',
+      count: clickBuckets.rapid,
+      sharePercent: Math.round((clickBuckets.rapid / clickDenom) * 100),
+    },
+    {
+      bucketKey: 'active',
+      label: '۳ تا ۱۰ ثانیه',
+      description: 'مطالعه فعال و بررسی جزئیات',
+      count: clickBuckets.active,
+      sharePercent: Math.round((clickBuckets.active / clickDenom) * 100),
+    },
+    {
+      bucketKey: 'deep',
+      label: '۱۰ تا ۳۰ ثانیه',
+      description: 'مکث عمیق روی مراحل پخت',
+      count: clickBuckets.deep,
+      sharePercent: Math.round((clickBuckets.deep / clickDenom) * 100),
+    },
+    {
+      bucketKey: 'cooking',
+      label: 'بالای ۳۰ ثانیه',
+      description: 'همراهی هم‌زمان در آشپزخانه',
+      count: clickBuckets.cooking,
+      sharePercent: Math.round((clickBuckets.cooking / clickDenom) * 100),
+    },
+  ];
+
+  return {
+    generatedAt: new Date().toISOString(),
+    summary: {
+      totalSessions: sessions.length,
+      totalRecipeViews,
+      avgRecipeDwellSeconds: totalRecipeViews > 0 ? Math.round(totalRecipeDwell / totalRecipeViews) : 0,
+      avgScrollDepthPercent: totalScrollCount > 0 ? Math.round(totalScrollValues / totalScrollCount) : 0,
+      avgClickIntervalMs:
+        totalClickIntervalCount > 0 ? Math.round(totalClickIntervalMs / totalClickIntervalCount) : 0,
+      peakHour,
+      peakHourLabel: `${toFaDigits(String(peakHour).padStart(2, '0'))}:۰۰`,
+      peakHourVisits: Math.max(0, peakHourVisits),
+      peakWindowLabel,
+    },
+    recipePopularity,
+    categoryPopularity,
+    peakHours,
+    scrollDepthDistribution,
+    clickIntervalDistribution,
+  };
+}
+
 export function registerBehavioralRoutes(app: express.Express, deps: BehavioralRouteDeps): void {
   // =========================================================================
   // 1. CONSUMER DIETARY PROFILE & STRICT AD SAFETY PREFERENCES
@@ -809,6 +1122,7 @@ export function registerBehavioralRoutes(app: express.Express, deps: BehavioralR
               'recipe_cook_start',
               'recipe_cook_complete',
               'scroll_depth',
+              'click_interval',
               'section_skip',
               'ad_impression',
               'ad_click',
@@ -824,7 +1138,7 @@ export function registerBehavioralRoutes(app: express.Express, deps: BehavioralR
             targetId: z.string().max(80).optional().default(''),
             targetLabel: z.string().max(120).optional().default(''),
             category: z.string().max(60).optional().default(''),
-            numericValue: z.number().min(0).max(86400).optional().default(0),
+            numericValue: z.number().min(0).max(120000).optional().default(0),
           })
         )
         .max(40)
@@ -903,6 +1217,16 @@ export function registerBehavioralRoutes(app: express.Express, deps: BehavioralR
 
     tx();
     res.json({ok: true});
+  });
+
+  // =========================================================================
+  // 2B. ADMIN BEHAVIORAL CHARTS REPORT (Recharts — Anonymized Aggregates)
+  // Accessible to authorized admins with dashboard.view permission
+  // =========================================================================
+  app.get('/api/admin/behavioral-reports/charts', (req, res) => {
+    const session = deps.requireAdmin(req, res, 'dashboard.view');
+    if (!session) return;
+    res.json(computeBehavioralChartsReport());
   });
 
   // =========================================================================

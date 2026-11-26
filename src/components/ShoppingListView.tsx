@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {AnimatePresence, motion} from 'motion/react';
+import {AnimatePresence, motion, useReducedMotion} from 'motion/react';
 import {
   Check,
   CheckCheck,
@@ -68,6 +68,7 @@ export function ShoppingListView({
   const [manualCategory, setManualCategory] = useState<string>('auto');
   const [showAdvancedAdd, setShowAdvancedAdd] = useState(false);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
 
   const detectedCategory: ShoppingCategory = name.trim()
     ? classifyIngredientCategory(name)
@@ -185,10 +186,10 @@ export function ShoppingListView({
 
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 self-center">
         <span
-          className={`px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums whitespace-nowrap border ${
+          className={`text-xs font-semibold tabular-nums whitespace-nowrap pl-1 transition-opacity ${
             item.checked
-              ? 'border-transparent bg-[#EFEFED] dark:bg-[#20201E] text-[#5C5C58] dark:text-[#A3A39E] opacity-70'
-              : 'border-[#E6E6E3] dark:border-[#2C2C29] bg-[#F6F6F5] dark:bg-[#20201E] text-[#0D0D0D] dark:text-[#FAFAFA]'
+              ? 'text-[#5C5C58] dark:text-[#A3A39E] opacity-55 line-through'
+              : 'text-[#0D0D0D] dark:text-[#FAFAFA]'
           }`}
         >
           {formatQuantity(item.amount)} {item.unit}
@@ -198,7 +199,7 @@ export function ShoppingListView({
           type="button"
           aria-label={`حذف ${item.name}`}
           onClick={() => onDeleteItem(item.id)}
-          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-full text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#B54B1F] dark:hover:text-[#E29A6F] hover:bg-[#EFEFED] dark:hover:bg-[#20201E] transition-colors"
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#B54B1F] dark:hover:text-[#E29A6F] hover:bg-[#EFEFED] dark:hover:bg-[#20201E] transition-colors"
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -309,12 +310,23 @@ export function ShoppingListView({
             </div>
             <div className="h-2 w-full rounded-full bg-[#EFEFED] dark:bg-[#242422] overflow-hidden">
               <motion.div
-                className="h-full rounded-full bg-gradient-to-l from-[#B54B1F] to-[#A97222] dark:from-[#E29A6F] dark:to-[#D8A85B]"
-                initial={{width: 0}}
-                animate={{width: `${progressPercent}%`}}
-                transition={{duration: 0.4, ease: [0.16, 1, 0.3, 1]}}
+                className="h-full w-full origin-right rounded-full bg-gradient-to-l from-[#B54B1F] to-[#A97222] dark:from-[#E29A6F] dark:to-[#D8A85B]"
+                initial={false}
+                animate={{scaleX: progressPercent / 100}}
+                transition={
+                  prefersReducedMotion ? {duration: 0} : {duration: 0.35, ease: [0.16, 1, 0.3, 1]}
+                }
               />
             </div>
+            {progressPercent === 100 && (
+              <p
+                role="status"
+                className="pt-1 flex items-center gap-1.5 text-xs font-semibold text-[#1E6B47] dark:text-[#6EE7B7]"
+              >
+                <CheckCheck className="w-4 h-4 shrink-0" />
+                <span>همه اقلام سبد خریداری شد · آماده شروع آشپزی هستید</span>
+              </p>
+            )}
           </div>
         )}
       </section>
@@ -448,25 +460,47 @@ export function ShoppingListView({
       {items.length > 0 && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex p-1 rounded-full bg-[#EFEFED] dark:bg-[#20201E] border border-[#E6E6E3]/80 dark:border-[#2C2C29]">
-              {[
-                {id: 'category', label: 'دسته‌بندی'},
-                {id: 'recipe', label: 'دستور پخت'},
-                {id: 'all', label: 'همه اقلام'},
-              ].map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setViewMode(m.id as 'category' | 'recipe' | 'all')}
-                  className={`min-h-[38px] px-4 rounded-full text-xs font-semibold transition-all whitespace-nowrap ${
-                    viewMode === m.id
-                      ? 'bg-[#FFFFFF] dark:bg-[#151514] text-[#0D0D0D] dark:text-[#FAFAFA] shadow-xs'
-                      : 'text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
+            <div
+              role="tablist"
+              aria-label="نحوه نمایش سبد خرید"
+              className="inline-flex p-1 rounded-full bg-[#EFEFED] dark:bg-[#20201E] border border-[#E6E6E3]/80 dark:border-[#2C2C29]"
+            >
+              {(
+                [
+                  {id: 'category', label: 'دسته‌بندی'},
+                  {id: 'recipe', label: 'دستور پخت'},
+                  {id: 'all', label: 'همه اقلام'},
+                ] as const
+              ).map((m) => {
+                const active = viewMode === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setViewMode(m.id)}
+                    className={`relative min-h-[40px] px-4 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${
+                      active
+                        ? 'text-[#0D0D0D] dark:text-[#FAFAFA]'
+                        : 'text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
+                    }`}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="shopping-view-pill"
+                        transition={
+                          prefersReducedMotion
+                            ? {duration: 0}
+                            : {type: 'spring', stiffness: 460, damping: 34}
+                        }
+                        className="absolute inset-0 rounded-full bg-[#FFFFFF] dark:bg-[#151514] shadow-xs"
+                      />
+                    )}
+                    <span className="relative z-10">{m.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

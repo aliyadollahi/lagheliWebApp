@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   Bookmark,
   Camera,
+  Check,
   Clock,
   Coins,
   Flame,
@@ -304,6 +305,8 @@ export function RecipeFeed({
 }: RecipeFeedProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [heroEdition, setHeroEdition] = useState<'daily' | 'weekly'>('daily');
+  const [sortBy, setSortBy] = useState<'recommended' | 'fastest' | 'lowest_cal' | 'economical'>('recommended');
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const feedSectionRef = useRef<HTMLElement | null>(null);
 
@@ -355,15 +358,31 @@ export function RecipeFeed({
   };
 
   const displayedRecipes = useMemo(() => {
-    return recipes.filter((r) => {
+    const filtered = recipes.filter((r) => {
       if (filters.needsPhotoOnly && r.imageUrl && r.imageUrl.trim().length > 0) return false;
       if (filters.maxTotalMinutes && getEstimatedCookMinutes(r) > filters.maxTotalMinutes) return false;
       return true;
     });
-  }, [recipes, filters.needsPhotoOnly, filters.maxTotalMinutes]);
+    if (sortBy === 'fastest') {
+      return [...filtered].sort((a, b) => getEstimatedCookMinutes(a) - getEstimatedCookMinutes(b));
+    }
+    if (sortBy === 'lowest_cal') {
+      return [...filtered].sort(
+        (a, b) => (a.nutrition?.calories || 9999) - (b.nutrition?.calories || 9999)
+      );
+    }
+    if (sortBy === 'economical') {
+      return [...filtered].sort((a, b) => {
+        const ca = (a.estimatedCost ?? estimateRecipeCost(a.ingredients, a.servings)).perServingToman;
+        const cb = (b.estimatedCost ?? estimateRecipeCost(b.ingredients, b.servings)).perServingToman;
+        return ca - cb;
+      });
+    }
+    return filtered;
+  }, [recipes, filters.needsPhotoOnly, filters.maxTotalMinutes, sortBy]);
 
   const photoLessCount = recipes.filter((r) => !r.imageUrl || r.imageUrl.trim().length === 0).length;
-  const isCleanHome = !filters.q && filters.categories.length === 0 && activeFilterCount === 0;
+  const isCleanHome = !filters.q && filters.categories.length === 0 && activeFilterCount === 0 && sortBy === 'recommended';
 
   // Pick Daily and Weekly photographed Editor's Picks for the cinematic hero
   const photographedRecipes = useMemo(
@@ -716,8 +735,18 @@ export function RecipeFeed({
               onChange={(e) => onChangeFilters({...filters, q: e.target.value})}
               placeholder="جست‌وجو میان هزاران دستور پخت، مواد اولیه، شهر یا سرآشپز..."
               aria-label="جست‌وجوی دستور پخت"
-              className="w-full min-h-[50px] rounded-full border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] pr-11 pl-5 text-sm placeholder:text-[#5C5C58]/75 shadow-[0_2px_12px_-6px_rgba(0,0,0,0.08)]"
+              className="w-full min-h-[50px] rounded-full border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] pr-11 pl-11 text-sm placeholder:text-[#5C5C58]/75 shadow-[0_2px_12px_-6px_rgba(0,0,0,0.08)] focus:border-[#A97222] dark:focus:border-[#D8A85B] transition-colors"
             />
+            {filters.q.trim().length > 0 && (
+              <button
+                type="button"
+                aria-label="پاک کردن عبارت جست‌وجو"
+                onClick={() => onChangeFilters({...filters, q: ''})}
+                className="absolute left-1.5 top-1/2 -translate-y-1/2 min-h-[38px] min-w-[38px] rounded-full flex items-center justify-center text-[#5C5C58] hover:text-[#0D0D0D] dark:text-[#A3A39E] dark:hover:text-[#FAFAFA] hover:bg-[#EFEFED] dark:hover:bg-[#242422] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           <button
@@ -782,9 +811,17 @@ export function RecipeFeed({
         </div>
         )}
 
-        {/* Expandable Faceted OR/AND Filter Drawer */}
+        {/* Expandable Faceted OR/AND Filter Drawer with Smooth Motion */}
+        <AnimatePresence initial={false}>
         {showAdvanced && (
-          <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 sm:p-6 space-y-5">
+          <motion.div
+            key="advanced-filter-drawer"
+            initial={{opacity: 0, y: -8}}
+            animate={{opacity: 1, y: 0}}
+            exit={{opacity: 0, y: -6}}
+            transition={{duration: 0.2, ease: [0.16, 1, 0.3, 1]}}
+            className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 sm:p-6 space-y-5"
+          >
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold">فیلتر چندوجهی (ترکیب دقیق)</p>
               <button
@@ -921,31 +958,77 @@ export function RecipeFeed({
                 <span>فقط دستورهای نیازمند عکس واقعی (+۴۰ جِم)</span>
               </label>
             </div>
-          </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#E6E6E3] dark:border-[#282825]">
+              <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
+                {toFaDigits(displayedRecipes.length)} دستور پخت با ترکیب فعلی آماده نمایش است
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAdvanced(false);
+                  feedSectionRef.current?.scrollIntoView({behavior: 'smooth', block: 'start'});
+                }}
+                className="min-h-[42px] px-5 rounded-full bg-[#0D0D0D] hover:bg-[#242422] dark:bg-[#FAFAFA] dark:text-[#0B0B0B] text-[#FFFFFF] text-xs font-bold whitespace-nowrap transition-transform active:scale-[0.98]"
+              >
+                نمایش {toFaDigits(displayedRecipes.length)} دستور متناسب
+              </button>
+            </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </section>
       )}
 
       {/* Minimalist Editorial Recipe Cards Grid */}
       <section ref={feedSectionRef} aria-label="فهرست دستورهای پخت" className="space-y-6 scroll-mt-24">
-        <div className="space-y-3">
-          <div className="flex items-baseline justify-between gap-4">
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#0D0D0D] dark:text-[#FAFAFA]">
-              {filters.needsPhotoOnly
-                ? `دستورهای در انتظار عکس واقعی شما (${toFaDigits(displayedRecipes.length)})`
-                : filters.q || filters.categories.length > 0 || activeFilterCount > 0
-                  ? `نتایج متناسب با سلیقه شما (${toFaDigits(displayedRecipes.length)})`
-                  : 'منتخب آرشیو دستورهای پخت'}
-            </h2>
-            {(filters.q || filters.categories.length > 0 || activeFilterCount > 0) && (
-              <button
-                type="button"
-                onClick={clearAllFilters}
-                className="text-xs text-[#B54B1F] dark:text-[#E29A6F] hover:underline min-h-[44px] px-2 shrink-0"
-              >
-                نمایش همه دستورها
-              </button>
-            )}
+        <div className="space-y-3.5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-baseline justify-between md:justify-start gap-3">
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#0D0D0D] dark:text-[#FAFAFA]">
+                {filters.needsPhotoOnly
+                  ? `دستورهای در انتظار عکس واقعی شما (${toFaDigits(displayedRecipes.length)})`
+                  : filters.q || filters.categories.length > 0 || activeFilterCount > 0
+                    ? `نتایج متناسب با سلیقه شما (${toFaDigits(displayedRecipes.length)})`
+                    : 'منتخب آرشیو دستورهای پخت'}
+              </h2>
+              {(filters.q || filters.categories.length > 0 || activeFilterCount > 0 || sortBy !== 'recommended') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearAllFilters();
+                    setSortBy('recommended');
+                  }}
+                  className="text-xs text-[#B54B1F] dark:text-[#E29A6F] hover:underline min-h-[40px] px-2 shrink-0 whitespace-nowrap"
+                >
+                  بازنشانی
+                </button>
+              )}
+            </div>
+
+            {/* Decision-First Quick Sort Segmented Control */}
+            <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[#EFEFED] dark:bg-[#191917] self-start md:self-auto overflow-x-auto max-w-full no-scrollbar">
+              {(
+                [
+                  {id: 'recommended' as const, label: 'پیشنهادی'},
+                  {id: 'fastest' as const, label: 'سریع‌ترین'},
+                  {id: 'economical' as const, label: 'اقتصادی‌تر'},
+                  {id: 'lowest_cal' as const, label: 'کم‌کالری‌تر'},
+                ] as const
+              ).map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSortBy(s.id)}
+                  className={`min-h-[34px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
+                    sortBy === s.id
+                      ? 'bg-[#FFFFFF] dark:bg-[#0D0D0D] text-[#0D0D0D] dark:text-[#FAFAFA] shadow-xs'
+                      : 'text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Active Taste/Filter Removable Controls */}
@@ -1045,16 +1128,18 @@ export function RecipeFeed({
                 >
                   <div className="space-y-4">
                     {/* Clean Photography OR Kinfolk Typographic Cover with Cooking Time + Economical Cost Indicator */}
-                    <div className="relative rounded-2xl overflow-hidden border border-[#E6E6E3]/80 dark:border-[#282825] shadow-[0_8px_28px_-22px_rgba(28,27,24,0.28)] transition-shadow duration-300 group-hover:shadow-[0_14px_34px_-20px_rgba(28,27,24,0.34)]">
-                      <EditorialImage
-                        src={recipe.imageUrl}
-                        alt={recipe.title}
-                        category={recipe.category}
-                        photoCreditName={recipe.photoCreditName}
-                        aspectClass="aspect-video"
-                        loading="lazy"
-                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      />
+                    <div className="relative rounded-2xl overflow-hidden border border-[#E6E6E3]/80 dark:border-[#282825] shadow-[0_8px_28px_-22px_rgba(28,27,24,0.28)] transition-all duration-300 group-hover:shadow-[0_16px_36px_-18px_rgba(28,27,24,0.34)]">
+                      <div className="transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.035]">
+                        <EditorialImage
+                          src={recipe.imageUrl}
+                          alt={recipe.title}
+                          category={recipe.category}
+                          photoCreditName={recipe.photoCreditName}
+                          aspectClass="aspect-video"
+                          loading="lazy"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        />
+                      </div>
 
                       {/* Unified Visual Cooking Time & Economy Cost Indicator */}
                       <div className="absolute top-3 left-3 z-10 inline-flex items-center gap-2 rounded-xl bg-[#0B0B0B]/74 dark:bg-[#0B0B0B]/84 backdrop-blur-md border border-white/15 px-2.5 py-1 text-[11px] font-semibold text-[#FAFAFA] tabular-nums shadow-xs">
@@ -1114,7 +1199,7 @@ export function RecipeFeed({
                     </div>
                   </div>
 
-                  {/* Calm Footer: Chef & Actions (Bookmark Only — Quiet Luxury) */}
+                  {/* Calm Footer: Chef & Tactile Micro-Feedback Actions */}
                   <div className="flex items-center justify-between pt-3 border-t border-[#E6E6E3]/70 dark:border-[#282825]">
                     <button
                       type="button"
@@ -1131,41 +1216,56 @@ export function RecipeFeed({
                     </button>
 
                     <div className="flex items-center gap-0.5 shrink-0">
-                      <button
+                      <motion.button
                         type="button"
+                        whileTap={{scale: 0.88}}
                         aria-label="افزودن مواد به لیست خرید"
                         onClick={(e) => {
                           e.stopPropagation();
                           onQuickAddShopping(recipe);
+                          setJustAddedId(recipe.id);
+                          window.setTimeout(() => {
+                            setJustAddedId((curr) => (curr === recipe.id ? null : curr));
+                          }, 1100);
                         }}
-                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#5C5C58] hover:text-[#B54B1F] dark:text-[#A3A39E] dark:hover:text-[#E29A6F] hover:bg-[#EFEFED] dark:hover:bg-[#20201E] transition-colors"
+                        className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors ${
+                          justAddedId === recipe.id
+                            ? 'text-[#15803D] dark:text-[#4ADE80] bg-[#15803D]/10'
+                            : 'text-[#5C5C58] hover:text-[#B54B1F] dark:text-[#A3A39E] dark:hover:text-[#E29A6F] hover:bg-[#EFEFED] dark:hover:bg-[#20201E]'
+                        }`}
                       >
-                        <ShoppingBag className="w-4 h-4" />
-                      </button>
-                      <button
+                        {justAddedId === recipe.id ? (
+                          <Check className="w-4 h-4" strokeWidth={2.5} />
+                        ) : (
+                          <ShoppingBag className="w-4 h-4" />
+                        )}
+                      </motion.button>
+                      <motion.button
                         type="button"
+                        whileTap={{scale: 0.88}}
                         aria-label="اشتراک‌گذاری دستور پخت"
                         onClick={(e) => handleShare(recipe, e)}
-                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#5C5C58] hover:text-[#B54B1F] dark:text-[#A3A39E] dark:hover:text-[#E29A6F] hover:bg-[#EFEFED] dark:hover:bg-[#20201E] transition-colors"
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-[#5C5C58] hover:text-[#B54B1F] dark:text-[#A3A39E] dark:hover:text-[#E29A6F] hover:bg-[#EFEFED] dark:hover:bg-[#20201E] transition-colors"
                       >
                         <Share2 className="w-4 h-4" />
-                      </button>
-                      <button
+                      </motion.button>
+                      <motion.button
                         type="button"
+                        whileTap={{scale: 0.84}}
                         aria-label={isBookmarked ? 'حذف از نشانک‌ها' : 'افزودن به نشانک‌ها'}
                         aria-pressed={isBookmarked}
                         onClick={(e) => {
                           e.stopPropagation();
                           onToggleBookmark(recipe.id);
                         }}
-                        className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-colors ${
+                        className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors ${
                           isBookmarked
-                            ? 'text-[#B54B1F] dark:text-[#E29A6F]'
+                            ? 'text-[#A97222] dark:text-[#E8BA66] bg-[#A97222]/10'
                             : 'text-[#5C5C58] dark:text-[#A3A39E] hover:bg-[#EFEFED] dark:hover:bg-[#20201E]'
                         }`}
                       >
                         <Bookmark className="w-4 h-4" fill={isBookmarked ? 'currentColor' : 'none'} />
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
                 </article>

@@ -15,13 +15,20 @@ import {
 import {apiRequest} from '../lib/api.ts';
 import {toFaDigits} from '../shared/persianEngine.ts';
 import {
+  ACL_ACTION_LABELS,
+  ADMIN_ACL_SECTIONS,
+  ADMIN_ACL_SECTION_ORDER,
+  CORE_RBAC_ROLES,
   DEFAULT_DYNAMIC_ROLES,
   PERMISSION_MATRIX_ROWS,
+  evaluateRoleSectionAccess,
   getRoleBadgeClass,
   getRoleLabel,
   normalizeAdminRole,
+  type PermissionMatrixGroup,
 } from '../shared/rbac.ts';
 import type {
+  AclAccessLevel,
   AdminPermission,
   AdminUserRow,
   DynamicRoleDefinition,
@@ -42,7 +49,19 @@ const PUBLIC_ROLES: {value: string; label: string}[] = [
   {value: 'user', label: 'کاربر عادی (لغو دسترسی مدیریت)'},
 ];
 
-const SENIOR_LOCKED_PERMS: AdminPermission[] = ['dashboard.view', 'rbac.manage', 'app.layout', 'ecosystem.manage'];
+const SENIOR_LOCKED_PERMS: AdminPermission[] = [
+  'dashboard.view',
+  'rbac.manage',
+  'app.layout',
+  'ecosystem.manage',
+  'finance.reports',
+];
+
+const ACCESS_LEVEL_STYLE: Record<AclAccessLevel, string> = {
+  full: 'text-[#15803D] dark:text-[#4ADE80]',
+  read_only: 'text-[#8C5B12] dark:text-[#ECC06E]',
+  none: 'text-[#B91C1C] dark:text-[#F87171]',
+};
 
 function formatAuditTime(iso: string): string {
   try {
@@ -71,12 +90,14 @@ export function AdminRbacPanel({
   const [staffFilter, setStaffFilter] = useState<string>('all_staff');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Dynamic ACL Matrix editable draft state: roleId -> Set<AdminPermission>
+  // Dynamic ACL Matrix editable draft state: roleId -> AdminPermission[]
   const [draftMatrix, setDraftMatrix] = useState<Record<string, AdminPermission[]>>({});
   const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
+  const [matrixGroupFilter, setMatrixGroupFilter] = useState<'all' | PermissionMatrixGroup>('all');
 
   // Create custom role state
   const [showCreateRole, setShowCreateRole] = useState(false);
+  const [newRoleId, setNewRoleId] = useState('');
   const [newRoleLabel, setNewRoleLabel] = useState('');
   const [newRoleShort, setNewRoleShort] = useState('');
   const [newRoleDesc, setNewRoleDesc] = useState('');
@@ -170,10 +191,21 @@ export function AdminRbacPanel({
     if (!newRoleLabel.trim()) return;
     setCreatingRole(true);
     try {
+      const cleanedId = newRoleId
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '_')
+        .replace(/^[^a-z]+/, '');
+      const generatedId =
+        cleanedId.length >= 3
+          ? cleanedId.slice(0, 32)
+          : `role_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+
       await apiRequest('/api/admin/acl/roles', {
         method: 'POST',
         useAdmin: true,
         body: JSON.stringify({
+          id: generatedId,
           label: newRoleLabel.trim(),
           shortLabel: newRoleShort.trim() || newRoleLabel.trim(),
           description: newRoleDesc.trim(),
@@ -181,6 +213,7 @@ export function AdminRbacPanel({
         }),
       });
       onNotify(`نقش سفارشی «${newRoleLabel.trim()}» با موفقیت ساخته شد.`);
+      setNewRoleId('');
       setNewRoleLabel('');
       setNewRoleShort('');
       setNewRoleDesc('');
@@ -257,6 +290,21 @@ export function AdminRbacPanel({
   };
 
   const selectedUserObj = users.find((u) => u.id === selectedUserId) || null;
+  const visibleMatrixRows = useMemo(
+    () =>
+      matrixGroupFilter === 'all'
+        ? PERMISSION_MATRIX_ROWS
+        : PERMISSION_MATRIX_ROWS.filter((r) => r.group === matrixGroupFilter),
+    [matrixGroupFilter]
+  );
+
+  const coreRolesOrdered = useMemo(() => {
+    const core = CORE_RBAC_ROLES.map((id) => effectiveRoles.find((r) => r.id === id)).filter(
+      (r): r is DynamicRoleDefinition => Boolean(r)
+    );
+    const others = effectiveRoles.filter((r) => !CORE_RBAC_ROLES.includes(r.id as (typeof CORE_RBAC_ROLES)[number]));
+    return [...core, ...others];
+  }, [effectiveRoles]);
 
   return (
     <div className="space-y-6">
@@ -285,7 +333,7 @@ export function AdminRbacPanel({
           className="rounded-2xl border border-[#B54B1F]/35 dark:border-[#E29A6F]/35 bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4"
         >
           <h3 className="text-sm font-bold">تعریف نقش سفارشی جدید در ماتریس دسترسی</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
             <input
               type="text"
               required
@@ -302,6 +350,15 @@ export function AdminRbacPanel({
               onChange={(e) => setNewRoleShort(e.target.value)}
               placeholder="عنوان کوتاه (مثلاً: ناظر عکس)"
               className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3"
+            />
+            <input
+              type="text"
+              maxLength={32}
+              dir="ltr"
+              value={newRoleId}
+              onChange={(e) => setNewRoleId(e.target.value)}
+              placeholder="شناسه اختیاری (مثل photo_reviewer)"
+              className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-left"
             />
             <input
               type="text"
@@ -401,6 +458,88 @@ export function AdminRbacPanel({
         ))}
       </div>
 
+      {/* 1B. 3-Pillar Domain Separation Matrix (Content / Advertising / Financial Reporting) */}
+      <section className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] overflow-hidden">
+        <div className="p-5 border-b border-[#E6E6E3] dark:border-[#282825] space-y-1">
+          <div className="text-xs font-semibold text-[#A97222] dark:text-[#D8A85B]">
+            تفکیک ساختاری RBAC در سه حوزه اصلی سوپرپنل
+          </div>
+          <h2 className="text-sm font-extrabold">
+            سیاست دسترسی نقش‌های کلیدی به «محتوا»، «تبلیغات» و «گزارش‌گیری مالی»
+          </h2>
+          <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
+            سطح دسترسی هر نقش (ادیتور، مدیر مالی، مدیر ارشد و سایر نقش‌ها) به‌صورت زنده از ماتریس مجوزهای سمت سرور محاسبه می‌شود.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-right">
+            <thead className="bg-[#F9F8F6] dark:bg-[#191917] text-[#5C5C58] dark:text-[#A3A39E] border-b border-[#E6E6E3] dark:border-[#282825]">
+              <tr>
+                <th className="py-3 px-4 font-semibold">نقش کاربری</th>
+                {ADMIN_ACL_SECTION_ORDER.map((secId) => (
+                  <th key={secId} className="py-3 px-4 font-bold">
+                    <div>{ADMIN_ACL_SECTIONS[secId].title}</div>
+                    <div className="text-[10px] font-normal text-[#7A7A74] dark:text-[#8A8A84] mt-0.5">
+                      {secId === 'content'
+                        ? 'دستورپخت، عکس، پرسش‌وپاسخ'
+                        : secId === 'advertising'
+                          ? 'تبلیغات بومی، مزایده، برندها'
+                          : 'درآمد، دفتر کل، کیف پول'}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E6E6E3]/70 dark:divide-[#282825] tabular-nums">
+              {coreRolesOrdered.map((role) => {
+                const livePerms = draftMatrix[role.id] || role.permissions;
+                return (
+                  <tr key={role.id} className="hover:bg-[#FAF9F7] dark:hover:bg-[#181816] align-top">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <div className="font-extrabold text-[#111110] dark:text-[#F5F5F3]">
+                        {role.label}
+                      </div>
+                      <div className="text-[11px] text-[#6B6B66] dark:text-[#989892] mt-0.5">
+                        {toFaDigits(roleCounts[role.id] || 0)} عضو · {toFaDigits(livePerms.length)} مجوز
+                      </div>
+                    </td>
+                    {ADMIN_ACL_SECTION_ORDER.map((secId) => {
+                      const decision = evaluateRoleSectionAccess(
+                        role.id,
+                        secId,
+                        effectiveRoles,
+                        livePerms
+                      );
+                      return (
+                        <td key={secId} className="py-3.5 px-4 min-w-[200px] space-y-1">
+                          <div className={`font-extrabold ${ACCESS_LEVEL_STYLE[decision.accessLevel]}`}>
+                            {decision.accessLabel}
+                            <span className="text-[11px] font-normal text-[#6B6B66] dark:text-[#989892] mr-1.5">
+                              ({toFaDigits(decision.grantedPermissions.length)} از{' '}
+                              {toFaDigits(decision.totalSectionPermissions)})
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
+                            {decision.summary}
+                          </p>
+                          {decision.allowedActions.length > 0 && (
+                            <p className="text-[10px] font-semibold text-[#7A7A74] dark:text-[#8E8E88]">
+                              عملیات مجاز:{' '}
+                              {decision.allowedActions.map((a) => ACL_ACTION_LABELS[a]).join(' · ')}
+                            </p>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       {/* 2. Interactive Dynamic ACL Permission Matrix */}
       <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -425,7 +564,7 @@ export function AdminRbacPanel({
                     type="button"
                     disabled={savingRoleId === rid}
                     onClick={() => handleSaveRolePermissions(role)}
-                    className="min-h-[38px] px-3.5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] text-white text-xs font-bold inline-flex items-center gap-1.5"
+                    className="min-h-[38px] px-3.5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] text-white text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>
@@ -436,6 +575,32 @@ export function AdminRbacPanel({
               })}
             </div>
           )}
+        </div>
+
+        {/* Domain Filter Bar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+          {(
+            [
+              {id: 'all', label: 'همه حوزه‌ها'},
+              {id: 'محتوا', label: 'محتوا'},
+              {id: 'تبلیغات', label: 'تبلیغات'},
+              {id: 'گزارش‌گیری مالی', label: 'گزارش‌گیری مالی'},
+              {id: 'پیکربندی و امنیت ACL', label: 'پیکربندی و امنیت ACL'},
+            ] as const
+          ).map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => setMatrixGroupFilter(g.id)}
+              className={`min-h-[34px] px-3 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors ${
+                matrixGroupFilter === g.id
+                  ? 'bg-[#0D0D0D] dark:bg-[#FAFAFA] text-white dark:text-[#0B0B0B]'
+                  : 'border border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58] dark:text-[#A3A39E]'
+              }`}
+            >
+              {g.label}
+            </button>
+          ))}
         </div>
 
         <div className="overflow-x-auto">
@@ -452,9 +617,9 @@ export function AdminRbacPanel({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E6E6E3]/60 dark:divide-[#282825]">
-              {PERMISSION_MATRIX_ROWS.map((row) => (
+              {visibleMatrixRows.map((row) => (
                 <tr key={row.id} className="hover:bg-[#F6F6F5]/60 dark:hover:bg-[#0B0B0B]/40">
-                  <td className="py-2.5 px-3 text-[11px] text-[#5C5C58] dark:text-[#A3A39E] whitespace-nowrap">
+                  <td className="py-2.5 px-3 text-[11px] font-semibold text-[#5C5C58] dark:text-[#A3A39E] whitespace-nowrap">
                     {row.group}
                   </td>
                   <td className="py-2.5 px-3 font-medium">{row.label}</td>

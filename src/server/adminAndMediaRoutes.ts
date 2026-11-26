@@ -10,7 +10,7 @@ import {
   type RecipeEngagementSignals,
 } from '../shared/editorialInsightsEngine.ts';
 import {normalizePersian} from '../shared/persianEngine.ts';
-import {ALL_ADMIN_PERMISSIONS} from '../shared/rbac.ts';
+import {ALL_ADMIN_PERMISSIONS, hasAdminPermission} from '../shared/rbac.ts';
 import type {
   AdminDashboardStats,
   AdminPermission,
@@ -1672,6 +1672,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
       cleanPerms.add('rbac.manage');
       cleanPerms.add('app.layout');
       cleanPerms.add('ecosystem.manage');
+      cleanPerms.add('finance.reports');
     }
 
     const now = new Date().toISOString();
@@ -2171,7 +2172,17 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   // ADMIN FINANCIAL LEDGER & DAILY FOOD ORDERS
   // =========================================================================
   app.get('/api/admin/transactions', (req, res) => {
-    if (!requireAdmin(req, res, 'finance.wallets')) return;
+    const session = requireAdmin(req, res, 'dashboard.view');
+    if (!session) return;
+    const dynamicRoles = getAclRoles();
+    const canViewFinance =
+      hasAdminPermission(session.adminRole, 'finance.reports', dynamicRoles) ||
+      hasAdminPermission(session.adminRole, 'finance.wallets', dynamicRoles);
+    if (!canViewFinance) {
+      return res.status(403).json({
+        error: 'دسترسی به گزارش‌گیری مالی و دفتر کل تراکنش‌ها برای نقش شما مجاز نیست.',
+      });
+    }
     const rows = db
       .prepare('SELECT * FROM wallet_transactions ORDER BY created_at DESC LIMIT 100')
       .all() as Record<string, unknown>[];
@@ -2188,6 +2199,49 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
       createdAt: String(r.created_at),
     }));
     res.json({transactions});
+  });
+
+  app.get('/api/admin/financial-reports/summary', (req, res) => {
+    if (!requireAdmin(req, res, 'finance.reports')) return;
+    const partnerWalletTotal = Number(
+      (db.prepare('SELECT COALESCE(SUM(business_balance), 0) as s FROM partners').get() as {s: number}).s || 0
+    );
+    const userWalletTotal = Number(
+      (db.prepare('SELECT COALESCE(SUM(wallet_balance), 0) as s FROM users').get() as {s: number}).s || 0
+    );
+    const approvedBidsTotal = Number(
+      (
+        db
+          .prepare("SELECT COALESCE(SUM(bid_amount_toman), 0) as s FROM ad_bids WHERE status = 'approved'")
+          .get() as {s: number}
+      ).s || 0
+    );
+    const pendingBidsTotal = Number(
+      (
+        db
+          .prepare("SELECT COALESCE(SUM(bid_amount_toman), 0) as s FROM ad_bids WHERE status = 'pending'")
+          .get() as {s: number}
+      ).s || 0
+    );
+    const activeCampaignBudgetTotal = Number(
+      (
+        db
+          .prepare("SELECT COALESCE(SUM(budget_toman), 0) as s FROM sponsor_campaigns WHERE status = 'active'")
+          .get() as {s: number}
+      ).s || 0
+    );
+    const transactionsCount = Number(
+      (db.prepare('SELECT COUNT(*) as c FROM wallet_transactions').get() as {c: number}).c || 0
+    );
+    res.json({
+      generatedAt: new Date().toISOString(),
+      partnerWalletTotalToman: partnerWalletTotal,
+      userWalletTotalToman: userWalletTotal,
+      approvedAdBidsRevenueToman: approvedBidsTotal,
+      pendingAuctionBidsVolumeToman: pendingBidsTotal,
+      activeCampaignBudgetToman: activeCampaignBudgetTotal,
+      transactionsCount,
+    });
   });
 
   app.get('/api/admin/orders', (req, res) => {

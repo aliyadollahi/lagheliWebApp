@@ -68,8 +68,24 @@
     background-color: var(--lagheli-canvas);
     color: var(--lagheli-ink);
     font-feature-settings: "tnum" on;
-    line-height: 1.7;
+    line-height: 1.72;
     overflow-x: clip;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .dark body {
+    letter-spacing: 0.008em;
+  }
+
+  ::selection {
+    background-color: rgba(169, 114, 34, 0.22);
+    color: var(--lagheli-ink);
+  }
+
+  .dark ::selection {
+    background-color: rgba(216, 168, 91, 0.28);
+    color: #FAFAFA;
   }
 
   h1, h2, h3, h4 {
@@ -136,7 +152,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--lagheli-ink);
+  outline: 2px solid var(--lagheli-saffron);
   outline-offset: 2px;
 }
 

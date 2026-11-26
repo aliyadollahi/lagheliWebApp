@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useState} from 'react';
-import {AnimatePresence, motion} from 'motion/react';
+import {AnimatePresence, motion, useReducedMotion} from 'motion/react';
 import {ArrowLeftRight, Clock, Eye, Flame, Plus, Search, ShoppingBag, Sparkles, Users, X} from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
 import {prefetchRecipeDetail} from '../lib/recipePrefetch.ts';
@@ -71,6 +71,7 @@ export function KitchenHub({
   onOpenPartner,
 }: KitchenHubProps) {
   const [mode, setMode] = useState<'fridge' | 'substitute'>('fridge');
+  const prefersReducedMotion = useReducedMotion();
 
   // Admin-managed dynamic chips with offline fallback
   const [fridgeItems, setFridgeItems] = useState<string[]>(COMMON_FRIDGE_ITEMS);
@@ -206,29 +207,46 @@ export function KitchenHub({
           </p>
         </div>
 
-        <div className="inline-flex p-1 rounded-xl bg-[#EFEFED] dark:bg-[#20201E] self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={() => setMode('fridge')}
-            className={`min-h-[44px] px-4 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-              mode === 'fridge'
-                ? 'bg-[#FFFFFF] dark:bg-[#151514] text-[#0D0D0D] dark:text-[#FAFAFA]'
-                : 'text-[#5C5C58] dark:text-[#A3A39E]'
-            }`}
-          >
-            یخچال‌گردی هوشمند
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('substitute')}
-            className={`min-h-[44px] px-4 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-              mode === 'substitute'
-                ? 'bg-[#FFFFFF] dark:bg-[#151514] text-[#0D0D0D] dark:text-[#FAFAFA]'
-                : 'text-[#5C5C58] dark:text-[#A3A39E]'
-            }`}
-          >
-            جایگزین مواد اولیه
-          </button>
+        <div
+          role="tablist"
+          aria-label="بخش‌های آشپزخانه هوشمند"
+          className="inline-flex p-1 rounded-xl bg-[#EFEFED] dark:bg-[#20201E] self-start sm:self-auto"
+        >
+          {(
+            [
+              {id: 'fridge', label: 'یخچال‌گردی هوشمند'},
+              {id: 'substitute', label: 'جایگزین مواد اولیه'},
+            ] as const
+          ).map((tab) => {
+            const active = mode === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setMode(tab.id)}
+                className={`relative min-h-[44px] px-4 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                  active
+                    ? 'text-[#0D0D0D] dark:text-[#FAFAFA]'
+                    : 'text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
+                }`}
+              >
+                {active && (
+                  <motion.span
+                    layoutId="kitchen-mode-pill"
+                    transition={
+                      prefersReducedMotion
+                        ? {duration: 0}
+                        : {type: 'spring', stiffness: 460, damping: 34}
+                    }
+                    className="absolute inset-0 rounded-lg bg-[#FFFFFF] dark:bg-[#151514] shadow-xs"
+                  />
+                )}
+                <span className="relative z-10">{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -262,18 +280,20 @@ export function KitchenHub({
                 {fridgeItems.map((item) => {
                   const selected = selectedIngredients.includes(item);
                   return (
-                    <button
+                    <motion.button
                       key={item}
                       type="button"
+                      whileTap={prefersReducedMotion ? undefined : {scale: 0.95}}
                       onClick={() => toggleIngredient(item)}
-                      className={`min-h-[40px] px-3.5 rounded-full text-xs font-medium transition-all active:scale-[0.96] ${
+                      aria-pressed={selected}
+                      className={`min-h-[42px] px-3.5 rounded-full text-xs font-medium transition-colors ${
                         selected
                           ? 'bg-[#0D0D0D] text-[#FFFFFF] dark:bg-[#FAFAFA] dark:text-[#0B0B0B]'
                           : 'bg-[#F2F2F0] dark:bg-[#20201E] text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
                       }`}
                     >
                       {item}
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>
@@ -527,18 +547,19 @@ export function KitchenHub({
 
           <div className="flex flex-wrap gap-2">
             {subQueries.map((item) => (
-              <button
+              <motion.button
                 key={item}
                 type="button"
+                whileTap={prefersReducedMotion ? undefined : {scale: 0.95}}
                 onClick={() => runSubstituteSearch(item)}
-                className={`min-h-[40px] px-4 rounded-full text-xs font-medium transition-all active:scale-[0.96] ${
+                className={`min-h-[42px] px-4 rounded-full text-xs font-medium transition-colors ${
                   subQuery === item
                     ? 'bg-[#0D0D0D] text-[#FFFFFF] dark:bg-[#FAFAFA] dark:text-[#0B0B0B]'
-                    : 'bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58] dark:text-[#A3A39E]'
+                    : 'bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
                 }`}
               >
                 {item}
-              </button>
+              </motion.button>
             ))}
           </div>
 

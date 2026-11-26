@@ -1,15 +1,19 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
+  Activity,
   BadgeCheck,
   BarChart3,
   BookOpen,
   Camera,
   Check,
   CheckCircle2,
+  Clock,
   Coins,
+  Download,
   Eye,
   FileSpreadsheet,
   Gavel,
+  Heart,
   History,
   Image as ImageIcon,
   Layers,
@@ -20,6 +24,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  ScrollText,
   Search,
   Settings,
   Shield,
@@ -35,7 +40,33 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
+import {
+  Area,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ComposedChart,
+  Line,
+  Pie,
+  PieChart,
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import {apiRequest, getAdminToken, setAdminToken} from '../lib/api.ts';
+import {
+  behaviorObserverSubject,
+  getAnonymizedBehaviorAggregates,
+  loadPassiveAffinityCategories,
+} from '../lib/behaviorTracker.ts';
 import {fileToCompressedDataUrl} from '../lib/imageUpload.ts';
 import {
   PARTNER_ROLES,
@@ -45,20 +76,24 @@ import {
 } from '../shared/persianEngine.ts';
 import {
   DEFAULT_DYNAMIC_ROLES,
+  getRoleAclMatrixSummary,
   getRoleBadgeClass,
   getRoleLabel,
   hasAdminPermission,
   normalizeAdminRole,
 } from '../shared/rbac.ts';
 import type {
+  AdminBehavioralChartsReportPayload,
   AdminDashboardStats,
   AdminEditorialInsightsReport,
   AdminPermission,
   AdminRole,
   AdminUserRow,
+  AnonymizedBehaviorAggregateStore,
   CampaignPlacement,
   DynamicRoleDefinition,
   EcosystemConfig,
+  ExecutiveBehavioralReportPayload,
   NativeAdUnit,
   Partner,
   PartnerAnalyticsSummary,
@@ -72,6 +107,7 @@ import type {
   WalletTransaction,
 } from '../shared/types.ts';
 import {AdminAdMarketplacePanel} from './AdminAdMarketplacePanel.tsx';
+import {AdminBehavioralChartsPanel} from './AdminBehavioralChartsPanel.tsx';
 import {AdminBehavioralIntelligencePanel} from './AdminBehavioralIntelligencePanel.tsx';
 import {AdminDynamicAppControlPanel} from './AdminDynamicAppControlPanel.tsx';
 import {AdminEditorialInsightsPanel} from './AdminEditorialInsightsPanel.tsx';
@@ -84,6 +120,8 @@ import {AdminWorkspaceSkeleton} from './EditorialSkeletons.tsx';
 
 type AdminNavId =
   | 'overview'
+  | 'advanced_analytics'
+  | 'behavior_reports'
   | 'behavioral_intel'
   | 'app_control'
   | 'native_ads'
@@ -96,6 +134,66 @@ type AdminNavId =
   | 'frontend_ops'
   | 'ecosystem'
   | 'rbac';
+
+type AdminNavDomain = 'overview' | 'content' | 'advertising' | 'financial_reporting' | 'system';
+
+interface AdminTabRbacPolicy {
+  domain: AdminNavDomain;
+  requiredAnyPermissions: AdminPermission[];
+  requireSeniorAdmin?: boolean;
+}
+
+const ADMIN_NAV_DOMAIN_ORDER: AdminNavDomain[] = [
+  'overview',
+  'content',
+  'advertising',
+  'financial_reporting',
+  'system',
+];
+
+const ADMIN_NAV_DOMAIN_LABELS: Record<AdminNavDomain, string> = {
+  overview: 'نمای کلی و تحلیل',
+  content: 'بخش محتوا',
+  advertising: 'بخش تبلیغات',
+  financial_reporting: 'بخش گزارش‌های مالی',
+  system: 'سیستم و کنترل دسترسی',
+};
+
+const ADMIN_TAB_RBAC_POLICIES: Record<AdminNavId, AdminTabRbacPolicy> = {
+  overview: {domain: 'overview', requiredAnyPermissions: ['dashboard.view']},
+  advanced_analytics: {
+    domain: 'overview',
+    requiredAnyPermissions: ['dashboard.view'],
+    requireSeniorAdmin: true,
+  },
+  behavior_reports: {domain: 'overview', requiredAnyPermissions: ['dashboard.view']},
+  recipes: {domain: 'content', requiredAnyPermissions: ['content.recipes']},
+  photos: {domain: 'content', requiredAnyPermissions: ['content.photos']},
+  frontend_ops: {domain: 'content', requiredAnyPermissions: ['content.kitchen', 'content.qa']},
+  native_ads: {domain: 'advertising', requiredAnyPermissions: ['ads.manage']},
+  ad_market: {domain: 'advertising', requiredAnyPermissions: ['ads.manage']},
+  partners: {domain: 'advertising', requiredAnyPermissions: ['ads.manage']},
+  campaigns: {domain: 'advertising', requiredAnyPermissions: ['ads.manage']},
+  ecosystem: {domain: 'financial_reporting', requiredAnyPermissions: ['finance.reports', 'finance.wallets']},
+  users: {domain: 'financial_reporting', requiredAnyPermissions: ['users.view']},
+  behavioral_intel: {
+    domain: 'system',
+    requiredAnyPermissions: ['dashboard.view'],
+    requireSeniorAdmin: true,
+  },
+  app_control: {domain: 'system', requiredAnyPermissions: ['app.layout', 'ecosystem.manage']},
+  rbac: {domain: 'system', requiredAnyPermissions: ['rbac.manage']},
+};
+
+interface FinancialReportSummary {
+  generatedAt: string;
+  partnerWalletTotalToman: number;
+  userWalletTotalToman: number;
+  approvedAdBidsRevenueToman: number;
+  pendingAuctionBidsVolumeToman: number;
+  activeCampaignBudgetToman: number;
+  transactionsCount: number;
+}
 
 interface AdminDashboardProps {
   onRefreshAppConfig: () => void;
@@ -193,6 +291,7 @@ export function AdminDashboard({
   const [campaigns, setCampaigns] = useState<SponsorCampaign[]>([]);
   const [nativeAds, setNativeAds] = useState<NativeAdUnit[]>([]);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [financialSummary, setFinancialSummary] = useState<FinancialReportSummary | null>(null);
   const [rbacAuditLogs, setRbacAuditLogs] = useState<RbacAuditLog[]>([]);
   const [pendingDrafts, setPendingDrafts] = useState<PendingRecipeDraftItem[]>([]);
   const [editorialInsights, setEditorialInsights] = useState<AdminEditorialInsightsReport | null>(null);
@@ -403,14 +502,24 @@ export function AdminDashboard({
         setCampaigns([]);
       }
 
-      if (checkPerm('finance.wallets')) {
+      if (checkPerm('finance.reports') || checkPerm('finance.wallets')) {
         tasks.push(
           apiRequest<{transactions: WalletTransaction[]}>('/api/admin/transactions', {useAdmin: true}).then((t) =>
             setTransactions(t.transactions)
           )
         );
+        if (checkPerm('finance.reports')) {
+          tasks.push(
+            apiRequest<FinancialReportSummary>('/api/admin/financial-reports/summary', {useAdmin: true})
+              .then((summary) => setFinancialSummary(summary))
+              .catch(() => setFinancialSummary(null))
+          );
+        } else {
+          setFinancialSummary(null);
+        }
       } else {
         setTransactions([]);
+        setFinancialSummary(null);
       }
 
       if (checkPerm('rbac.manage')) {
@@ -655,6 +764,33 @@ export function AdminDashboard({
     }
   };
 
+  // RBAC enforcement hook: must execute unconditionally before early returns
+  useEffect(() => {
+    if (!adminAuthed) return;
+    const policy = ADMIN_TAB_RBAC_POLICIES[activeNav];
+    const allowed =
+      Boolean(policy) &&
+      (!policy.requireSeniorAdmin || activeRole === 'senior_admin') &&
+      policy.requiredAnyPermissions.some((perm) =>
+        hasAdminPermission(activeRole, perm, aclRoles, activePermissions)
+      );
+    if (!allowed) {
+      setActiveNav('overview');
+    }
+    if (!hasAdminPermission(activeRole, 'content.recipes', aclRoles, activePermissions)) {
+      setEditingRecipe(null);
+      setVersionModalTarget(null);
+      setBulkOpen(false);
+    }
+    if (!hasAdminPermission(activeRole, 'finance.wallets', aclRoles, activePermissions)) {
+      setWalletTarget(null);
+    }
+    if (!hasAdminPermission(activeRole, 'ads.manage', aclRoles, activePermissions)) {
+      setPartnerModalOpen(false);
+      setCampaignModalOpen(false);
+    }
+  }, [adminAuthed, activeNav, activeRole, aclRoles, activePermissions]);
+
   // Unauthenticated Gate
   if (!adminAuthed) {
     return (
@@ -741,6 +877,13 @@ export function AdminDashboard({
 
   const can = (perm: AdminPermission) => hasAdminPermission(activeRole, perm, aclRoles, activePermissions);
 
+  const canAccessTab = (tabId: AdminNavId): boolean => {
+    const policy = ADMIN_TAB_RBAC_POLICIES[tabId];
+    if (!policy) return false;
+    if (policy.requireSeniorAdmin && activeRole !== 'senior_admin') return false;
+    return policy.requiredAnyPermissions.some((perm) => can(perm));
+  };
+
   const staffMembersCount = users.filter((u) => normalizeAdminRole(u.role, aclRoles) !== null).length;
   const activeNativeAdsCount = nativeAds.filter((a) => a.status === 'active').length;
   const totalNativeAdImpressions = nativeAds.reduce((sum, a) => sum + (a.impressions || 0), 0);
@@ -748,94 +891,136 @@ export function AdminDashboard({
 
   const allNavItems: {
     id: AdminNavId;
+    domain: AdminNavDomain;
     label: string;
     icon: typeof BarChart3;
     badge?: number;
     visible: boolean;
   }[] = [
-    {id: 'overview', label: 'داشبورد و آمار', icon: BarChart3, visible: can('dashboard.view')},
     {
-      id: 'behavioral_intel',
-      label: 'هوش رفتاری و شناخت کاربر',
-      icon: TrendingUp,
-      visible: activeRole === 'senior_admin',
+      id: 'overview',
+      domain: 'overview',
+      label: 'داشبورد و آمار',
+      icon: BarChart3,
+      visible: canAccessTab('overview'),
     },
     {
-      id: 'app_control',
-      label: 'کنترل داینامیک اپ کاربر',
-      icon: LayoutGrid,
-      visible: can('app.layout') || can('ecosystem.manage'),
+      id: 'advanced_analytics',
+      domain: 'overview',
+      label: 'تحلیل رفتاری پیشرفته',
+      icon: Activity,
+      visible: canAccessTab('advanced_analytics'),
     },
     {
-      id: 'native_ads',
-      label: 'استودیو تبلیغات بومی',
-      icon: Megaphone,
-      badge: activeNativeAdsCount || undefined,
-      visible: can('ads.manage'),
-    },
-    {
-      id: 'ad_market',
-      label: 'مزایده، حامی ویژه و پنل برندها',
-      icon: Gavel,
-      visible: can('ads.manage'),
+      id: 'behavior_reports',
+      domain: 'overview',
+      label: 'گزارش نموداری رفتار کاربران',
+      icon: BarChart3,
+      visible: canAccessTab('behavior_reports'),
     },
     {
       id: 'recipes',
+      domain: 'content',
       label: 'دستورهای پخت و کنترل نسخه',
       icon: BookOpen,
-      badge: (stats?.pendingDraftVersionsCount || 0) > 0 ? stats?.pendingDraftVersionsCount : stats?.recipesWithoutPhoto || undefined,
-      visible: can('content.recipes'),
+      badge:
+        (stats?.pendingDraftVersionsCount || 0) > 0
+          ? stats?.pendingDraftVersionsCount
+          : stats?.recipesWithoutPhoto || undefined,
+      visible: canAccessTab('recipes'),
     },
     {
       id: 'photos',
+      domain: 'content',
       label: 'مدیریت عکس‌های کاربران',
       icon: Camera,
       badge: stats?.pendingPhotosCount || undefined,
-      visible: can('content.photos'),
-    },
-    {
-      id: 'partners',
-      label: 'برندهای همکار و اصناف',
-      icon: Store,
-      badge: stats?.pendingPartnersCount || undefined,
-      visible: can('finance.partners'),
-    },
-    {
-      id: 'campaigns',
-      label: 'کمپین‌های ویژه برندها',
-      icon: Sparkles,
-      badge: stats?.activeCampaignsCount || undefined,
-      visible: can('finance.campaigns'),
+      visible: canAccessTab('photos'),
     },
     {
       id: 'frontend_ops',
+      domain: 'content',
       label: 'یخچال هوشمند و پرسش‌وپاسخ',
       icon: Utensils,
-      visible: can('content.kitchen') || can('content.qa'),
+      visible: canAccessTab('frontend_ops'),
     },
     {
-      id: 'users',
-      label: can('users.manage') ? 'کاربران و سرآشپزها' : 'کیف جِم کاربران',
-      icon: Users,
-      visible: can('users.view'),
+      id: 'native_ads',
+      domain: 'advertising',
+      label: 'استودیو تبلیغات بومی',
+      icon: Megaphone,
+      badge: activeNativeAdsCount || undefined,
+      visible: canAccessTab('native_ads'),
+    },
+    {
+      id: 'ad_market',
+      domain: 'advertising',
+      label: 'مزایده، حامی ویژه و پنل برندها',
+      icon: Gavel,
+      visible: canAccessTab('ad_market'),
+    },
+    {
+      id: 'partners',
+      domain: 'advertising',
+      label: 'برندهای همکار و اصناف',
+      icon: Store,
+      badge: stats?.pendingPartnersCount || undefined,
+      visible: canAccessTab('partners'),
+    },
+    {
+      id: 'campaigns',
+      domain: 'advertising',
+      label: 'کمپین‌های ویژه برندها',
+      icon: Sparkles,
+      badge: stats?.activeCampaignsCount || undefined,
+      visible: canAccessTab('campaigns'),
     },
     {
       id: 'ecosystem',
-      label: 'دفتر کل مالی و تراکنش‌ها',
-      icon: Settings,
-      visible: can('finance.wallets'),
+      domain: 'financial_reporting',
+      label: 'گزارش‌های مالی و دفتر کل',
+      icon: Wallet,
+      visible: canAccessTab('ecosystem'),
+    },
+    {
+      id: 'users',
+      domain: 'financial_reporting',
+      label: can('users.manage') ? 'کاربران و سرآشپزها' : 'کیف جِم کاربران',
+      icon: Users,
+      visible: canAccessTab('users'),
+    },
+    {
+      id: 'behavioral_intel',
+      domain: 'system',
+      label: 'هوش رفتاری و شناخت کاربر',
+      icon: TrendingUp,
+      visible: canAccessTab('behavioral_intel'),
+    },
+    {
+      id: 'app_control',
+      domain: 'system',
+      label: 'کنترل داینامیک اپ کاربر',
+      icon: LayoutGrid,
+      visible: canAccessTab('app_control'),
     },
     {
       id: 'rbac',
+      domain: 'system',
       label: 'ماتریس دسترسی پویا و نقش‌ها',
       icon: ShieldCheck,
       badge: staffMembersCount || undefined,
-      visible: can('rbac.manage'),
+      visible: canAccessTab('rbac'),
     },
   ];
 
   const navItems = allNavItems.filter((item) => item.visible);
+  const navGroups = ADMIN_NAV_DOMAIN_ORDER.map((domain) => ({
+    domain,
+    label: ADMIN_NAV_DOMAIN_LABELS[domain],
+    items: navItems.filter((item) => item.domain === domain),
+  })).filter((g) => g.items.length > 0);
   const currentNav: AdminNavId = navItems.some((n) => n.id === activeNav) ? activeNav : 'overview';
+  const activeRoleDomainDecisions = getRoleAclMatrixSummary(activeRole, aclRoles, activePermissions);
 
   const filteredRecipes = recipes.filter((r) => {
     if (recipeStatusFilter === 'has_draft') {
@@ -949,47 +1134,54 @@ export function AdminDashboard({
 
       {/* Desktop-First 2-Column Workspace (Sticky Sidebar + Wide Fluid Main Canvas) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* RTL Right Sidebar */}
+        {/* RTL Right Sidebar — Filtered Strictly by RBAC Role & Domain */}
         <aside
           className={`${
             mobileMenuOpen ? 'block' : 'hidden'
-          } lg:block lg:col-span-3 xl:col-span-2 lg:sticky lg:top-20 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-2.5 space-y-1`}
+          } lg:block lg:col-span-3 xl:col-span-2 lg:sticky lg:top-20 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-2.5 space-y-3`}
         >
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = currentNav === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  setActiveNav(item.id);
-                  setMobileMenuOpen(false);
-                }}
-                className={`w-full min-h-[44px] px-3 rounded-xl text-xs font-medium flex items-center justify-between gap-2 transition-colors ${
-                  active
-                    ? 'bg-[#B54B1F] text-[#FAFAFA] dark:bg-[#E29A6F] dark:text-[#0B0B0B]'
-                    : 'text-[#5C5C58] dark:text-[#A3A39E] hover:bg-[#EFEFED] dark:hover:bg-[#20201E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
-                }`}
-              >
-                <span className="inline-flex items-center gap-2 truncate">
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
-                </span>
-                {item.badge !== undefined && item.badge > 0 && (
-                  <span
-                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums shrink-0 ${
+          {navGroups.map((group) => (
+            <div key={group.domain} className="space-y-1">
+              <p className="px-3 pt-1 text-[10px] font-bold text-[#7A7A74] dark:text-[#8E8E88]">
+                {group.label}
+              </p>
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = currentNav === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveNav(item.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full min-h-[42px] px-3 rounded-xl text-xs font-medium flex items-center justify-between gap-2 transition-colors ${
                       active
-                        ? 'bg-white/20 text-white dark:bg-black/20 dark:text-[#0B0B0B]'
-                        : 'bg-[#A97222]/15 text-[#A97222] dark:text-[#D8A85B]'
+                        ? 'bg-[#B54B1F] text-[#FAFAFA] dark:bg-[#E29A6F] dark:text-[#0B0B0B]'
+                        : 'text-[#5C5C58] dark:text-[#A3A39E] hover:bg-[#EFEFED] dark:hover:bg-[#20201E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
                     }`}
                   >
-                    {toFaDigits(item.badge)}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+                    <span className="inline-flex items-center gap-2 truncate">
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </span>
+                    {item.badge !== undefined && item.badge > 0 && (
+                      <span
+                        className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums shrink-0 ${
+                          active
+                            ? 'bg-white/20 text-white dark:bg-black/20 dark:text-[#0B0B0B]'
+                            : 'bg-[#A97222]/15 text-[#A97222] dark:text-[#D8A85B]'
+                        }`}
+                      >
+                        {toFaDigits(item.badge)}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </aside>
 
         {/* Main Workspace Canvas */}
@@ -997,54 +1189,70 @@ export function AdminDashboard({
           {loading && !stats && <AdminWorkspaceSkeleton />}
 
           {/* =========================================================
-              1. OVERVIEW & ANALYTICS
+              1. OVERVIEW & ANALYTICS (ROLE-FILTERED METRICS)
           ========================================================= */}
           {currentNav === 'overview' && stats && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 tabular-nums">
-                <KpiCard
-                  label="کل دستورهای پخت"
-                  value={toFaDigits(stats.totalRecipes)}
-                  hint={`${toFaDigits(stats.recipesWithoutPhoto)} دستور بدون عکس`}
-                />
-                <KpiCard
-                  label="عکس‌های در صف تایید"
-                  value={toFaDigits(stats.pendingPhotosCount)}
-                  hint={`${toFaDigits(stats.approvedPhotosCount)} عکس واقعی تاییدشده`}
-                  accent
-                />
-                <KpiCard
-                  label="کاربران و سرآشپزها"
-                  value={toFaDigits(stats.totalUsers)}
-                  hint={`${toFaDigits(stats.verifiedChefsCount)} سرآشپز تاییدشده`}
-                />
-                <KpiCard
-                  label="اصناف و کمپین فعال"
-                  value={toFaDigits(stats.totalPartners)}
-                  hint={`${toFaDigits(stats.activeCampaignsCount)} کمپین اسپانسری فعال`}
-                />
-                {can('finance.wallets') && (
+                {canAccessTab('recipes') && (
                   <KpiCard
-                    label="مجموع کیف پول کاربران"
-                    value={formatToman(stats.totalUserWalletToman)}
-                    hint="تومان (قابل شارژ از بخش کاربران)"
+                    label="کل دستورهای پخت"
+                    value={toFaDigits(stats.totalRecipes)}
+                    hint={`${toFaDigits(stats.recipesWithoutPhoto)} دستور بدون عکس`}
                   />
                 )}
-                {can('finance.wallets') && (
+                {canAccessTab('photos') && (
                   <KpiCard
-                    label="مجموع حساب تجاری اصناف"
-                    value={formatToman(stats.totalPartnerWalletToman)}
-                    hint="تومان (بودجه تبلیغات و اسپانسری)"
+                    label="عکس‌های در صف تایید"
+                    value={toFaDigits(stats.pendingPhotosCount)}
+                    hint={`${toFaDigits(stats.approvedPhotosCount)} عکس واقعی تاییدشده`}
+                    accent
                   />
                 )}
-                {can('ads.manage') && (
+                {can('users.view') && (
+                  <KpiCard
+                    label="کاربران و سرآشپزها"
+                    value={toFaDigits(stats.totalUsers)}
+                    hint={`${toFaDigits(stats.verifiedChefsCount)} سرآشپز تاییدشده`}
+                  />
+                )}
+                {canAccessTab('native_ads') && (
                   <KpiCard
                     label="واحدهای تبلیغ بومی فعال"
                     value={toFaDigits(activeNativeAdsCount)}
                     hint={`${toFaDigits(totalNativeAdImpressions)} نمایش · ${toFaDigits(totalNativeAdClicks)} کلیک`}
                   />
                 )}
-                {can('finance.campaigns') && (
+                {(canAccessTab('partners') || canAccessTab('campaigns')) && (
+                  <KpiCard
+                    label="اصناف و کمپین فعال"
+                    value={toFaDigits(stats.totalPartners)}
+                    hint={`${toFaDigits(stats.activeCampaignsCount)} کمپین اسپانسری فعال`}
+                  />
+                )}
+                {canAccessTab('ecosystem') && (
+                  <KpiCard
+                    label="مجموع کیف پول کاربران"
+                    value={formatToman(stats.totalUserWalletToman)}
+                    hint="تومان (قابل مدیریت در بخش مالی)"
+                  />
+                )}
+                {canAccessTab('ecosystem') && (
+                  <KpiCard
+                    label="مجموع حساب تجاری برندها"
+                    value={formatToman(stats.totalPartnerWalletToman)}
+                    hint="تومان (اعتبار تبلیغات و مزایده)"
+                    accent
+                  />
+                )}
+                {canAccessTab('ecosystem') && financialSummary && (
+                  <KpiCard
+                    label="درآمد مزایده‌های تاییدشده"
+                    value={formatToman(financialSummary.approvedAdBidsRevenueToman)}
+                    hint={`${formatToman(financialSummary.pendingAuctionBidsVolumeToman)} تومان پیشنهاد در جریان`}
+                  />
+                )}
+                {canAccessTab('campaigns') && (
                   <KpiCard
                     label="تعاملات برندهای همکار"
                     value={toFaDigits(
@@ -1115,7 +1323,7 @@ export function AdminDashboard({
                         }}
                       />
                     )}
-                    {can('finance.partners') && (
+                    {canAccessTab('partners') && (
                       <QuickRow
                         label="کسب‌وکارهای در انتظار تایید یا مالکیت"
                         count={stats.pendingPartnersCount}
@@ -1123,7 +1331,23 @@ export function AdminDashboard({
                         onClick={() => setActiveNav('partners')}
                       />
                     )}
-                    {can('rbac.manage') && (
+                    {canAccessTab('ecosystem') && (
+                      <QuickRow
+                        label="تراکنش‌های ثبت‌شده در گزارش مالی و دفتر کل"
+                        count={transactions.length}
+                        actionLabel="مشاهده گزارش‌های مالی"
+                        onClick={() => setActiveNav('ecosystem')}
+                      />
+                    )}
+                    {canAccessTab('advanced_analytics') && (
+                      <QuickRow
+                        label="تحلیل رفتاری پیشرفته (ماندگاری، نرخ اسکرول، علایق و ساعات اوج)"
+                        count={stats.totalRecipes}
+                        actionLabel="مشاهده نمودارهای پیشرفته"
+                        onClick={() => setActiveNav('advanced_analytics')}
+                      />
+                    )}
+                    {canAccessTab('rbac') && (
                       <QuickRow
                         label="اعضای تیم مدیریت دارای سطح دسترسی فعال"
                         count={staffMembersCount}
@@ -1134,12 +1358,30 @@ export function AdminDashboard({
                   </div>
                 </div>
 
-                {/* Pending Chef Verifications & Partner Analytics */}
+                {/* Role RBAC Scope & Partner Analytics */}
                 <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
                   <h2 className="text-base font-bold">
-                    {can('finance.partners') ? 'عملکرد اصناف و اسپانسرها' : 'حوزه اختیارات نقش فعلی'}
+                    {canAccessTab('partners') ? 'عملکرد اصناف و محدوده دسترسی نقش' : 'محدوده دسترسی نقش فعلی (RBAC)'}
                   </h2>
-                  {can('finance.partners') ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs pb-3 border-b border-[#E6E6E3] dark:border-[#282825]">
+                    {activeRoleDomainDecisions.map((d) => (
+                      <div key={d.sectionId} className="space-y-0.5">
+                        <p className="text-[11px] text-[#6B6B66] dark:text-[#989892]">{d.sectionTitle}</p>
+                        <p
+                          className={`font-extrabold ${
+                            d.accessLevel === 'full'
+                              ? 'text-[#15803D] dark:text-[#4ADE80]'
+                              : d.accessLevel === 'read_only'
+                                ? 'text-[#8C5B12] dark:text-[#ECC06E]'
+                                : 'text-[#B91C1C] dark:text-[#F87171]'
+                          }`}
+                        >
+                          {d.accessLabel}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  {canAccessTab('partners') ? (
                     analytics && analytics.byPartner.length > 0 ? (
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs text-right tabular-nums">
@@ -1177,7 +1419,7 @@ export function AdminDashboard({
                       <ul className="space-y-1.5 pt-1">
                         {navItems
                           .filter((item) => item.id !== 'overview')
-                          .slice(0, 4)
+                          .slice(0, 5)
                           .map((item) => (
                             <li key={item.id} className="flex items-center gap-1.5 text-[#0D0D0D] dark:text-[#FAFAFA]">
                               <CheckCircle2 className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F] shrink-0" />
@@ -1298,7 +1540,7 @@ export function AdminDashboard({
           {/* =========================================================
               2. RECIPES CMS + VERSION CONTROL + SMART RECOMMENDATIONS
           ========================================================= */}
-          {currentNav === 'recipes' && can('content.recipes') && (
+          {currentNav === 'recipes' && canAccessTab('recipes') && (
             <div className="space-y-5">
               {/* Recipes Workspace Sub-Tab Switcher */}
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1639,7 +1881,7 @@ export function AdminDashboard({
           {/* =========================================================
               3. COMMUNITY PHOTO MODERATION & COVER PROMOTION
           ========================================================= */}
-          {currentNav === 'photos' && can('content.photos') && (
+          {currentNav === 'photos' && canAccessTab('photos') && (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                 <div className="space-y-0.5">
@@ -1762,7 +2004,7 @@ export function AdminDashboard({
           {/* =========================================================
               4. USERS MANAGEMENT & USER WALLET (TOMAN & GEMS) TOP-UP
           ========================================================= */}
-          {currentNav === 'users' && can('users.view') && (
+          {currentNav === 'users' && canAccessTab('users') && (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                 <div className="relative flex-1 max-w-md">
@@ -1950,7 +2192,7 @@ export function AdminDashboard({
           {/* =========================================================
               5. PARTNERS & COMMERCIAL ACCOUNT WALLET TOP-UP
           ========================================================= */}
-          {currentNav === 'partners' && can('finance.partners') && (
+          {currentNav === 'partners' && canAccessTab('partners') && (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                 <div>
@@ -2078,7 +2320,7 @@ export function AdminDashboard({
           {/* =========================================================
               6. SPONSORS & ADS CAMPAIGNS MANAGER
           ========================================================= */}
-          {currentNav === 'campaigns' && can('finance.campaigns') && (
+          {currentNav === 'campaigns' && canAccessTab('campaigns') && (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                 <div>
@@ -2191,7 +2433,7 @@ export function AdminDashboard({
           {/* =========================================================
               6B. LIVE DYNAMIC APP CONTROL CENTER
           ========================================================= */}
-          {currentNav === 'app_control' && (can('app.layout') || can('ecosystem.manage')) && config && (
+          {currentNav === 'app_control' && canAccessTab('app_control') && config && (
             <AdminDynamicAppControlPanel
               config={config}
               onChangeConfig={setConfig}
@@ -2202,7 +2444,7 @@ export function AdminDashboard({
           {/* =========================================================
               6C. MULTI-FORMAT NATIVE AD STUDIO
           ========================================================= */}
-          {currentNav === 'native_ads' && can('ads.manage') && (
+          {currentNav === 'native_ads' && canAccessTab('native_ads') && (
             <AdminNativeAdsPanel
               nativeAds={nativeAds}
               partners={partners}
@@ -2218,11 +2460,19 @@ export function AdminDashboard({
           {/* =========================================================
               6D. AD MARKETPLACE, AUCTIONS, FLAGSHIP & ADVERTISER PORTAL CONTROL
           ========================================================= */}
-          {currentNav === 'behavioral_intel' && activeRole === 'senior_admin' && (
+          {currentNav === 'advanced_analytics' && canAccessTab('advanced_analytics') && (
+            <AdvancedBehavioralAnalyticsPanel onNotify={onNotify} />
+          )}
+
+          {currentNav === 'behavior_reports' && canAccessTab('behavior_reports') && (
+            <AdminBehavioralChartsPanel onNotify={onNotify} />
+          )}
+
+          {currentNav === 'behavioral_intel' && canAccessTab('behavioral_intel') && (
             <AdminBehavioralIntelligencePanel onNotify={onNotify} />
           )}
 
-          {currentNav === 'ad_market' && can('ads.manage') && (
+          {currentNav === 'ad_market' && canAccessTab('ad_market') && (
             <AdminAdMarketplacePanel
               partners={partners}
               onRefreshAppConfig={() => {
@@ -2234,10 +2484,95 @@ export function AdminDashboard({
           )}
 
           {/* =========================================================
-              7. FINANCIAL LEDGER (COMMERCIAL & USER WALLET TRANSACTIONS)
+              7. FINANCIAL REPORTING & LEDGER (FINANCE MANAGER & SENIOR ADMIN ONLY)
           ========================================================= */}
-          {currentNav === 'ecosystem' && can('finance.wallets') && (
+          {currentNav === 'ecosystem' && canAccessTab('ecosystem') && (
             <div className="space-y-6">
+              {financialSummary && (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 tabular-nums">
+                  <KpiCard
+                    label="مجموع حساب تجاری برندها"
+                    value={formatToman(financialSummary.partnerWalletTotalToman)}
+                    hint="تومان · موجودی کل اصناف و برندها"
+                    accent
+                  />
+                  <KpiCard
+                    label="درآمد مزایده‌های تاییدشده"
+                    value={formatToman(financialSummary.approvedAdBidsRevenueToman)}
+                    hint="تومان · جایگاه‌های تبلیغاتی تاییدشده"
+                  />
+                  <KpiCard
+                    label="حجم پیشنهادهای مزایده فعال"
+                    value={formatToman(financialSummary.pendingAuctionBidsVolumeToman)}
+                    hint="تومان · در انتظار بررسی و نهایی‌سازی"
+                  />
+                  <KpiCard
+                    label="بودجه کمپین‌های فعال"
+                    value={formatToman(financialSummary.activeCampaignBudgetToman)}
+                    hint={`${toFaDigits(financialSummary.transactionsCount)} تراکنش ثبت‌شده`}
+                  />
+                </div>
+              )}
+
+              {can('finance.wallets') && partners.length > 0 && (
+                <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
+                  <div>
+                    <h2 className="text-base font-bold inline-flex items-center gap-2">
+                      <Wallet className="w-4 h-4 text-[#A97222] dark:text-[#D8A85B]" />
+                      <span>مانده حساب تجاری برندهای همکار و شارژ کیف پول</span>
+                    </h2>
+                    <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] mt-0.5">
+                      مدیریت مالی و تعدیل اعتبار تبلیغاتی برندها بدون نیاز به دسترسی به تنظیمات تبلیغات
+                    </p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-right tabular-nums">
+                      <thead className="border-b border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58]">
+                        <tr>
+                          <th className="py-2 font-medium">نام برند / کسب‌وکار</th>
+                          <th className="py-2 font-medium">رسته و شهر</th>
+                          <th className="py-2 font-medium">مانده حساب تجاری</th>
+                          <th className="py-2 font-medium text-left">عملیات مالی</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E6E6E3]/60 dark:divide-[#282825]">
+                        {partners.map((p) => (
+                          <tr key={p.id}>
+                            <td className="py-2.5 font-bold">{p.name}</td>
+                            <td className="py-2.5 text-[#5C5C58] dark:text-[#A3A39E]">
+                              {PARTNER_ROLE_LABELS[p.roleType]} · {p.city}
+                            </td>
+                            <td className="py-2.5 font-extrabold text-[#A97222] dark:text-[#D8A85B]">
+                              {formatToman(p.businessBalance)} تومان
+                            </td>
+                            <td className="py-2.5 text-left">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setWalletCurrency('toman');
+                                  setWalletAmount('');
+                                  setWalletReason('شارژ اعتبار تجاری از بخش مالی');
+                                  setWalletTarget({
+                                    type: 'partner',
+                                    id: p.id,
+                                    name: p.name,
+                                    currentToman: p.businessBalance,
+                                  });
+                                }}
+                                className="min-h-[34px] px-3 rounded-lg bg-[#0D0D0D] dark:bg-[#FAFAFA] text-white dark:text-[#0B0B0B] text-[11px] font-bold inline-flex items-center gap-1 whitespace-nowrap"
+                              >
+                                <Coins className="w-3.5 h-3.5" />
+                                <span>شارژ یا تعدیل</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
                 <h2 className="text-base font-bold inline-flex items-center gap-2">
                   <Layers className="w-4 h-4 text-[#B54B1F]" />
@@ -2292,7 +2627,7 @@ export function AdminDashboard({
           {/* =========================================================
               8. SMART KITCHEN / SUBSTITUTIONS & Q&A MODERATION
           ========================================================= */}
-          {currentNav === 'frontend_ops' && (
+          {currentNav === 'frontend_ops' && canAccessTab('frontend_ops') && (
             <AdminFrontendOpsPanel
               adminRole={activeRole}
               aclRoles={aclRoles}
@@ -2305,7 +2640,7 @@ export function AdminDashboard({
           {/* =========================================================
               9. DYNAMIC ACCESS CONTROL LIST (ACL) CONSOLE
           ========================================================= */}
-          {currentNav === 'rbac' && can('rbac.manage') && (
+          {currentNav === 'rbac' && canAccessTab('rbac') && (
             <AdminRbacPanel
               users={users}
               aclRoles={aclRoles}
@@ -2320,7 +2655,7 @@ export function AdminDashboard({
       {/* =====================================================================
           MODAL 1: ADMIN RECIPE CREATE / EDIT CMS MODAL (DRAFT + LIVE PREVIEW)
       ===================================================================== */}
-      {editingRecipe && (
+      {editingRecipe && can('content.recipes') && (
         <AdminRecipeEditorModal
           initial={editingRecipe === 'new' ? null : editingRecipe}
           prefillTitle={editingRecipe === 'new' ? draftSeedTitle : ''}
@@ -2344,7 +2679,7 @@ export function AdminDashboard({
       {/* =====================================================================
           MODAL 1B: RECIPE VERSION CONTROL, PREVIEW & APPROVAL MODAL
       ===================================================================== */}
-      {versionModalTarget && (
+      {versionModalTarget && can('content.recipes') && (
         <AdminRecipeVersionModal
           recipeId={versionModalTarget.recipeId}
           initialVersionId={versionModalTarget.versionId}
@@ -2361,7 +2696,7 @@ export function AdminDashboard({
       {/* =====================================================================
           MODAL 2: BULK IMPORT THOUSANDS OF RECIPES (JSON / FILE)
       ===================================================================== */}
-      {bulkOpen && (
+      {bulkOpen && can('content.recipes') && (
         <div
           role="dialog"
           aria-modal="true"
@@ -2437,7 +2772,7 @@ export function AdminDashboard({
       {/* =====================================================================
           MODAL 3: WALLET TOP-UP / DEDUCTION (USER TOMAN/GEM OR PARTNER TOMAN)
       ===================================================================== */}
-      {walletTarget && (
+      {walletTarget && can('finance.wallets') && (
         <div
           role="dialog"
           aria-modal="true"
@@ -2534,7 +2869,7 @@ export function AdminDashboard({
       {/* =====================================================================
           MODAL 4: CREATE NEW COMMERCIAL PARTNER
       ===================================================================== */}
-      {partnerModalOpen && (
+      {partnerModalOpen && canAccessTab('partners') && (
         <div
           role="dialog"
           aria-modal="true"
@@ -2646,7 +2981,7 @@ export function AdminDashboard({
       {/* =====================================================================
           MODAL 5: CREATE NEW SPONSOR CAMPAIGN
       ===================================================================== */}
-      {campaignModalOpen && (
+      {campaignModalOpen && canAccessTab('campaigns') && (
         <div
           role="dialog"
           aria-modal="true"
@@ -3236,3 +3571,1351 @@ function AdminRecipeEditorModal({
     </div>
   );
 }
+
+// =============================================================================
+// SENIOR ADMIN ADVANCED BEHAVIORAL ANALYTICS PANEL (RECHARTS + BEHAVIORTRACKER)
+// =============================================================================
+
+type AdvancedRecipeMetric = 'views' | 'avgDwellSeconds' | 'popularityScore';
+type AdvancedTimeWindow = 'all' | 'morning_noon' | 'evening_night';
+type AdvancedHourlyMetric = 'traffic' | 'dwell';
+type AdvancedInterestChartView = 'radar' | 'donut';
+type AdvancedScrollPanelView = 'funnel' | 'sections';
+type AdvancedDataScope = 'merged' | 'server' | 'local';
+type AdvancedTableSortKey = 'popularityScore' | 'avgDwellSeconds' | 'avgScrollDepthPercent' | 'views';
+
+interface MergedRecipeAnalyticsRow {
+  id: string;
+  title: string;
+  shortTitle: string;
+  category: string;
+  views: number;
+  avgDwellSeconds: number;
+  avgScrollDepthPercent: number;
+  avgClickIntervalSec: number;
+  cookStarts: number;
+  popularityScore: number;
+  sourceLabel: string;
+}
+
+interface InterestChartDatum {
+  category: string;
+  views: number;
+  avgDwellSeconds: number;
+  sharePercent: number;
+  affinityIndex: number;
+  color: string;
+}
+
+const INTEREST_PALETTE = ['#B54B1F', '#A97222', '#15803D', '#C99649', '#57534E', '#7C2D12'];
+
+function formatAnalyticsDurationFa(seconds: number): string {
+  const safe = Math.max(0, Math.round(seconds));
+  if (safe < 60) return `${toFaDigits(safe)} ثانیه`;
+  const mins = Math.floor(safe / 60);
+  const rem = safe % 60;
+  return rem > 0
+    ? `${toFaDigits(mins)} دقیقه و ${toFaDigits(rem)} ثانیه`
+    : `${toFaDigits(mins)} دقیقه`;
+}
+
+function truncatePersianLabel(label: string, max = 18): string {
+  const clean = label.trim();
+  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
+}
+
+interface AnalyticsTooltipProps {
+  active?: boolean;
+  payload?: {
+    name?: string;
+    value?: number;
+    dataKey?: string;
+    payload?: Record<string, unknown>;
+  }[];
+  label?: string;
+}
+
+function AdvancedRecipeTooltip({active, payload}: AnalyticsTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = payload[0]?.payload as MergedRecipeAnalyticsRow | undefined;
+  if (!row) return null;
+  return (
+    <div
+      dir="rtl"
+      className="rounded-xl border border-[#E6E6E3] dark:border-[#2C2C29] bg-[#FFFFFF] dark:bg-[#171715] px-3.5 py-2.5 text-xs shadow-sm space-y-1.5 tabular-nums max-w-[250px]"
+    >
+      <p className="font-extrabold text-[#111110] dark:text-[#F5F5F3] leading-snug">{row.title}</p>
+      <p className="text-[11px] text-[#6B6B66] dark:text-[#989892]">
+        {row.category} · {row.sourceLabel}
+      </p>
+      <div className="pt-1 border-t border-[#EFEFED] dark:border-[#262623] space-y-1 text-[11px]">
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-[#6B6B66] dark:text-[#989892]">بازدید</span>
+          <strong className="font-bold">{toFaDigits(row.views)}</strong>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-[#6B6B66] dark:text-[#989892]">میانگین ماندگاری</span>
+          <strong className="font-bold text-[#A97222] dark:text-[#D8A85B]">
+            {formatAnalyticsDurationFa(row.avgDwellSeconds)}
+          </strong>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-[#6B6B66] dark:text-[#989892]">نرخ اسکرول</span>
+          <strong className="font-bold text-[#15803D] dark:text-[#4ADE80]">
+            {toFaDigits(row.avgScrollDepthPercent)}٪
+          </strong>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-[#6B6B66] dark:text-[#989892]">شروع آشپزی</span>
+          <strong className="font-bold">{toFaDigits(row.cookStarts)}</strong>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-[#6B6B66] dark:text-[#989892]">شاخص محبوبیت</span>
+          <strong className="font-bold text-[#B54B1F] dark:text-[#E29A6F]">
+            {toFaDigits(row.popularityScore)}
+          </strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdvancedPeakHourTooltip({active, payload, label}: AnalyticsTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = payload[0]?.payload as
+    | {label: string; visits: number; interactions: number; avgDwellSeconds: number}
+    | undefined;
+  if (!row) return null;
+  return (
+    <div
+      dir="rtl"
+      className="rounded-xl border border-[#E6E6E3] dark:border-[#2C2C29] bg-[#FFFFFF] dark:bg-[#171715] px-3.5 py-2.5 text-xs shadow-sm space-y-1.5 tabular-nums"
+    >
+      <p className="font-extrabold text-[#111110] dark:text-[#F5F5F3]">ساعت {label || row.label}</p>
+      <div className="space-y-1 text-[11px]">
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-[#6B6B66] dark:text-[#989892]">بازدید نشست‌ها</span>
+          <strong className="font-bold text-[#A97222] dark:text-[#D8A85B]">
+            {toFaDigits(row.visits)}
+          </strong>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-[#6B6B66] dark:text-[#989892]">تعامل رفتاری</span>
+          <strong className="font-bold text-[#B54B1F] dark:text-[#E29A6F]">
+            {toFaDigits(row.interactions)}
+          </strong>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-[#6B6B66] dark:text-[#989892]">میانگین ماندگاری</span>
+          <strong className="font-bold text-[#15803D] dark:text-[#4ADE80]">
+            {formatAnalyticsDurationFa(row.avgDwellSeconds)}
+          </strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdvancedInterestTooltip({active, payload}: AnalyticsTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = payload[0]?.payload as InterestChartDatum | undefined;
+  if (!row) return null;
+  return (
+    <div
+      dir="rtl"
+      className="rounded-xl border border-[#E6E6E3] dark:border-[#2C2C29] bg-[#FFFFFF] dark:bg-[#171715] px-3.5 py-2.5 text-xs shadow-sm space-y-1 tabular-nums"
+    >
+      <p className="font-extrabold text-[#111110] dark:text-[#F5F5F3]">{row.category}</p>
+      <p className="text-[11px] text-[#6B6B66] dark:text-[#989892]">
+        سهم علاقه: <strong className="text-[#B54B1F] dark:text-[#E29A6F]">{toFaDigits(row.sharePercent)}٪</strong>
+      </p>
+      <p className="text-[11px] text-[#6B6B66] dark:text-[#989892]">
+        بازدید تجمیعی: <strong className="text-[#111110] dark:text-[#F5F5F3]">{toFaDigits(row.views)}</strong>
+      </p>
+      <p className="text-[11px] text-[#6B6B66] dark:text-[#989892]">
+        میانگین ماندگاری: <strong className="text-[#15803D] dark:text-[#4ADE80]">{formatAnalyticsDurationFa(row.avgDwellSeconds)}</strong>
+      </p>
+    </div>
+  );
+}
+
+function AdvancedScrollTooltip({active, payload}: AnalyticsTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = payload[0]?.payload as Record<string, unknown> | undefined;
+  if (!row) return null;
+  const label = String(row.label || row.sectionLabel || '');
+  const primaryValue = Number(payload[0]?.value || 0);
+  const isSection = Boolean(row.sectionLabel);
+  return (
+    <div
+      dir="rtl"
+      className="rounded-xl border border-[#E6E6E3] dark:border-[#2C2C29] bg-[#FFFFFF] dark:bg-[#171715] px-3.5 py-2.5 text-xs shadow-sm space-y-1 tabular-nums"
+    >
+      <p className="font-extrabold text-[#111110] dark:text-[#F5F5F3]">{label}</p>
+      {isSection ? (
+        <>
+          <p className="text-[11px] text-[#6B6B66] dark:text-[#989892]">
+            میانگین ماندگاری: <strong className="text-[#A97222] dark:text-[#D8A85B]">{formatAnalyticsDurationFa(primaryValue)}</strong>
+          </p>
+          <p className="text-[11px] text-[#6B6B66] dark:text-[#989892]">
+            نرخ عبور سریع: <strong className="text-[#B54B1F] dark:text-[#E29A6F]">{toFaDigits(Number(row.fastSkipPercent || 0))}٪</strong>
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="text-[11px] text-[#6B6B66] dark:text-[#989892]">
+            نرخ دستیابی نشست‌ها: <strong className="text-[#15803D] dark:text-[#4ADE80]">{toFaDigits(primaryValue)}٪</strong>
+          </p>
+          <p className="text-[11px] text-[#6B6B66] dark:text-[#989892]">
+            تعداد نشست: <strong className="text-[#111110] dark:text-[#F5F5F3]">{toFaDigits(Number(row.sessionsCount || 0))}</strong>
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AdvancedBehavioralAnalyticsPanel({onNotify}: {onNotify: (msg: string) => void}) {
+  const [chartsReport, setChartsReport] = useState<AdminBehavioralChartsReportPayload | null>(null);
+  const [execReport, setExecReport] = useState<ExecutiveBehavioralReportPayload | null>(null);
+  const [localAggregate, setLocalAggregate] = useState<AnonymizedBehaviorAggregateStore>(() =>
+    getAnonymizedBehaviorAggregates()
+  );
+  const [passiveCategories, setPassiveCategories] = useState<string[]>(() =>
+    loadPassiveAffinityCategories()
+  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [dataScope, setDataScope] = useState<AdvancedDataScope>('merged');
+  const [recipeMetric, setRecipeMetric] = useState<AdvancedRecipeMetric>('views');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [timeWindow, setTimeWindow] = useState<AdvancedTimeWindow>('all');
+  const [hourlyMetric, setHourlyMetric] = useState<AdvancedHourlyMetric>('traffic');
+  const [interestView, setInterestView] = useState<AdvancedInterestChartView>('radar');
+  const [scrollPanelView, setScrollPanelView] = useState<AdvancedScrollPanelView>('funnel');
+  const [tableSearch, setTableSearch] = useState('');
+  const [tableSort, setTableSort] = useState<AdvancedTableSortKey>('popularityScore');
+
+  const fetchExecutiveTelemetry = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [chartsData, executiveData] = await Promise.all([
+        apiRequest<AdminBehavioralChartsReportPayload>('/api/admin/behavioral-reports/charts', {
+          useAdmin: true,
+        }),
+        apiRequest<ExecutiveBehavioralReportPayload>('/api/admin/behavioral-intelligence', {
+          useAdmin: true,
+        }),
+      ]);
+      setChartsReport(chartsData);
+      setExecReport(executiveData);
+      setLocalAggregate(getAnonymizedBehaviorAggregates());
+      setPassiveCategories(loadPassiveAffinityCategories());
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'دریافت داده‌های پنل تحلیل رفتاری پیشرفته برای مدیر ارشد ناموفق بود.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchExecutiveTelemetry();
+    const unsubscribe = behaviorObserverSubject.subscribe((_ev, snapshot) => {
+      setLocalAggregate(snapshot);
+      setPassiveCategories(loadPassiveAffinityCategories());
+    });
+    return unsubscribe;
+  }, [fetchExecutiveTelemetry]);
+
+  const mergedRecipes = useMemo<MergedRecipeAnalyticsRow[]>(() => {
+    const map = new Map<string, MergedRecipeAnalyticsRow>();
+
+    if (dataScope !== 'local' && chartsReport) {
+      for (const item of chartsReport.recipePopularity) {
+        map.set(item.id, {
+          id: item.id,
+          title: item.title,
+          shortTitle: truncatePersianLabel(item.title, 18),
+          category: item.category || 'عمومی',
+          views: item.views,
+          avgDwellSeconds: item.avgDwellSeconds,
+          avgScrollDepthPercent: item.avgScrollDepthPercent,
+          avgClickIntervalSec: item.avgClickIntervalSec,
+          cookStarts: item.cookStarts,
+          popularityScore: item.popularityScore,
+          sourceLabel: 'تجمیع سرور',
+        });
+      }
+    }
+
+    if (dataScope !== 'server') {
+      const localList = Object.values(localAggregate.recipes);
+      for (const bucket of localList) {
+        const existing = map.get(bucket.recipeId);
+        const localClickSec =
+          bucket.avgClickIntervalMs > 0
+            ? Number((bucket.avgClickIntervalMs / 1000).toFixed(1))
+            : 5.2;
+        if (existing) {
+          const totalViews = existing.views + bucket.visitsCount;
+          const weightedDwell = Math.round(
+            (existing.avgDwellSeconds * existing.views +
+              bucket.avgDwellSeconds * bucket.visitsCount) /
+              Math.max(1, totalViews)
+          );
+          const weightedScroll = Math.round(
+            (existing.avgScrollDepthPercent * existing.views +
+              bucket.avgScrollDepthPercent * bucket.visitsCount) /
+              Math.max(1, totalViews)
+          );
+          map.set(bucket.recipeId, {
+            ...existing,
+            views: totalViews,
+            avgDwellSeconds: weightedDwell,
+            avgScrollDepthPercent: weightedScroll,
+            popularityScore: Math.round(
+              totalViews * 14 +
+                existing.cookStarts * 22 +
+                weightedDwell * 0.12 +
+                weightedScroll * 0.25
+            ),
+            sourceLabel: 'سرور + رصدگر زنده',
+          });
+        } else {
+          map.set(bucket.recipeId, {
+            id: bucket.recipeId,
+            title: bucket.recipeTitle,
+            shortTitle: truncatePersianLabel(bucket.recipeTitle, 18),
+            category: bucket.category || 'عمومی',
+            views: bucket.visitsCount,
+            avgDwellSeconds: bucket.avgDwellSeconds,
+            avgScrollDepthPercent: bucket.avgScrollDepthPercent,
+            avgClickIntervalSec: localClickSec,
+            cookStarts: 0,
+            popularityScore: Math.round(
+              bucket.visitsCount * 14 +
+                bucket.avgDwellSeconds * 0.12 +
+                bucket.avgScrollDepthPercent * 0.25
+            ),
+            sourceLabel: 'رصدگر محلی مرورگر',
+          });
+        }
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.popularityScore - a.popularityScore);
+  }, [chartsReport, localAggregate, dataScope]);
+
+  const categories = useMemo(
+    () => Array.from(new Set(mergedRecipes.map((r) => r.category).filter(Boolean))),
+    [mergedRecipes]
+  );
+
+  const filteredChartRecipes = useMemo(() => {
+    const base =
+      selectedCategory === 'all'
+        ? mergedRecipes
+        : mergedRecipes.filter((r) => r.category === selectedCategory);
+    return [...base].sort((a, b) => b[recipeMetric] - a[recipeMetric]).slice(0, 10);
+  }, [mergedRecipes, selectedCategory, recipeMetric]);
+
+  const hourlyData = useMemo(() => {
+    const base = Array.from({length: 24}, (_, hour) => {
+      const serverRow = chartsReport?.peakHours.find((h) => h.hour === hour);
+      const localHits = Number(localAggregate.hourlyVisitCounts[hour] || 0);
+      const visits =
+        dataScope === 'local'
+          ? localHits
+          : dataScope === 'server'
+            ? serverRow?.visits || 0
+            : (serverRow?.visits || 0) + localHits;
+      return {
+        hour,
+        label: `${toFaDigits(String(hour).padStart(2, '0'))}:۰۰`,
+        visits,
+        interactions: dataScope === 'local' ? localHits : serverRow?.interactions || 0,
+        avgDwellSeconds:
+          dataScope === 'local'
+            ? localHits > 0
+              ? localAggregate.globalAvgDwellSeconds
+              : 0
+            : serverRow?.avgDwellSeconds || 0,
+      };
+    });
+
+    if (timeWindow === 'morning_noon') {
+      return base.filter((b) => b.hour >= 6 && b.hour <= 15);
+    }
+    if (timeWindow === 'evening_night') {
+      return base.filter((b) => b.hour >= 15 && b.hour <= 23);
+    }
+    return base;
+  }, [chartsReport, localAggregate, dataScope, timeWindow]);
+
+  const peakHourPoint = useMemo(() => {
+    let best = hourlyData[0] || {hour: 19, label: '۱۹:۰۰', visits: 0};
+    for (const row of hourlyData) {
+      if (row.visits > best.visits) best = row;
+    }
+    return best;
+  }, [hourlyData]);
+
+  const interestChartData = useMemo<InterestChartDatum[]>(() => {
+    const catMap = new Map<string, {views: number; dwellWeighted: number; affinityBonus: number}>();
+
+    if (dataScope !== 'local' && chartsReport) {
+      for (const c of chartsReport.categoryPopularity) {
+        catMap.set(c.category, {
+          views: c.views,
+          dwellWeighted: c.avgDwellSeconds * Math.max(1, c.views),
+          affinityBonus: 0,
+        });
+      }
+    }
+
+    if (dataScope !== 'server') {
+      for (const rec of Object.values(localAggregate.recipes)) {
+        const key = rec.category || 'عمومی';
+        const prev = catMap.get(key) || {views: 0, dwellWeighted: 0, affinityBonus: 0};
+        prev.views += rec.visitsCount;
+        prev.dwellWeighted += rec.avgDwellSeconds * Math.max(1, rec.visitsCount);
+        prev.affinityBonus += 12;
+        catMap.set(key, prev);
+      }
+      passiveCategories.forEach((cat, idx) => {
+        const prev = catMap.get(cat) || {views: 1, dwellWeighted: 90, affinityBonus: 0};
+        prev.affinityBonus += Math.max(6, 20 - idx * 4);
+        catMap.set(cat, prev);
+      });
+    }
+
+    const entries = Array.from(catMap.entries());
+    const totalViews = Math.max(
+      1,
+      entries.reduce((sum, [, val]) => sum + val.views, 0)
+    );
+
+    return entries
+      .map(([category, st], idx) => {
+        const avgDwell = st.views > 0 ? Math.round(st.dwellWeighted / st.views) : 0;
+        const sharePercent = Math.round((st.views / totalViews) * 100);
+        const affinityIndex = Math.min(
+          100,
+          Math.round(sharePercent * 1.35 + Math.min(28, avgDwell / 8) + st.affinityBonus)
+        );
+        return {
+          category,
+          views: st.views,
+          avgDwellSeconds: avgDwell,
+          sharePercent,
+          affinityIndex,
+          color: INTEREST_PALETTE[idx % INTEREST_PALETTE.length],
+        };
+      })
+      .sort((a, b) => b.views - a.views || b.affinityIndex - a.affinityIndex)
+      .slice(0, 6);
+  }, [chartsReport, localAggregate, passiveCategories, dataScope]);
+
+  const filteredTableRows = useMemo(() => {
+    const q = tableSearch.trim().toLowerCase();
+    const rows = q
+      ? mergedRecipes.filter(
+          (r) =>
+            r.title.toLowerCase().includes(q) ||
+            r.category.toLowerCase().includes(q) ||
+            r.sourceLabel.toLowerCase().includes(q)
+        )
+      : mergedRecipes;
+    return [...rows].sort((a, b) => b[tableSort] - a[tableSort]);
+  }, [mergedRecipes, tableSearch, tableSort]);
+
+  const handleExportAdvancedJson = () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      scope: dataScope,
+      privacyNotice:
+        'گزارش تجمیعی تحلیل رفتاری پیشرفته مدیر ارشد — بدون اطلاعات هویتی افراد (مبتنی بر behaviorTracker)',
+      summary: chartsReport?.summary || null,
+      recipeTrends: mergedRecipes,
+      peakHours: hourlyData,
+      interests: interestChartData,
+      scrollFunnel: chartsReport?.scrollDepthDistribution || [],
+      localObserverAggregates: localAggregate,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json;charset=utf-8;',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lagheli-executive-behavioral-analytics-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    onNotify('فایل JSON تحلیل رفتاری پیشرفته با موفقیت دانلود شد.');
+  };
+
+  if (loading && !chartsReport) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {Array.from({length: 5}).map((_, idx) => (
+            <div
+              key={idx}
+              className="h-24 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] animate-pulse"
+            />
+          ))}
+        </div>
+        <div className="h-[340px] rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] animate-pulse" />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="h-[280px] rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] animate-pulse" />
+          <div className="h-[280px] rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !chartsReport) {
+    return (
+      <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-8 text-center space-y-3">
+        <p className="text-sm font-bold text-[#B91C1C] dark:text-[#F87171]">
+          {error || 'امکان بارگذاری داده‌های تحلیل رفتاری پیشرفته وجود ندارد.'}
+        </p>
+        <button
+          type="button"
+          onClick={fetchExecutiveTelemetry}
+          className="min-h-[40px] px-4 rounded-xl bg-[#0D0D0D] dark:bg-[#FAFAFA] text-white dark:text-[#0B0B0B] text-xs font-bold whitespace-nowrap"
+        >
+          تلاش مجدد
+        </button>
+      </div>
+    );
+  }
+
+  const deepScrollReach =
+    chartsReport.scrollDepthDistribution.find((s) => s.depth === 75)?.reachPercent || 0;
+  const topInterest = interestChartData[0];
+  const localRecipeCount = Object.keys(localAggregate.recipes).length;
+  const displayedAvgDwell =
+    dataScope === 'local'
+      ? localAggregate.globalAvgDwellSeconds
+      : chartsReport.summary.avgRecipeDwellSeconds;
+  const displayedAvgScroll =
+    dataScope === 'local'
+      ? localAggregate.globalAvgScrollDepthPercent
+      : chartsReport.summary.avgScrollDepthPercent;
+
+  const metricAxisLabel: Record<AdvancedRecipeMetric, string> = {
+    views: 'تعداد بازدید',
+    avgDwellSeconds: 'میانگین ماندگاری (ثانیه)',
+    popularityScore: 'شاخص محبوبیت',
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Executive Header Bar */}
+      <section className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="text-xs font-semibold text-[#A97222] dark:text-[#D8A85B]">
+            ویژه مدیران ارشد · رصدگر زنده behaviorTracker · آمار تجمیعی بدون هویت
+          </div>
+          <h2 className="text-lg font-extrabold text-balance">
+            پنل تحلیل رفتاری پیشرفته: ماندگاری، نرخ اسکرول، علایق و ساعات اوج
+          </h2>
+          <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
+            ترکیب هوشمند داده‌های تجمیعی سرور با رصدگر رفتاری مرورگر برای کشف روند محبوبیت دستورپخت‌ها، عمق مطالعه و زمان‌های پربازدید کاربران.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {/* Data Source Scope Segmented Control */}
+          <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[#F4F3EF] dark:bg-[#1E1E1B]">
+            {(
+              [
+                {id: 'merged' as AdvancedDataScope, label: 'تجمیع کل'},
+                {id: 'server' as AdvancedDataScope, label: 'سرور'},
+                {id: 'local' as AdvancedDataScope, label: 'رصدگر زنده'},
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setDataScope(opt.id)}
+                className={`min-h-[34px] px-3 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors ${
+                  dataScope === opt.id
+                    ? 'bg-[#FFFFFF] dark:bg-[#0D0D0D] text-[#111110] dark:text-[#FAFAFA] shadow-xs'
+                    : 'text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#111110] dark:hover:text-[#FAFAFA]'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={fetchExecutiveTelemetry}
+            disabled={loading}
+            className="min-h-[40px] px-3.5 rounded-xl border border-[#E6E6E3] dark:border-[#2A2A27] text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 hover:border-[#A97222] transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>بروزرسانی</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportAdvancedJson}
+            className="min-h-[40px] px-4 rounded-xl bg-[#0D0D0D] dark:bg-[#FAFAFA] text-white dark:text-[#0B0B0B] text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 hover:opacity-90 transition-opacity"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>خروجی JSON</span>
+          </button>
+        </div>
+      </section>
+
+      {/* 5-Card Executive KPI Strip (Single-Elevation, Tabular Numerals, Zero Pills) */}
+      <section className="grid grid-cols-2 lg:grid-cols-5 gap-3 tabular-nums">
+        {[
+          {
+            label: 'میانگین زمان ماندگاری',
+            value: formatAnalyticsDurationFa(displayedAvgDwell),
+            meta: execReport
+              ? `طولانی‌ترین نشست: ${formatAnalyticsDurationFa(execReport.overview.longestSessionSeconds)}`
+              : 'مکث واقعی روی دستورپخت',
+          },
+          {
+            label: 'میانگین نرخ اسکرول',
+            value: `${toFaDigits(displayedAvgScroll)}٪`,
+            meta: `${toFaDigits(deepScrollReach)}٪ رسیدن به عمق ۷۵٪+`,
+          },
+          {
+            label: 'پربازدیدترین ساعت شبانه‌روز',
+            value: peakHourPoint.label,
+            meta: `بازه اوج: ${chartsReport.summary.peakWindowLabel}`,
+          },
+          {
+            label: 'پرطرفدارترین حوزه علاقه',
+            value: topInterest ? topInterest.category : 'در حال گردآوری',
+            meta: topInterest
+              ? `${toFaDigits(topInterest.sharePercent)}٪ از کل توجه کاربران`
+              : 'بر اساس علایق رفتاری کاربران',
+          },
+          {
+            label: 'نشست‌ها و رصدهای ثبت‌شده',
+            value: toFaDigits(
+              chartsReport.summary.totalSessions + localAggregate.totalObservedSessions
+            ),
+            meta: `${toFaDigits(chartsReport.summary.totalRecipeViews)} بازدید سرور · ${toFaDigits(localRecipeCount)} رصد محلی`,
+          },
+        ].map((kpi) => (
+          <div
+            key={kpi.label}
+            className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 space-y-1"
+          >
+            <p className="text-[11px] text-[#6B6B66] dark:text-[#989892]">{kpi.label}</p>
+            <p className="text-lg font-extrabold truncate">{kpi.value}</p>
+            <p className="text-[11px] text-[#7A7A74] dark:text-[#84847E] truncate">{kpi.meta}</p>
+          </div>
+        ))}
+      </section>
+
+      {/* CHART 1: RECIPE POPULARITY TRENDS (DUAL-AXIS COMPOSED CHART: METRIC BAR + SCROLL RATE LINE) */}
+      <section className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-5">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <h3 className="text-sm font-extrabold inline-flex items-center gap-1.5">
+              <TrendingUp className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
+              <span>روند محبوبیت دستورپخت‌ها: همبستگی ماندگاری و نرخ اسکرول</span>
+            </h3>
+            <p className="text-xs text-[#6B6B66] dark:text-[#989892]">
+              ستون‌ها نشان‌دهنده {metricAxisLabel[recipeMetric]} و خط سبز نشان‌دهنده میانگین نرخ اسکرول (٪) هر دستورپخت است.
+            </p>
+          </div>
+
+          <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[#F4F3EF] dark:bg-[#1E1E1B] self-start xl:self-center">
+            {(
+              [
+                {key: 'views' as AdvancedRecipeMetric, label: 'بازدید و اسکرول'},
+                {key: 'avgDwellSeconds' as AdvancedRecipeMetric, label: 'ماندگاری و اسکرول'},
+                {key: 'popularityScore' as AdvancedRecipeMetric, label: 'شاخص محبوبیت'},
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setRecipeMetric(opt.key)}
+                className={`min-h-[34px] px-3 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors ${
+                  recipeMetric === opt.key
+                    ? 'bg-[#FFFFFF] dark:bg-[#0D0D0D] text-[#111110] dark:text-[#FAFAFA] shadow-xs'
+                    : 'text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#111110] dark:hover:text-[#FAFAFA]'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {categories.length > 1 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('all')}
+              className={`min-h-[34px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                selectedCategory === 'all'
+                  ? 'bg-[#0D0D0D] dark:bg-[#FAFAFA] text-white dark:text-[#0B0B0B]'
+                  : 'border border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58] dark:text-[#A3A39E]'
+              }`}
+            >
+              همه دسته‌ها ({toFaDigits(mergedRecipes.length)})
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`min-h-[34px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                  selectedCategory === cat
+                    ? 'bg-[#0D0D0D] dark:bg-[#FAFAFA] text-white dark:text-[#0B0B0B]'
+                    : 'border border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58] dark:text-[#A3A39E]'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {filteredChartRecipes.length === 0 ? (
+          <div className="py-14 text-center space-y-2">
+            <p className="text-xs font-semibold text-[#5C5C58] dark:text-[#A3A39E]">
+              در دامنه انتخاب‌شده هنوز رصدی برای دستورپخت ثبت نشده است.
+            </p>
+            {dataScope === 'local' && (
+              <button
+                type="button"
+                onClick={() => setDataScope('merged')}
+                className="min-h-[36px] px-3.5 rounded-lg border border-[#E6E6E3] dark:border-[#282825] text-xs font-bold"
+              >
+                نمایش تجمیع کل سرور و رصدگر زنده
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="h-[340px] w-full" dir="ltr">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={filteredChartRecipes}
+                margin={{top: 14, right: 16, left: 6, bottom: 36}}
+                barCategoryGap="24%"
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,120,0.18)" />
+                <XAxis
+                  dataKey="shortTitle"
+                  tick={{fontSize: 11, fill: '#73736D'}}
+                  interval={0}
+                  angle={-16}
+                  textAnchor="end"
+                  height={60}
+                  axisLine={{stroke: 'rgba(128,128,120,0.22)'}}
+                  tickLine={false}
+                />
+                <YAxis
+                  yAxisId="left"
+                  tick={{fontSize: 11, fill: '#73736D'}}
+                  tickFormatter={(v) => toFaDigits(Number(v))}
+                  axisLine={false}
+                  tickLine={false}
+                  width={44}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  domain={[0, 100]}
+                  tick={{fontSize: 11, fill: '#15803D'}}
+                  tickFormatter={(v) => `${toFaDigits(Number(v))}٪`}
+                  axisLine={false}
+                  tickLine={false}
+                  width={42}
+                />
+                <Tooltip
+                  content={<AdvancedRecipeTooltip />}
+                  cursor={{fill: 'rgba(169, 114, 34, 0.08)'}}
+                />
+                <Bar yAxisId="left" dataKey={recipeMetric} radius={[6, 6, 0, 0]} maxBarSize={42}>
+                  {filteredChartRecipes.map((entry, idx) => (
+                    <Cell
+                      key={entry.id}
+                      fill={idx === 0 ? '#B54B1F' : idx === 1 ? '#A97222' : '#C99649'}
+                    />
+                  ))}
+                </Bar>
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="avgScrollDepthPercent"
+                  name="نرخ اسکرول (٪)"
+                  stroke="#15803D"
+                  strokeWidth={2.4}
+                  dot={{r: 4, fill: '#15803D', strokeWidth: 0}}
+                  activeDot={{r: 6, fill: '#15803D'}}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-5 text-xs text-[#5C5C58] dark:text-[#A3A39E] pt-2 border-t border-[#EFEFED] dark:border-[#242422]">
+          <span className="inline-flex items-center gap-2">
+            <span className="w-3 h-2 rounded-xs bg-[#B54B1F]" />
+            <span>رتبه اول ({metricAxisLabel[recipeMetric]})</span>
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <span className="w-3 h-2 rounded-xs bg-[#C99649]" />
+            <span>سایر دستورهای پربازدید</span>
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <span className="w-3.5 h-0.5 bg-[#15803D]" />
+            <span>نرخ میانگین اسکرول روی دستورپخت (محور سمت راست · درصد)</span>
+          </span>
+        </div>
+      </section>
+
+      {/* CHART 2: 24-HOUR PEAK VISIT TIMES & HOURLY DWELL CURVE */}
+      <section className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-5">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <h3 className="text-sm font-extrabold inline-flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-[#A97222] dark:text-[#D8A85B]" />
+              <span>تحلیل زمان‌های پربازدید و الگوی ماندگاری در شبانه‌روز</span>
+            </h3>
+            <p className="text-xs text-[#6B6B66] dark:text-[#989892]">
+              نقطه اوج در بازه انتخابی: ساعت <strong>{peakHourPoint.label}</strong> · پنجره طلایی شبانه‌روز:{' '}
+              <strong>{chartsReport.summary.peakWindowLabel}</strong>
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[#F4F3EF] dark:bg-[#1E1E1B]">
+              {(
+                [
+                  {id: 'all' as AdvancedTimeWindow, label: '۲۴ ساعته'},
+                  {id: 'morning_noon' as AdvancedTimeWindow, label: 'صبح و ظهر'},
+                  {id: 'evening_night' as AdvancedTimeWindow, label: 'عصر و شب'},
+                ] as const
+              ).map((w) => (
+                <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => setTimeWindow(w.id)}
+                  className={`min-h-[34px] px-2.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors ${
+                    timeWindow === w.id
+                      ? 'bg-[#FFFFFF] dark:bg-[#0D0D0D] text-[#111110] dark:text-[#FAFAFA] shadow-xs'
+                      : 'text-[#5C5C58] dark:text-[#A3A39E]'
+                  }`}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[#F4F3EF] dark:bg-[#1E1E1B]">
+              <button
+                type="button"
+                onClick={() => setHourlyMetric('traffic')}
+                className={`min-h-[34px] px-3 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors ${
+                  hourlyMetric === 'traffic'
+                    ? 'bg-[#FFFFFF] dark:bg-[#0D0D0D] text-[#111110] dark:text-[#FAFAFA] shadow-xs'
+                    : 'text-[#5C5C58] dark:text-[#A3A39E]'
+                }`}
+              >
+                بازدید و تعامل
+              </button>
+              <button
+                type="button"
+                onClick={() => setHourlyMetric('dwell')}
+                className={`min-h-[34px] px-3 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors ${
+                  hourlyMetric === 'dwell'
+                    ? 'bg-[#FFFFFF] dark:bg-[#0D0D0D] text-[#111110] dark:text-[#FAFAFA] shadow-xs'
+                    : 'text-[#5C5C58] dark:text-[#A3A39E]'
+                }`}
+              >
+                ماندگاری ساعتی
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="h-[300px] w-full" dir="ltr">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={hourlyData} margin={{top: 16, right: 16, left: 4, bottom: 8}}>
+              <defs>
+                <linearGradient id="advSaffronArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#A97222" stopOpacity={0.34} />
+                  <stop offset="95%" stopColor="#A97222" stopOpacity={0.02} />
+                </linearGradient>
+                <linearGradient id="advEmeraldArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#15803D" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#15803D" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,120,0.18)" />
+              <XAxis
+                dataKey="label"
+                tick={{fontSize: 11, fill: '#73736D'}}
+                interval={timeWindow === 'all' ? 1 : 0}
+                axisLine={{stroke: 'rgba(128,128,120,0.22)'}}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{fontSize: 11, fill: '#73736D'}}
+                tickFormatter={(v) => toFaDigits(Number(v))}
+                axisLine={false}
+                tickLine={false}
+                width={42}
+              />
+              <Tooltip content={<AdvancedPeakHourTooltip />} />
+              {peakHourPoint.visits > 0 && (
+                <ReferenceLine
+                  x={peakHourPoint.label}
+                  stroke="#B54B1F"
+                  strokeDasharray="4 4"
+                  label={{
+                    value: 'اوج',
+                    position: 'top',
+                    fill: '#B54B1F',
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                />
+              )}
+              {hourlyMetric === 'traffic' ? (
+                <>
+                  <Area
+                    type="monotone"
+                    dataKey="visits"
+                    name="بازدید"
+                    stroke="#A97222"
+                    strokeWidth={2.4}
+                    fill="url(#advSaffronArea)"
+                    activeDot={{r: 5, fill: '#A97222'}}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="interactions"
+                    name="تعامل"
+                    stroke="#B54B1F"
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{r: 4, fill: '#B54B1F'}}
+                  />
+                </>
+              ) : (
+                <Area
+                  type="monotone"
+                  dataKey="avgDwellSeconds"
+                  name="میانگین ماندگاری (ثانیه)"
+                  stroke="#15803D"
+                  strokeWidth={2.4}
+                  fill="url(#advEmeraldArea)"
+                  activeDot={{r: 5, fill: '#15803D'}}
+                />
+              )}
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-[#5C5C58] dark:text-[#A3A39E] pt-2 border-t border-[#EFEFED] dark:border-[#242422]">
+          <div className="flex flex-wrap items-center gap-5">
+            {hourlyMetric === 'traffic' ? (
+              <>
+                <span className="inline-flex items-center gap-2">
+                  <span className="w-3 h-1.5 rounded-xs bg-[#A97222]" />
+                  <span>حجم بازدید ساعتی</span>
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="w-3 h-0.5 bg-[#B54B1F]" />
+                  <span>تعامل‌های رفتاری (مطالعه، اسکرول، پخت)</span>
+                </span>
+              </>
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                <span className="w-3 h-1.5 rounded-xs bg-[#15803D]" />
+                <span>میانگین ماندگاری کاربران در هر ساعت (ثانیه)</span>
+              </span>
+            )}
+          </div>
+          {execReport && (
+            <span className="tabular-nums">
+              روزهای کاری {toFaDigits(execReport.temporal.weekdayVsWeekend.weekdayPercent)}٪ · آخر هفته{' '}
+              {toFaDigits(execReport.temporal.weekdayVsWeekend.weekendPercent)}٪
+            </span>
+          )}
+        </div>
+      </section>
+
+      {/* CHARTS 3 & 4: USER INTERESTS (RADAR/DONUT) & SCROLL RATE / SECTION DWELL (2-COL BALANCED) */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-stretch">
+        {/* CHART 3: USER INTERESTS & PASSIVE AFFINITIES */}
+        <section className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4 flex flex-col">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-0.5">
+              <h3 className="text-sm font-extrabold inline-flex items-center gap-1.5">
+                <Heart className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
+                <span>نقشه علایق و ذائقه کاربران (behaviorTracker)</span>
+              </h3>
+              <p className="text-xs text-[#6B6B66] dark:text-[#989892]">
+                استخراج علایق واقعی از بازدید خاموش دسته‌ها، ماندگاری و فیلترهای رژیمی
+              </p>
+            </div>
+
+            <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[#F4F3EF] dark:bg-[#1E1E1B]">
+              <button
+                type="button"
+                onClick={() => setInterestView('radar')}
+                className={`min-h-[32px] px-2.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors ${
+                  interestView === 'radar'
+                    ? 'bg-[#FFFFFF] dark:bg-[#0D0D0D] text-[#111110] dark:text-[#FAFAFA] shadow-xs'
+                    : 'text-[#5C5C58] dark:text-[#A3A39E]'
+                }`}
+              >
+                رادار علایق
+              </button>
+              <button
+                type="button"
+                onClick={() => setInterestView('donut')}
+                className={`min-h-[32px] px-2.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors ${
+                  interestView === 'donut'
+                    ? 'bg-[#FFFFFF] dark:bg-[#0D0D0D] text-[#111110] dark:text-[#FAFAFA] shadow-xs'
+                    : 'text-[#5C5C58] dark:text-[#A3A39E]'
+                }`}
+              >
+                سهم درصدی
+              </button>
+            </div>
+          </div>
+
+          {interestChartData.length === 0 ? (
+            <div className="h-[260px] flex items-center justify-center text-xs text-[#6B6B66] dark:text-[#989892]">
+              هنوز داده کافی برای ترسیم نقشه علایق ثبت نشده است.
+            </div>
+          ) : (
+            <div className="h-[260px] w-full flex-1" dir="ltr">
+              <ResponsiveContainer width="100%" height="100%">
+                {interestView === 'radar' ? (
+                  <RadarChart cx="50%" cy="50%" outerRadius="72%" data={interestChartData}>
+                    <PolarGrid stroke="rgba(128,128,120,0.22)" />
+                    <PolarAngleAxis dataKey="category" tick={{fontSize: 11, fill: '#73736D'}} />
+                    <PolarRadiusAxis
+                      angle={30}
+                      domain={[0, 100]}
+                      tick={{fontSize: 10, fill: '#8A8A84'}}
+                      tickFormatter={(v) => toFaDigits(Number(v))}
+                    />
+                    <Tooltip content={<AdvancedInterestTooltip />} />
+                    <Radar
+                      name="شاخص علاقه"
+                      dataKey="affinityIndex"
+                      stroke="#B54B1F"
+                      strokeWidth={2}
+                      fill="#A97222"
+                      fillOpacity={0.28}
+                    />
+                  </RadarChart>
+                ) : (
+                  <PieChart>
+                    <Pie
+                      data={interestChartData}
+                      dataKey="views"
+                      nameKey="category"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={56}
+                      outerRadius={92}
+                      paddingAngle={3}
+                    >
+                      {interestChartData.map((entry) => (
+                        <Cell key={entry.category} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<AdvancedInterestTooltip />} />
+                  </PieChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Clean Unboxed Interest Breakdown & Passive Affinities */}
+          <div className="pt-3 border-t border-[#EFEFED] dark:border-[#242422] space-y-2.5 text-xs tabular-nums">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
+              {interestChartData.map((item) => (
+                <div key={item.category} className="flex items-center justify-between gap-2 min-w-0">
+                  <span className="inline-flex items-center gap-1.5 truncate text-[#5C5C58] dark:text-[#A3A39E]">
+                    <span
+                      className="w-2.5 h-2.5 rounded-xs shrink-0"
+                      style={{backgroundColor: item.color}}
+                    />
+                    <span className="truncate">{item.category}</span>
+                  </span>
+                  <strong className="font-bold shrink-0">{toFaDigits(item.sharePercent)}٪</strong>
+                </div>
+              ))}
+            </div>
+
+            {execReport && execReport.passiveAffinities.topVenues.length > 0 && (
+              <div className="pt-2 border-t border-[#EFEFED] dark:border-[#242422] flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#6B6B66] dark:text-[#989892]">
+                <span className="font-bold text-[#111110] dark:text-[#F5F5F3]">علاقه‌مندی‌های خاموش برتر:</span>
+                {execReport.passiveAffinities.topVenues.slice(0, 3).map((v, idx) => (
+                  <span key={v.id}>
+                    {idx > 0 && '· '}
+                    {v.label} ({toFaDigits(v.passiveViews)} مشاهده)
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* CHART 4: SCROLL RATE FUNNEL & SECTION DWELL DEPTH */}
+        <section className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4 flex flex-col">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-0.5">
+              <h3 className="text-sm font-extrabold inline-flex items-center gap-1.5">
+                <ScrollText className="w-4 h-4 text-[#15803D] dark:text-[#4ADE80]" />
+                <span>
+                  {scrollPanelView === 'funnel'
+                    ? 'قیف نرخ اسکرول و عمق مطالعه دستورپخت'
+                    : 'زمان ماندگاری کاربران در بخش‌های اپلیکیشن'}
+                </span>
+              </h3>
+              <p className="text-xs text-[#6B6B66] dark:text-[#989892]">
+                {scrollPanelView === 'funnel'
+                  ? 'درصد نشست‌هایی که تا هر آستانه اسکرول (۲۵٪ تا ۱۰۰٪) پیشروی کرده‌اند'
+                  : 'مقایسه میانگین مکث (ثانیه) و نرخ عبور سریع در نواحی مختلف رابط کاربری'}
+              </p>
+            </div>
+
+            <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[#F4F3EF] dark:bg-[#1E1E1B]">
+              <button
+                type="button"
+                onClick={() => setScrollPanelView('funnel')}
+                className={`min-h-[32px] px-2.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors ${
+                  scrollPanelView === 'funnel'
+                    ? 'bg-[#FFFFFF] dark:bg-[#0D0D0D] text-[#111110] dark:text-[#FAFAFA] shadow-xs'
+                    : 'text-[#5C5C58] dark:text-[#A3A39E]'
+                }`}
+              >
+                نرخ اسکرول
+              </button>
+              <button
+                type="button"
+                onClick={() => setScrollPanelView('sections')}
+                className={`min-h-[32px] px-2.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors ${
+                  scrollPanelView === 'sections'
+                    ? 'bg-[#FFFFFF] dark:bg-[#0D0D0D] text-[#111110] dark:text-[#FAFAFA] shadow-xs'
+                    : 'text-[#5C5C58] dark:text-[#A3A39E]'
+                }`}
+              >
+                ماندگاری بخش‌ها
+              </button>
+            </div>
+          </div>
+
+          <div className="h-[260px] w-full flex-1" dir="ltr">
+            <ResponsiveContainer width="100%" height="100%">
+              {scrollPanelView === 'funnel' ? (
+                <BarChart
+                  data={chartsReport.scrollDepthDistribution}
+                  margin={{top: 10, right: 12, left: 0, bottom: 8}}
+                  barCategoryGap="28%"
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,120,0.18)" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{fontSize: 11, fill: '#73736D'}}
+                    axisLine={{stroke: 'rgba(128,128,120,0.22)'}}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    tick={{fontSize: 11, fill: '#73736D'}}
+                    tickFormatter={(v) => `${toFaDigits(Number(v))}٪`}
+                    axisLine={false}
+                    tickLine={false}
+                    width={42}
+                  />
+                  <Tooltip
+                    content={<AdvancedScrollTooltip />}
+                    cursor={{fill: 'rgba(21, 128, 61, 0.08)'}}
+                  />
+                  <Bar dataKey="reachPercent" radius={[6, 6, 0, 0]} maxBarSize={52}>
+                    {chartsReport.scrollDepthDistribution.map((entry) => (
+                      <Cell
+                        key={entry.depth}
+                        fill={entry.depth >= 75 ? '#15803D' : entry.depth >= 50 ? '#A97222' : '#C99649'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              ) : (
+                <BarChart
+                  data={(execReport?.attentionPhysics.sectionZones || []).slice(0, 6)}
+                  margin={{top: 10, right: 12, left: 0, bottom: 26}}
+                  barCategoryGap="26%"
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,120,0.18)" />
+                  <XAxis
+                    dataKey="sectionLabel"
+                    tick={{fontSize: 10, fill: '#73736D'}}
+                    interval={0}
+                    angle={-14}
+                    textAnchor="end"
+                    height={52}
+                    axisLine={{stroke: 'rgba(128,128,120,0.22)'}}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{fontSize: 11, fill: '#73736D'}}
+                    tickFormatter={(v) => `${toFaDigits(Number(v))}ث`}
+                    axisLine={false}
+                    tickLine={false}
+                    width={44}
+                  />
+                  <Tooltip
+                    content={<AdvancedScrollTooltip />}
+                    cursor={{fill: 'rgba(169, 114, 34, 0.08)'}}
+                  />
+                  <Bar dataKey="avgDwellSeconds" radius={[6, 6, 0, 0]} maxBarSize={44}>
+                    {(execReport?.attentionPhysics.sectionZones || []).slice(0, 6).map((z, idx) => (
+                      <Cell
+                        key={z.sectionKey}
+                        fill={idx === 0 ? '#B54B1F' : z.fastSkipPercent <= 30 ? '#15803D' : '#A97222'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              )}
+            </ResponsiveContainer>
+          </div>
+
+          <div className="pt-3 border-t border-[#EFEFED] dark:border-[#242422] flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#6B6B66] dark:text-[#989892] tabular-nums">
+            <span>
+              میانگین فاصله کلیک: <strong className="text-[#111110] dark:text-[#F5F5F3]">{toFaDigits((chartsReport.summary.avgClickIntervalMs / 1000).toFixed(1))} ثانیه</strong>
+            </span>
+            {execReport && (
+              <span>
+                پربازده‌ترین بخش توجه:{' '}
+                <strong className="text-[#15803D] dark:text-[#4ADE80]">
+                  {execReport.attentionPhysics.sectionZones[0]?.sectionLabel || 'صفحه دستورپخت'}
+                </strong>
+              </span>
+            )}
+          </div>
+        </section>
+      </div>
+
+      {/* HIGH-DENSITY SEARCHABLE & SORTABLE RECIPE BEHAVIORAL MATRIX */}
+      <section className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] overflow-hidden">
+        <div className="p-5 border-b border-[#E6E6E3] dark:border-[#282825] flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <h3 className="text-sm font-extrabold inline-flex items-center gap-1.5">
+              <Activity className="w-4 h-4 text-[#A97222] dark:text-[#D8A85B]" />
+              <span>ماتریس جامع شاخص‌های رفتاری دستورپخت‌ها</span>
+            </h3>
+            <p className="text-xs text-[#6B6B66] dark:text-[#989892]">
+              مقایسه دقیق بازدید، زمان ماندگاری، نرخ اسکرول و امتیاز محبوبیت در تمامی نشست‌های رصدشده
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-[#7A7A74] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={tableSearch}
+                onChange={(e) => setTableSearch(e.target.value)}
+                placeholder="جستجوی دستور یا دسته..."
+                className="min-h-[36px] w-48 sm:w-56 rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FAF9F7] dark:bg-[#10100F] pr-8 pl-3 text-xs"
+              />
+            </div>
+
+            <select
+              value={tableSort}
+              onChange={(e) => setTableSort(e.target.value as AdvancedTableSortKey)}
+              className="min-h-[36px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FAF9F7] dark:bg-[#10100F] px-2.5 text-xs font-semibold"
+            >
+              <option value="popularityScore">مرتب‌سازی: امتیاز محبوبیت</option>
+              <option value="avgDwellSeconds">مرتب‌سازی: زمان ماندگاری</option>
+              <option value="avgScrollDepthPercent">مرتب‌سازی: نرخ اسکرول</option>
+              <option value="views">مرتب‌سازی: تعداد بازدید</option>
+            </select>
+          </div>
+        </div>
+
+        {filteredTableRows.length === 0 ? (
+          <div className="p-8 text-center text-xs text-[#6B6B66] dark:text-[#989892]">
+            موردی منطبق با جستجوی شما یافت نشد.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead className="bg-[#F9F8F6] dark:bg-[#191917] text-[#6B6B66] dark:text-[#989892] border-b border-[#E6E6E3] dark:border-[#282825]">
+                <tr>
+                  <th className="py-3 px-4 font-semibold">دستورپخت و دسته</th>
+                  <th className="py-3 px-4 font-semibold text-left">بازدید</th>
+                  <th className="py-3 px-4 font-semibold text-left">میانگین ماندگاری</th>
+                  <th className="py-3 px-4 font-semibold text-left">نرخ اسکرول</th>
+                  <th className="py-3 px-4 font-semibold text-left">شروع پخت</th>
+                  <th className="py-3 px-4 font-semibold text-left">شاخص محبوبیت</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E6E6E3] dark:divide-[#282825] tabular-nums">
+                {filteredTableRows.map((row) => (
+                  <tr key={row.id} className="hover:bg-[#FAF9F7] dark:hover:bg-[#181816]">
+                    <td className="py-3 px-4">
+                      <div className="font-bold text-[#111110] dark:text-[#F5F5F3]">{row.title}</div>
+                      <div className="text-[11px] text-[#6B6B66] dark:text-[#989892]">
+                        {row.category} · {row.sourceLabel}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-left font-bold">{toFaDigits(row.views)}</td>
+                    <td className="py-3 px-4 text-left font-semibold">
+                      {formatAnalyticsDurationFa(row.avgDwellSeconds)}
+                    </td>
+                    <td className="py-3 px-4 text-left">
+                      <div className="inline-flex items-center gap-2 justify-end">
+                        <div className="w-16 h-1.5 rounded-full bg-[#EFEFED] dark:bg-[#262623] overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${Math.min(100, row.avgScrollDepthPercent)}%`,
+                              backgroundColor:
+                                row.avgScrollDepthPercent >= 75 ? '#15803D' : '#A97222',
+                            }}
+                          />
+                        </div>
+                        <span className="font-semibold">{toFaDigits(row.avgScrollDepthPercent)}٪</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-left font-semibold text-[#15803D] dark:text-[#4ADE80]">
+                      {toFaDigits(row.cookStarts)}
+                    </td>
+                    <td className="py-3 px-4 text-left font-extrabold text-[#B54B1F] dark:text-[#E29A6F]">
+                      {toFaDigits(row.popularityScore)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+

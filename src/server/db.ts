@@ -1895,6 +1895,24 @@ function seedV2Content(): void {
     );
   }
 
+  // Upgrade existing senior_admin and finance_manager rows to include finance.reports idempotently
+  for (const roleId of ['senior_admin', 'finance_manager']) {
+    const existingRole = db
+      .prepare('SELECT permissions_json FROM acl_roles WHERE id = ?')
+      .get(roleId) as {permissions_json: string} | undefined;
+    if (existingRole) {
+      const perms = JSON.parse(existingRole.permissions_json || '[]') as string[];
+      if (!perms.includes('finance.reports')) {
+        perms.push('finance.reports');
+        db.prepare('UPDATE acl_roles SET permissions_json = ?, updated_at = ? WHERE id = ?').run(
+          JSON.stringify(Array.from(new Set(perms))),
+          now,
+          roleId
+        );
+      }
+    }
+  }
+
   // Seed curated, non-intrusive Native Ad Units across all 4 formats (zero fake discount codes)
   const nativeAdCount = (db.prepare('SELECT COUNT(*) as c FROM native_ads').get() as {c: number}).c;
   if (nativeAdCount === 0) {
@@ -3141,5 +3159,67 @@ function seedV2Content(): void {
       }),
       now
     );
+  }
+
+  // Idempotent seed for Observer click-interval and per-recipe scroll depth samples
+  const clickIntervalCount = (
+    db.prepare("SELECT COUNT(*) as c FROM behavior_events WHERE event_type = 'click_interval'").get() as {
+      c: number;
+    }
+  ).c;
+
+  if (clickIntervalCount === 0) {
+    const recipesList = db
+      .prepare("SELECT id, title, category FROM recipes WHERE status = 'published' LIMIT 8")
+      .all() as {id: string; title: string; category: string}[];
+    const existingSessions = db
+      .prepare('SELECT id, subject_key, user_id, last_seen_at FROM behavior_sessions LIMIT 18')
+      .all() as {id: string; subject_key: string; user_id: string | null; last_seen_at: string}[];
+
+    const insertEv = db.prepare(`
+      INSERT OR IGNORE INTO behavior_events (
+        id, session_id, subject_key, user_id, event_type, section_name, target_type,
+        target_id, target_label, category, numeric_value, metadata_json, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?)
+    `);
+
+    const clickIntervalSamplesMs = [
+      2200, 4800, 6400, 8900, 14200, 3400, 18500, 7100, 36000, 5200, 11800, 2700, 22500, 6300, 9400, 41000,
+      5800, 13400,
+    ];
+    const scrollSamples = [100, 75, 100, 75, 100, 75, 50, 75, 100, 50, 75, 100, 75, 50, 25, 100, 75, 100];
+
+    existingSessions.forEach((sess, idx) => {
+      if (recipesList.length === 0) return;
+      const rec = recipesList[idx % recipesList.length];
+      insertEv.run(
+        `bev-ci-seed-${idx}`,
+        sess.id,
+        sess.subject_key,
+        sess.user_id,
+        'click_interval',
+        'recipe_detail',
+        'recipe',
+        rec.id,
+        rec.title,
+        rec.category,
+        clickIntervalSamplesMs[idx % clickIntervalSamplesMs.length],
+        sess.last_seen_at
+      );
+      insertEv.run(
+        `bev-rscr-seed-${idx}`,
+        sess.id,
+        sess.subject_key,
+        sess.user_id,
+        'scroll_depth',
+        'recipe_detail',
+        'recipe',
+        rec.id,
+        rec.title,
+        rec.category,
+        scrollSamples[idx % scrollSamples.length],
+        sess.last_seen_at
+      );
+    });
   }
 }

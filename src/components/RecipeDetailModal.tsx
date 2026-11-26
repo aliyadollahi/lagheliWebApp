@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {motion, useReducedMotion} from 'motion/react';
 import {
   ArrowLeftRight,
   BadgeCheck,
@@ -19,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
+import {behaviorTracker, useRecipeBehaviorObserver} from '../lib/behaviorTracker.ts';
 import {fileToCompressedDataUrl} from '../lib/imageUpload.ts';
 import {
   fetchRecipeDetail,
@@ -127,7 +129,34 @@ export function RecipeDetailModal({
   const [replyBody, setReplyBody] = useState('');
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const ingredientsSectionRef = useRef<HTMLDivElement | null>(null);
+  const stepsSectionRef = useRef<HTMLDivElement | null>(null);
   const prefetchedNextRef = useRef<boolean>(false);
+  const [readProgress, setReadProgress] = useState(0);
+  const [showMobileBar, setShowMobileBar] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
+
+  // Observer-pattern behavioral tracking (dwell time, scroll depth, inter-click intervals — strictly anonymized)
+  useRecipeBehaviorObserver({
+    recipeId,
+    recipeTitle: recipe?.title,
+    category: recipe?.category,
+    containerRef: scrollContainerRef,
+    enabled: Boolean(recipe && !loading),
+  });
+
+  useEffect(() => {
+    if (cookMode && recipe) {
+      behaviorTracker.trackEvent('recipe_cook_start', {
+        sectionName: 'cooking_mode',
+        targetType: 'recipe',
+        targetId: recipe.id,
+        targetLabel: recipe.title,
+        category: recipe.category,
+        numericValue: Math.max(60, (recipe.cookMinutes || 30) * 60),
+      });
+    }
+  }, [cookMode, recipe]);
 
   const applyDetailPayload = useCallback(
     (data: RecipeDetailPayload, resetInteractiveState: boolean) => {
@@ -190,8 +219,33 @@ export function RecipeDetailModal({
 
   useEffect(() => {
     prefetchedNextRef.current = false;
+    setReadProgress(0);
+    setShowMobileBar(false);
     loadDetail(recipeId);
   }, [recipeId, city, loadDetail]);
+
+  // Close modal with Escape key when Cook Mode is not open
+  useEffect(() => {
+    if (cookMode) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [cookMode, onClose]);
+
+  const scrollToSection = useCallback(
+    (ref: {current: HTMLDivElement | null}) => {
+      if (!ref.current) return;
+      ref.current.scrollIntoView({
+        behavior: prefersReducedMotion ? 'auto' : 'smooth',
+        block: 'start',
+      });
+    },
+    [prefersReducedMotion]
+  );
 
   // Prefetch variations of the current recipe once loaded (instant variation switching)
   useEffect(() => {
@@ -201,11 +255,16 @@ export function RecipeDetailModal({
     });
   }, [recipe, variations, city]);
 
-  // Prefetch upcoming adjacent recipes in the feed when user scrolls inside RecipeDetailModal
+  // Track reading progress, conditional mobile thumb-zone bar, and prefetch upcoming adjacent recipes
   const handleModalScroll = useCallback(() => {
-    if (prefetchedNextRef.current || adjacentRecipeIds.length === 0) return;
     const el = scrollContainerRef.current;
     if (!el) return;
+    const maxScroll = Math.max(1, el.scrollHeight - el.clientHeight);
+    const ratio = Math.min(1, Math.max(0, el.scrollTop / maxScroll));
+    setReadProgress(Math.round(ratio * 100));
+    setShowMobileBar(el.scrollTop > 320);
+
+    if (prefetchedNextRef.current || adjacentRecipeIds.length === 0) return;
     const progress = (el.scrollTop + el.clientHeight) / Math.max(1, el.scrollHeight);
     if (progress >= 0.35) {
       prefetchedNextRef.current = true;
@@ -560,51 +619,87 @@ export function RecipeDetailModal({
       className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] overflow-y-auto overscroll-contain"
     >
       <div className="min-h-screen flex items-start justify-center p-0 sm:p-6 lg:p-10">
-        <div className="w-full max-w-[1020px] bg-[#F6F6F5] dark:bg-[#0B0B0B] sm:bg-[#FFFFFF]/94 sm:dark:bg-[#0B0B0B]/92 sm:backdrop-blur-[14px] sm:rounded-[32px] sm:border sm:border-[#E6E6E3] sm:dark:border-[#282825] shadow-[0_32px_90px_-28px_rgba(17,17,16,0.38)] dark:shadow-[0_32px_90px_-28px_rgba(0,0,0,0.75)] overflow-hidden my-0 sm:my-4">
-          {/* Sticky Reading Bar */}
-          <div className="sticky top-0 z-20 flex items-center justify-between gap-3 px-4 sm:px-10 h-14 sm:h-16 bg-[#FFFFFF]/92 dark:bg-[#0B0B0B]/92 backdrop-blur-[12px] border-b border-[#E6E6E3] dark:border-[#242422]">
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-[42px] px-3 rounded-full text-sm font-semibold inline-flex items-center gap-1.5 hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07] transition-colors whitespace-nowrap shrink-0"
-            >
-              <X className="w-4 h-4" />
-              <span>بستن</span>
-            </button>
+        <div className="w-full max-w-[1020px] bg-[#F6F6F5] dark:bg-[#0B0B0B] sm:bg-[#FFFFFF]/94 sm:dark:bg-[#0B0B0B]/92 sm:backdrop-blur-[14px] sm:rounded-[32px] sm:border sm:border-[#E6E6E3] sm:dark:border-[#282825] shadow-[0_32px_90px_-28px_rgba(17,17,16,0.38)] dark:shadow-[0_32px_90px_-28px_rgba(0,0,0,0.75)] overflow-clip my-0 sm:my-4">
+          {/* Sticky Reading Bar + Reading Progress Hairline */}
+          <div className="sticky top-0 z-20 bg-[#FFFFFF]/94 dark:bg-[#0B0B0B]/94 backdrop-blur-[12px] border-b border-[#E6E6E3] dark:border-[#242422]">
+            <div className="flex items-center justify-between gap-2.5 px-4 sm:px-10 h-14 sm:h-16">
+              <button
+                type="button"
+                onClick={onClose}
+                className="min-h-[44px] px-3 rounded-full text-sm font-semibold inline-flex items-center gap-1.5 hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07] transition-colors whitespace-nowrap shrink-0"
+              >
+                <X className="w-4 h-4" />
+                <span>بستن</span>
+              </button>
 
-            {recipe && (
-              <span className="hidden md:block text-xs font-medium text-[#5C5C58] dark:text-[#A3A39E] truncate max-w-md">
-                {recipe.title}
-              </span>
-            )}
+              {recipe && !(recipe.isVip && !recipe.isUnlocked) ? (
+                <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection(ingredientsSectionRef)}
+                    className="min-h-[38px] px-2.5 sm:px-3 rounded-full text-xs font-medium text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA] hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07] transition-colors whitespace-nowrap"
+                  >
+                    مواد اولیه
+                  </button>
+                  <span aria-hidden="true" className="text-[#E6E6E3] dark:text-[#282825] select-none">
+                    ·
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection(stepsSectionRef)}
+                    className="min-h-[38px] px-2.5 sm:px-3 rounded-full text-xs font-medium text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA] hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07] transition-colors whitespace-nowrap"
+                  >
+                    مراحل پخت
+                  </button>
+                  <span className="hidden lg:inline text-[#E6E6E3] dark:text-[#282825] select-none">
+                    ·
+                  </span>
+                  <span className="hidden lg:block text-xs font-medium text-[#5C5C58] dark:text-[#A3A39E] truncate max-w-[220px]">
+                    {recipe.title}
+                  </span>
+                </div>
+              ) : recipe ? (
+                <span className="hidden md:block text-xs font-medium text-[#5C5C58] dark:text-[#A3A39E] truncate max-w-md">
+                  {recipe.title}
+                </span>
+              ) : null}
 
-            {recipe && (
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleShareText}
-                  aria-label="اشتراک‌گذاری دستور پخت"
-                  className="min-h-[42px] px-3 rounded-full text-sm inline-flex items-center justify-center gap-1.5 hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07] transition-colors whitespace-nowrap shrink-0"
-                >
-                  <Share2 className="w-4 h-4" />
-                  <span className="hidden sm:inline">اشتراک‌گذاری</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onToggleBookmark(recipe.id)}
-                  aria-label={isBookmarked ? 'حذف نشانک' : 'ذخیره در نشانک‌ها'}
-                  aria-pressed={isBookmarked}
-                  className={`min-h-[42px] px-3.5 rounded-full text-sm inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
-                    isBookmarked
-                      ? 'bg-[#B54B1F]/12 text-[#B54B1F] dark:text-[#E29A6F] font-medium'
-                      : 'hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07]'
-                  }`}
-                >
-                  <Bookmark className="w-4 h-4" fill={isBookmarked ? 'currentColor' : 'none'} />
-                  <span className="hidden sm:inline">{isBookmarked ? 'نشانک‌شده' : 'ذخیره'}</span>
-                </button>
-              </div>
-            )}
+              {recipe && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleShareText}
+                    aria-label="اشتراک‌گذاری دستور پخت"
+                    className="min-h-[44px] min-w-[44px] sm:min-w-0 sm:px-3 rounded-full text-sm inline-flex items-center justify-center gap-1.5 hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07] transition-colors whitespace-nowrap shrink-0"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    <span className="hidden sm:inline">اشتراک‌گذاری</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onToggleBookmark(recipe.id)}
+                    aria-label={isBookmarked ? 'حذف نشانک' : 'ذخیره در نشانک‌ها'}
+                    aria-pressed={isBookmarked}
+                    className={`min-h-[44px] min-w-[44px] sm:min-w-0 sm:px-3.5 rounded-full text-sm inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
+                      isBookmarked
+                        ? 'bg-[#A97222]/15 text-[#A97222] dark:bg-[#D8A85B]/15 dark:text-[#D8A85B] font-semibold'
+                        : 'hover:bg-[#111110]/[0.05] dark:hover:bg-white/[0.07]'
+                    }`}
+                  >
+                    <Bookmark className="w-4 h-4" fill={isBookmarked ? 'currentColor' : 'none'} />
+                    <span className="hidden sm:inline">{isBookmarked ? 'نشانک‌شده' : 'ذخیره'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 2px Compositor-Only Reading Progress Hairline */}
+            <div className="h-[2px] w-full bg-transparent overflow-hidden" aria-hidden="true">
+              <div
+                className="h-full w-full origin-right bg-gradient-to-l from-[#A97222] to-[#B54B1F] dark:from-[#D8A85B] dark:to-[#E29A6F] transition-transform duration-150 ease-out"
+                style={{transform: `scaleX(${readProgress / 100})`}}
+              />
+            </div>
           </div>
 
           {loading || !recipe ? (
@@ -794,7 +889,7 @@ export function RecipeDetailModal({
               ) : (
                 <div className="mx-2 sm:mx-6 lg:mx-8 grid grid-cols-1 lg:grid-cols-12 gap-14 lg:gap-14 xl:gap-16 items-start">
                   {/* Sticky Editorial Ingredients Ledger + Servings Scaler */}
-                  <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-6">
+                  <div ref={ingredientsSectionRef} className="lg:col-span-5 lg:sticky lg:top-24 scroll-mt-24 space-y-6">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between gap-3">
                         <div className="space-y-1">
@@ -848,9 +943,38 @@ export function RecipeDetailModal({
                       </div>
                     </div>
 
-                    <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] leading-[1.85]">
-                      موادی که در خانه دارید را تیک بزنید تا فقط کمبودها با یک کلیک به لیست خرید اضافه شوند.
-                    </p>
+                    {/* Interactive Ingredient Readiness Progress */}
+                    <div className="space-y-2 rounded-2xl bg-[#F6F6F5] dark:bg-[#151514] border border-[#111110]/[0.06] dark:border-white/[0.08] px-3.5 py-3">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="text-[#5C5C58] dark:text-[#A3A39E] font-medium">
+                          {haveSet.size === 0
+                            ? 'مواد موجود در خانه را تیک بزنید'
+                            : haveSet.size >= recipe.ingredients.length
+                              ? 'تمام مواد آماده پخت هستند'
+                              : 'آمادگی مواد اولیه'}
+                        </span>
+                        <span className="font-bold tabular-nums text-[#0D0D0D] dark:text-[#FAFAFA] whitespace-nowrap">
+                          {toFaDigits(haveSet.size)} از {toFaDigits(recipe.ingredients.length)} قلم
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-[#E6E6E3] dark:bg-[#242422] overflow-hidden">
+                        <motion.div
+                          className="h-full w-full origin-right rounded-full bg-gradient-to-l from-[#A97222] to-[#B54B1F] dark:from-[#D8A85B] dark:to-[#E29A6F]"
+                          initial={false}
+                          animate={{
+                            scaleX:
+                              recipe.ingredients.length > 0
+                                ? Math.min(1, haveSet.size / recipe.ingredients.length)
+                                : 0,
+                          }}
+                          transition={
+                            prefersReducedMotion
+                              ? {duration: 0}
+                              : {duration: 0.28, ease: [0.16, 1, 0.3, 1]}
+                          }
+                        />
+                      </div>
+                    </div>
 
                     <ul className="divide-y divide-[#111110]/[0.07] dark:divide-white/[0.08] border-y border-[#111110]/[0.07] dark:border-white/[0.08]">
                       {recipe.ingredients.map((ing: IngredientItem, idx: number) => {
@@ -982,7 +1106,7 @@ export function RecipeDetailModal({
                   </div>
 
                   {/* Spacious Editorial Cooking Narrative + Subsequent Magazine Chapters */}
-                  <div className="lg:col-span-7 space-y-16">
+                  <div ref={stepsSectionRef} className="lg:col-span-7 scroll-mt-24 space-y-16">
                     <div className="space-y-8">
                       <div className="flex items-end justify-between gap-4">
                         <div className="space-y-1">
@@ -1401,6 +1525,39 @@ export function RecipeDetailModal({
                 </div>
               )}
             </div>
+          )}
+
+          {/* Conditional Mobile Thumb-Zone Action Bar (<=15% Sticky Cap, Shown After Hero CTA Scrolled Past) */}
+          {showMobileBar && recipe && !(recipe.isVip && !recipe.isUnlocked) && (
+            <motion.div
+              initial={prefersReducedMotion ? false : {opacity: 0, y: 14}}
+              animate={{opacity: 1, y: 0}}
+              transition={prefersReducedMotion ? {duration: 0} : {duration: 0.2, ease: [0.16, 1, 0.3, 1]}}
+              className="lg:hidden sticky bottom-0 z-20 border-t border-[#E6E6E3] dark:border-[#242422] bg-[#FFFFFF]/95 dark:bg-[#0B0B0B]/95 backdrop-blur-[14px] px-4 py-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))]"
+            >
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setCookMode(true)}
+                  className="flex-1 min-h-[46px] px-4 rounded-full bg-[#111110] hover:bg-[#282825] dark:bg-[#FAFAFA] dark:hover:bg-[#E6E6E3] text-[#FFFFFF] dark:text-[#111110] text-xs font-bold inline-flex items-center justify-center gap-2 active:scale-[0.98] transition-transform whitespace-nowrap"
+                >
+                  <ChefHat className="w-4 h-4 shrink-0" />
+                  <span>شروع آشپزی</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddMissing}
+                  className="min-h-[46px] px-4 rounded-full border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#151514] text-[#0D0D0D] dark:text-[#FAFAFA] text-xs font-semibold inline-flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform whitespace-nowrap tabular-nums"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5 text-[#A97222] dark:text-[#D8A85B] shrink-0" />
+                  <span>
+                    {Math.max(0, recipe.ingredients.length - haveSet.size) > 0
+                      ? `کمبودها (${toFaDigits(Math.max(0, recipe.ingredients.length - haveSet.size))})`
+                      : 'همه آماده است'}
+                  </span>
+                </button>
+              </div>
+            </motion.div>
           )}
         </div>
       </div>

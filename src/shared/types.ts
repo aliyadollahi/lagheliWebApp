@@ -22,6 +22,7 @@ export type AdminPermission =
   | 'content.chefs'
   | 'ads.manage'
   | 'app.layout'
+  | 'finance.reports'
   | 'finance.wallets'
   | 'finance.pricing'
   | 'finance.partners'
@@ -31,6 +32,34 @@ export type AdminPermission =
   | 'users.manage'
   | 'rbac.manage'
   | 'ecosystem.manage';
+
+export type CoreRbacRoleId = 'editor' | 'finance_manager' | 'senior_admin';
+
+export type AdminAclSectionId = 'content' | 'advertising' | 'financial_reporting';
+
+export type AclAccessLevel = 'full' | 'read_only' | 'none';
+
+export type AclActionCapability = 'view' | 'create' | 'edit' | 'approve' | 'export' | 'delete';
+
+export interface AdminAclSectionPolicy {
+  sectionId: AdminAclSectionId;
+  title: string;
+  subtitle: string;
+  primaryPermissions: AdminPermission[];
+  readOnlyPermissions: AdminPermission[];
+  guardedRoutes: string[];
+}
+
+export interface RoleSectionAccessDecision {
+  sectionId: AdminAclSectionId;
+  sectionTitle: string;
+  accessLevel: AclAccessLevel;
+  accessLabel: string;
+  allowedActions: AclActionCapability[];
+  grantedPermissions: AdminPermission[];
+  totalSectionPermissions: number;
+  summary: string;
+}
 
 export interface DynamicRoleDefinition {
   id: string;
@@ -314,6 +343,7 @@ export type BehavioralEventType =
   | 'recipe_cook_start'
   | 'recipe_cook_complete'
   | 'scroll_depth'
+  | 'click_interval'
   | 'section_skip'
   | 'ad_impression'
   | 'ad_click'
@@ -323,6 +353,100 @@ export type BehavioralEventType =
   | 'chef_view'
   | 'fridge_search'
   | 'shopping_add';
+
+export interface AnonymizedRecipeBehaviorBucket {
+  recipeId: string;
+  recipeTitle: string;
+  category: string;
+  visitsCount: number;
+  totalDwellSeconds: number;
+  avgDwellSeconds: number;
+  maxScrollDepthPercent: number;
+  avgScrollDepthPercent: number;
+  totalClicks: number;
+  avgClickIntervalMs: number;
+  clickIntervalSamples: number;
+  hourlyVisits: Record<number, number>;
+  lastUpdatedAt: string;
+}
+
+export interface AnonymizedBehaviorAggregateStore {
+  schemaVersion: 1;
+  updatedAt: string;
+  totalObservedSessions: number;
+  totalRecipeObservations: number;
+  globalAvgDwellSeconds: number;
+  globalAvgScrollDepthPercent: number;
+  globalAvgClickIntervalMs: number;
+  hourlyVisitCounts: Record<number, number>;
+  recipes: Record<string, AnonymizedRecipeBehaviorBucket>;
+}
+
+export interface BehaviorObserverMetricEvent {
+  type: 'dwell' | 'scroll' | 'click_interval' | 'commit';
+  recipeId: string;
+  recipeTitle: string;
+  category: string;
+  dwellSeconds: number;
+  maxScrollDepthPercent: number;
+  clickCount: number;
+  lastClickIntervalMs: number | null;
+  avgClickIntervalMs: number;
+  observedAt: string;
+}
+
+export interface AdminBehavioralChartsReportPayload {
+  generatedAt: string;
+  summary: {
+    totalSessions: number;
+    totalRecipeViews: number;
+    avgRecipeDwellSeconds: number;
+    avgScrollDepthPercent: number;
+    avgClickIntervalMs: number;
+    peakHour: number;
+    peakHourLabel: string;
+    peakHourVisits: number;
+    peakWindowLabel: string;
+  };
+  recipePopularity: {
+    id: string;
+    title: string;
+    shortTitle: string;
+    category: string;
+    views: number;
+    avgDwellSeconds: number;
+    cookStarts: number;
+    avgScrollDepthPercent: number;
+    avgClickIntervalSec: number;
+    popularityScore: number;
+  }[];
+  categoryPopularity: {
+    category: string;
+    views: number;
+    avgDwellSeconds: number;
+    sharePercent: number;
+  }[];
+  peakHours: {
+    hour: number;
+    label: string;
+    visits: number;
+    avgDwellSeconds: number;
+    interactions: number;
+  }[];
+  scrollDepthDistribution: {
+    depth: number;
+    label: string;
+    sessionsCount: number;
+    reachPercent: number;
+  }[];
+  clickIntervalDistribution: {
+    bucketKey: string;
+    label: string;
+    description: string;
+    count: number;
+    sharePercent: number;
+  }[];
+}
 
 export interface BehavioralTelemetryEventInput {
   eventType: BehavioralEventType;
