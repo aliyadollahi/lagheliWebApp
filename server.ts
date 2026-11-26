@@ -6,10 +6,15 @@ import path from 'path';
 import {createServer as createViteServer} from 'vite';
 import {z} from 'zod';
 import {
+  DEFAULT_APP_SECTIONS,
   DEFAULT_ECOSYSTEM_CONFIG,
   GEM_STORE_OFFERS,
   db,
+  getAclRoles,
+  getActiveFlagshipSponsorship,
   getEcosystemConfig,
+  getLocalVenues,
+  getNativeAds,
   initDatabase,
 } from './src/server/db.ts';
 import {
@@ -22,6 +27,9 @@ import {
   getKitchenConfig,
   registerAdminExtrasRoutes,
 } from './src/server/adminExtrasRoutes.ts';
+import {registerAdMarketplaceRoutes} from './src/server/adMarketplaceRoutes.ts';
+import {registerBehavioralRoutes} from './src/server/behavioralRoutes.ts';
+import {DEFAULT_AD_HARMONY} from './src/shared/nativeAdEngine.ts';
 import {
   PANTRY_STAPLES,
   PARTNER_ROLES,
@@ -34,7 +42,15 @@ import {
   toEnDigits,
   validateIranMobile,
 } from './src/shared/persianEngine.ts';
+import {
+  getRoleLabel,
+  getRolePermissions,
+  hasAdminPermission,
+  normalizeAdminRole,
+} from './src/shared/rbac.ts';
 import type {
+  AdminPermission,
+  AdminRole,
   BadgeItem,
   ChefSummary,
   EcosystemConfig,
@@ -112,26 +128,61 @@ function getBearerToken(req: express.Request): string | null {
 interface SessionContext {
   userId: string;
   isAdmin: boolean;
+  adminRole: AdminRole | null;
+  actorName: string;
 }
 
 function getSession(req: express.Request): SessionContext | null {
   const token = getBearerToken(req);
   if (!token) return null;
   const row = db
-    .prepare('SELECT user_id, is_admin, expires_at FROM sessions WHERE token_hash = ?')
-    .get(hashToken(token)) as {user_id: string; is_admin: number; expires_at: number} | undefined;
+    .prepare('SELECT user_id, is_admin, session_role, expires_at FROM sessions WHERE token_hash = ?')
+    .get(hashToken(token)) as
+    | {user_id: string; is_admin: number; session_role: string | null; expires_at: number}
+    | undefined;
   if (!row || row.expires_at < Date.now()) {
     return null;
   }
-  return {userId: row.user_id, isAdmin: row.is_admin === 1};
+
+  const dynamicRoles = getAclRoles();
+
+  // Root passcode or test-role session (not tied to a regular user row)
+  if (row.user_id === 'admin-root' || row.user_id.startsWith('admin-test-')) {
+    const resolvedRole = normalizeAdminRole(row.session_role, dynamicRoles) || 'senior_admin';
+    const actorName =
+      row.user_id === 'admin-root'
+        ? 'مدیر ارشد سیستم'
+        : `نشست آزمایشی (${getRoleLabel(resolvedRole, dynamicRoles)})`;
+    return {
+      userId: row.user_id,
+      isAdmin: row.is_admin === 1,
+      adminRole: row.is_admin === 1 ? resolvedRole : null,
+      actorName,
+    };
+  }
+
+  // User-backed session: always resolve current role & suspension status live from DB
+  const user = db.prepare('SELECT name, role, is_suspended FROM users WHERE id = ?').get(row.user_id) as
+    | {name: string; role: string; is_suspended: number}
+    | undefined;
+  if (!user) return null;
+
+  const suspended = Number(user.is_suspended || 0) === 1;
+  const dbAdminRole = suspended ? null : normalizeAdminRole(user.role, dynamicRoles);
+  return {
+    userId: row.user_id,
+    isAdmin: dbAdminRole !== null,
+    adminRole: dbAdminRole,
+    actorName: user.name,
+  };
 }
 
-function createSession(userId: string, isAdmin = false): string {
+function createSession(userId: string, isAdmin = false, sessionRole: AdminRole | null = null): string {
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 7; // 7 days
   db.prepare(
-    'INSERT INTO sessions (token_hash, user_id, is_admin, expires_at, created_at) VALUES (?, ?, ?, ?, ?)'
-  ).run(hashToken(token), userId, isAdmin ? 1 : 0, expiresAt, new Date().toISOString());
+    'INSERT INTO sessions (token_hash, user_id, is_admin, session_role, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(hashToken(token), userId, isAdmin ? 1 : 0, sessionRole, expiresAt, new Date().toISOString());
   return token;
 }
 
@@ -297,11 +348,32 @@ app.get('/api/config', (_req, res) => {
   res.json({
     ecosystem: getEcosystemConfig(),
     partnerRoles: PARTNER_ROLES,
-    gemStoreOffers: getGemStoreOffers(GEM_STORE_OFFERS),
     kitchenConfig: getKitchenConfig(),
-    deliveryPricing: getDeliveryPricingConfig(),
+    nativeAds: getNativeAds(true),
+    flagshipSponsorship: getActiveFlagshipSponsorship(),
+    localVenues: getLocalVenues(true),
     quickTestLoginEnabled: isTestQuickLoginEnabled(),
   });
+});
+
+app.post('/api/native-ads/:id/event', (req, res) => {
+  const schema = z.object({type: z.enum(['impression', 'click'])});
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({error: 'نوع رویداد نامعتبر است.'});
+
+  const adId = String(req.params.id || '').slice(0, 64);
+  const ipKey = req.ip || 'anon';
+  const rateWindow = parsed.data.type === 'impression' ? 1000 * 60 : 1000 * 10;
+  if (!checkRateLimit(`nad:${parsed.data.type}:${ipKey}:${adId}`, 2, rateWindow)) {
+    return res.json({ok: true, deduplicated: true});
+  }
+
+  if (parsed.data.type === 'impression') {
+    db.prepare('UPDATE native_ads SET impressions = impressions + 1 WHERE id = ?').run(adId);
+  } else {
+    db.prepare('UPDATE native_ads SET clicks = clicks + 1 WHERE id = ?').run(adId);
+  }
+  res.json({ok: true});
 });
 
 // =========================================================================
@@ -552,9 +624,38 @@ app.post('/api/profile/verify-chef', (req, res) => {
 // =========================================================================
 // 3. RECIPES, FACETED SEARCH, BOOKMARKS, VARIATIONS, VIP & Q&A
 // =========================================================================
+function recordAnonymizedSearch(
+  ipKey: string,
+  rawQuery: string,
+  source: 'search' | 'fridge',
+  resultsCount: number
+): void {
+  const cleanedRaw = rawQuery.trim().slice(0, 80);
+  const norm = normalizePersian(cleanedRaw);
+  if (!norm || norm.length < 2) return;
+  // Prevent spam / typing-burst duplicates for the exact same query from same IP within 45s
+  if (!checkRateLimit(`slog:${ipKey}:${source}:${norm}`, 1, 1000 * 45)) return;
+  try {
+    db.prepare(
+      `INSERT INTO search_logs (id, query_raw, query_norm, source, results_count, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(
+      `slog-${crypto.randomUUID().slice(0, 8)}`,
+      cleanedRaw,
+      norm,
+      source,
+      Math.max(0, Math.round(resultsCount)),
+      new Date().toISOString()
+    );
+  } catch {
+    // Non-critical telemetry write must never break recipe search
+  }
+}
+
 app.get('/api/recipes', (req, res) => {
   const session = getSession(req);
-  const q = typeof req.query.q === 'string' ? normalizePersian(req.query.q) : '';
+  const rawQ = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  const q = rawQ ? normalizePersian(rawQ) : '';
   const categories = typeof req.query.categories === 'string' && req.query.categories ? req.query.categories.split(',') : [];
   const seasons = typeof req.query.seasons === 'string' && req.query.seasons ? req.query.seasons.split(',') : [];
   const regions = typeof req.query.regions === 'string' && req.query.regions ? req.query.regions.split(',') : [];
@@ -619,6 +720,10 @@ app.get('/api/recipes', (req, res) => {
     if (bookmarkedOnly && !rec.isBookmarked) return false;
     return true;
   });
+
+  if (rawQ && !includePending) {
+    recordAnonymizedSearch(String(req.ip || 'anon'), rawQ, 'search', recipes.length);
+  }
 
   res.json({recipes});
 });
@@ -1018,6 +1123,11 @@ app.post('/api/kitchen/fridge-match', (req, res) => {
     })
     .filter((m) => (parsed.data.exactOnly ? m.missingIngredients.length === 0 : m.matchPercent > 0))
     .sort((a, b) => b.matchPercent - a.matchPercent);
+
+  const ipKey = String(req.ip || 'anon');
+  for (const ing of parsed.data.ingredients.slice(0, 4)) {
+    recordAnonymizedSearch(ipKey, ing, 'fridge', matches.length);
+  }
 
   res.json({matches});
 });
@@ -1737,10 +1847,21 @@ function getStoredAdminHash(): string | null {
   return row?.password_hash ?? null;
 }
 
-function requireAdmin(req: express.Request, res: express.Response): SessionContext | null {
+function requireAdmin(
+  req: express.Request,
+  res: express.Response,
+  permission?: AdminPermission
+): SessionContext | null {
   const session = getSession(req);
-  if (!session || !session.isAdmin) {
-    res.status(403).json({error: 'دسترسی مدیریت تایید نشده است.'});
+  if (!session || !session.isAdmin || !session.adminRole) {
+    res.status(401).json({error: 'دسترسی سوپرپنل مدیریت تایید نشده است؛ لطفاً ابتدا وارد شوید.'});
+    return null;
+  }
+  const dynamicRoles = getAclRoles();
+  if (permission && !hasAdminPermission(session.adminRole, permission, dynamicRoles)) {
+    res.status(403).json({
+      error: `نقش «${getRoleLabel(session.adminRole, dynamicRoles)}» مجوز دسترسی به این بخش را ندارد.`,
+    });
     return null;
   }
   return session;
@@ -1750,10 +1871,16 @@ app.get('/api/admin/status', (req, res) => {
   const session = getSession(req);
   const envConfigured = isEnvAdminPasscodeSet();
   const dbConfigured = Boolean(getStoredAdminHash());
+  const dynamicRoles = getAclRoles();
+  const activeRole = session?.isAdmin ? session.adminRole : null;
   res.json({
     configured: envConfigured || dbConfigured,
-    authenticated: Boolean(session?.isAdmin),
+    authenticated: Boolean(activeRole),
     quickTestLoginEnabled: isTestQuickLoginEnabled(),
+    role: activeRole,
+    actorName: activeRole ? session?.actorName : null,
+    permissions: activeRole ? getRolePermissions(activeRole, dynamicRoles) : [],
+    roles: dynamicRoles,
   });
 });
 
@@ -1761,11 +1888,26 @@ app.post('/api/admin/quick-test-login', (req, res) => {
   if (!isTestQuickLoginEnabled()) {
     return res.status(403).json({error: 'ورود سریع مدیریت در محیط عملیاتی غیرفعال است.'});
   }
-  if (!checkRateLimit(`quick-admin:${req.ip}`, 20, 1000 * 60 * 5)) {
+  if (!checkRateLimit(`quick-admin:${req.ip}`, 30, 1000 * 60 * 5)) {
     return res.status(429).json({error: 'تعداد درخواست‌ها زیاد است؛ کمی صبر کنید.'});
   }
-  const adminToken = createSession('admin-root', true);
-  res.json({adminToken, testMode: true, message: 'ورود سریع آزمایشی به پنل مدیریت فعال شد.'});
+  const dynamicRoles = getAclRoles();
+  const roleSchema = z.object({
+    role: z.string().min(2).max(40).optional().default('senior_admin'),
+  });
+  const parsed = roleSchema.safeParse(req.body || {});
+  const requestedRole = parsed.success ? parsed.data.role : 'senior_admin';
+  const role: AdminRole = normalizeAdminRole(requestedRole, dynamicRoles) || 'senior_admin';
+  const roleLabel = getRoleLabel(role, dynamicRoles);
+  const adminToken = createSession(`admin-test-${role}`, true, role);
+  res.json({
+    adminToken,
+    role,
+    actorName: `نشست آزمایشی (${roleLabel})`,
+    permissions: getRolePermissions(role, dynamicRoles),
+    testMode: true,
+    message: `ورود سریع آزمایشی با نقش «${roleLabel}» فعال شد.`,
+  });
 });
 
 app.post('/api/admin/setup', (req, res) => {
@@ -1784,8 +1926,15 @@ app.post('/api/admin/setup', (req, res) => {
     return res.status(409).json({error: 'رمز مدیریت پیش‌تر ثبت شده است.'});
   }
 
-  const adminToken = createSession('admin-root', true);
-  res.status(201).json({adminToken, message: 'رمز مدیریت با موفقیت ثبت شد و وارد پنل شدید.'});
+  const dynamicRoles = getAclRoles();
+  const adminToken = createSession('admin-root', true, 'senior_admin');
+  res.status(201).json({
+    adminToken,
+    role: 'senior_admin',
+    actorName: 'مدیر ارشد سیستم',
+    permissions: getRolePermissions('senior_admin', dynamicRoles),
+    message: 'رمز مدیریت با موفقیت ثبت شد و با نقش مدیر ارشد وارد سوپرپنل شدید.',
+  });
 });
 
 app.post('/api/admin/login', (req, res) => {
@@ -1807,50 +1956,54 @@ app.post('/api/admin/login', (req, res) => {
   }
 
   if (!valid) return res.status(401).json({error: 'رمز عبور مدیریت نادرست است.'});
-  const adminToken = createSession('admin-root', true);
-  res.json({adminToken});
+  const dynamicRoles = getAclRoles();
+  const adminToken = createSession('admin-root', true, 'senior_admin');
+  res.json({
+    adminToken,
+    role: 'senior_admin',
+    actorName: 'مدیر ارشد سیستم',
+    permissions: getRolePermissions('senior_admin', dynamicRoles),
+  });
 });
 
 app.get('/api/admin/overview', (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  const session = requireAdmin(req, res, 'dashboard.view');
+  if (!session || !session.adminRole) return;
+  const dynamicRoles = getAclRoles();
+
+  const canPartners = hasAdminPermission(session.adminRole, 'finance.partners', dynamicRoles);
+  const canRecipes = hasAdminPermission(session.adminRole, 'content.recipes', dynamicRoles);
+  const canChefs = hasAdminPermission(session.adminRole, 'content.chefs', dynamicRoles);
 
   const config = getEcosystemConfig();
-  const pendingPartners = (
-    db.prepare("SELECT * FROM partners WHERE status = 'pending' OR claim_status = 'pending'").all() as Record<
-      string,
-      unknown
-    >[]
-  ).map((p) => mapPartnerRow(p));
-  const allPartners = (
-    db.prepare('SELECT * FROM partners ORDER BY created_at DESC').all() as Record<string, unknown>[]
-  ).map((p) => mapPartnerRow(p));
-  const pendingRecipes = (
-    db.prepare("SELECT * FROM recipes WHERE status = 'pending'").all() as Record<string, unknown>[]
-  ).map((r) => mapRecipeRow(r));
-  const pendingChefs = db
-    .prepare("SELECT id, name, phone, city, bio, specialty FROM users WHERE chef_verification_status = 'pending'")
-    .all();
-
-  const events = db.prepare('SELECT partner_id, event_type FROM partner_events').all() as {
-    partner_id: string;
-    event_type: string;
-  }[];
+  const pendingPartners = canPartners
+    ? (
+        db.prepare("SELECT * FROM partners WHERE status = 'pending' OR claim_status = 'pending'").all() as Record<
+          string,
+          unknown
+        >[]
+      ).map((p) => mapPartnerRow(p))
+    : [];
+  const allPartners = canPartners
+    ? (db.prepare('SELECT * FROM partners ORDER BY created_at DESC').all() as Record<string, unknown>[]).map((p) =>
+        mapPartnerRow(p)
+      )
+    : [];
+  const pendingRecipes = canRecipes
+    ? (db.prepare("SELECT * FROM recipes WHERE status = 'pending'").all() as Record<string, unknown>[]).map((r) =>
+        mapRecipeRow(r)
+      )
+    : [];
+  const pendingChefs = canChefs
+    ? db
+        .prepare("SELECT id, name, phone, city, bio, specialty FROM users WHERE chef_verification_status = 'pending'")
+        .all()
+    : [];
 
   const byPartnerMap = new Map<
     string,
     {partnerId: string; partnerName: string; impressions: number; profileOpens: number; couponCopies: number; affiliateClicks: number}
   >();
-
-  for (const p of allPartners) {
-    byPartnerMap.set(p.id, {
-      partnerId: p.id,
-      partnerName: p.name,
-      impressions: 0,
-      profileOpens: 0,
-      couponCopies: 0,
-      affiliateClicks: 0,
-    });
-  }
 
   let totalImpressions = 0;
   let totalProfileOpens = 0;
@@ -1858,22 +2011,40 @@ app.get('/api/admin/overview', (req, res) => {
   let totalGemRedeems = 0;
   let totalAffiliateClicks = 0;
 
-  for (const ev of events) {
-    const bucket = byPartnerMap.get(ev.partner_id);
-    if (ev.event_type === 'impression') {
-      totalImpressions++;
-      if (bucket) bucket.impressions++;
-    } else if (ev.event_type === 'profile_open') {
-      totalProfileOpens++;
-      if (bucket) bucket.profileOpens++;
-    } else if (ev.event_type === 'coupon_copy') {
-      totalCouponCopies++;
-      if (bucket) bucket.couponCopies++;
-    } else if (ev.event_type === 'gem_redeem') {
-      totalGemRedeems++;
-    } else if (ev.event_type === 'affiliate_click') {
-      totalAffiliateClicks++;
-      if (bucket) bucket.affiliateClicks++;
+  if (canPartners) {
+    const events = db.prepare('SELECT partner_id, event_type FROM partner_events').all() as {
+      partner_id: string;
+      event_type: string;
+    }[];
+
+    for (const p of allPartners) {
+      byPartnerMap.set(p.id, {
+        partnerId: p.id,
+        partnerName: p.name,
+        impressions: 0,
+        profileOpens: 0,
+        couponCopies: 0,
+        affiliateClicks: 0,
+      });
+    }
+
+    for (const ev of events) {
+      const bucket = byPartnerMap.get(ev.partner_id);
+      if (ev.event_type === 'impression') {
+        totalImpressions++;
+        if (bucket) bucket.impressions++;
+      } else if (ev.event_type === 'profile_open') {
+        totalProfileOpens++;
+        if (bucket) bucket.profileOpens++;
+      } else if (ev.event_type === 'coupon_copy') {
+        totalCouponCopies++;
+        if (bucket) bucket.couponCopies++;
+      } else if (ev.event_type === 'gem_redeem') {
+        totalGemRedeems++;
+      } else if (ev.event_type === 'affiliate_click') {
+        totalAffiliateClicks++;
+        if (bucket) bucket.affiliateClicks++;
+      }
     }
   }
 
@@ -1895,24 +2066,75 @@ app.get('/api/admin/overview', (req, res) => {
 });
 
 app.put('/api/admin/config', (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  const session = getSession(req);
+  const dynamicRoles = getAclRoles();
+  if (
+    !session?.isAdmin ||
+    !session.adminRole ||
+    (!hasAdminPermission(session.adminRole, 'app.layout', dynamicRoles) &&
+      !hasAdminPermission(session.adminRole, 'ecosystem.manage', dynamicRoles))
+  ) {
+    return res.status(403).json({error: 'مجوز ویرایش تنظیمات پویای اپلیکیشن را ندارید.'});
+  }
+
   const schema = z.object({
     marketplaceTabEnabled: z.boolean(),
     marketplaceTitle: z.string().min(2).max(40),
     exploreShowcaseEnabled: z.boolean(),
     recipeContextEnabled: z.boolean(),
-    shoppingDeliveryCardEnabled: z.boolean(),
+    shoppingDeliveryCardEnabled: z.boolean().optional().default(false),
     maxPartnerCardsPerRecipe: z.number().int().min(0).max(3),
     enabledPartnerRoles: z.array(z.string()),
     activeCampaignTitle: z.string().max(100),
+    appSections: z
+      .object({
+        heroEnabled: z.boolean(),
+        heroTitle: z.string().min(2).max(120),
+        heroSubtitle: z.string().max(240),
+        editorialNotice: z.string().max(180),
+        searchBarEnabled: z.boolean(),
+        quickCategoriesEnabled: z.boolean(),
+        kitchenTabEnabled: z.boolean(),
+        shoppingTabEnabled: z.boolean(),
+        submitRecipeEnabled: z.boolean(),
+        featuredCategories: z.array(z.string().min(1).max(40)).max(12),
+      })
+      .optional(),
+    adHarmony: z
+      .object({
+        adsEnabled: z.boolean(),
+        feedEditorialBannerEnabled: z.boolean(),
+        feedBannerEveryNRecipes: z.number().int().min(3).max(12),
+        inlineIngredientMentionEnabled: z.boolean(),
+        maxInlineMentionsPerRecipe: z.number().int().min(0).max(3),
+        toolAndSubMentionEnabled: z.boolean(),
+        fridgeCompanionAdEnabled: z.boolean(),
+        shoppingCompanionAdEnabled: z.boolean(),
+        nearbyVenuesEnabled: z.boolean().optional(),
+        flagshipSponsorEnabled: z.boolean().optional(),
+        disclosureLabel: z.string().min(2).max(40),
+      })
+      .optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({error: 'تنظیمات واردشده معتبر نیست.'});
 
+  const existing = getEcosystemConfig();
   const nextConfig: EcosystemConfig = {
     ...DEFAULT_ECOSYSTEM_CONFIG,
+    ...existing,
     ...parsed.data,
     enabledPartnerRoles: parsed.data.enabledPartnerRoles as PartnerRoleId[],
+    appSections: {
+      ...DEFAULT_APP_SECTIONS,
+      ...existing.appSections,
+      ...(parsed.data.appSections || {}),
+    },
+    adHarmony: {
+      ...DEFAULT_AD_HARMONY,
+      ...existing.adHarmony,
+      ...(parsed.data.adHarmony || {}),
+    },
   };
   db.prepare('INSERT OR REPLACE INTO app_config (key, value_json) VALUES (?, ?)').run(
     'ecosystem',
@@ -1922,7 +2144,7 @@ app.put('/api/admin/config', (req, res) => {
 });
 
 app.post('/api/admin/partners/:id/approve', (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!requireAdmin(req, res, 'finance.partners')) return;
   db.prepare("UPDATE partners SET status = 'approved', verified = 1, claim_status = 'verified' WHERE id = ?").run(
     req.params.id
   );
@@ -1930,14 +2152,32 @@ app.post('/api/admin/partners/:id/approve', (req, res) => {
 });
 
 app.post('/api/admin/recipes/:id/approve', (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  db.prepare("UPDATE recipes SET status = 'published' WHERE id = ?").run(req.params.id);
+  const session = requireAdmin(req, res, 'content.recipes');
+  if (!session) return;
+  const now = new Date().toISOString();
+  const runApprove = db.transaction(() => {
+    db.prepare("UPDATE recipes SET status = 'published' WHERE id = ?").run(req.params.id);
+    const latestDraft = db
+      .prepare("SELECT id FROM recipe_versions WHERE recipe_id = ? AND status = 'draft' ORDER BY version_number DESC LIMIT 1")
+      .get(req.params.id) as {id: string} | undefined;
+    if (latestDraft) {
+      db.prepare(
+        "UPDATE recipe_versions SET status = 'archived' WHERE recipe_id = ? AND status = 'published' AND id != ?"
+      ).run(req.params.id, latestDraft.id);
+      db.prepare(
+        `UPDATE recipe_versions
+         SET status = 'published', reviewed_by_id = ?, reviewed_by_name = ?, review_note = ?, reviewed_at = ?
+         WHERE id = ?`
+      ).run(session.userId, session.actorName, 'انتشار مستقیم از لیست دستورها', now, latestDraft.id);
+    }
+  });
+  runApprove();
   res.json({ok: true});
 });
 
 app.post('/api/admin/chefs/:id/approve', (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  db.prepare("UPDATE users SET is_verified_chef = 1, chef_verification_status = 'approved', role = 'chef' WHERE id = ?").run(
+  if (!requireAdmin(req, res, 'content.chefs')) return;
+  db.prepare("UPDATE users SET is_verified_chef = 1, chef_verification_status = 'approved', role = CASE WHEN role IN ('editor', 'finance_manager', 'senior_admin', 'admin') THEN role ELSE 'chef' END WHERE id = ?").run(
     req.params.id
   );
   res.json({ok: true});
@@ -1960,6 +2200,20 @@ registerAdminExtrasRoutes(app, {
   defaultGemOffers: GEM_STORE_OFFERS,
 });
 
+registerAdMarketplaceRoutes(app, {
+  requireAdmin,
+  isSafeUrl,
+  mapRecipeRow,
+  mapPartnerRow,
+  checkRateLimit,
+});
+
+registerBehavioralRoutes(app, {
+  getSession,
+  requireAdmin,
+  checkRateLimit,
+});
+
 // =========================================================================
 // TECHNICAL SEO ENDPOINTS (/robots.txt & DYNAMIC /sitemap.xml)
 // =========================================================================
@@ -1979,7 +2233,11 @@ app.get('/robots.txt', (req, res) => {
       'User-agent: *',
       'Allow: /',
       'Disallow: /api/',
+      'Disallow: /superadmin',
+      'Disallow: /?portal=superadmin',
       'Disallow: /?tab=admin',
+      'Disallow: /advertiser',
+      'Disallow: /?portal=advertiser',
       '',
       `Sitemap: ${baseUrl}/sitemap.xml`,
     ].join('\n')
@@ -1996,7 +2254,7 @@ app.get('/sitemap.xml', (req, res) => {
   const urls: string[] = [
     `<url><loc>${escapeXml(baseUrl)}/</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>`,
     `<url><loc>${escapeXml(baseUrl)}/?tab=kitchen</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`,
-    `<url><loc>${escapeXml(baseUrl)}/?tab=order</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>`,
+    `<url><loc>${escapeXml(baseUrl)}/?tab=shopping</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>`,
     `<url><loc>${escapeXml(baseUrl)}/?tab=marketplace</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>`,
   ];
 

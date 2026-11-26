@@ -2,6 +2,7 @@
 
 let userAuthToken: string | null = null;
 let adminAuthToken: string | null = null;
+let advertiserAuthToken: string | null = null;
 
 export function setUserToken(token: string | null): void {
   userAuthToken = token;
@@ -19,12 +20,24 @@ export function getAdminToken(): string | null {
   return adminAuthToken;
 }
 
+export function setAdvertiserToken(token: string | null): void {
+  advertiserAuthToken = token;
+}
+
+export function getAdvertiserToken(): string | null {
+  return advertiserAuthToken;
+}
+
 export async function apiRequest<T>(
   path: string,
-  options: RequestInit & {useAdmin?: boolean} = {}
+  options: RequestInit & {useAdmin?: boolean; useAdvertiser?: boolean} = {}
 ): Promise<T> {
-  const {useAdmin, headers, ...rest} = options;
-  const token = useAdmin ? adminAuthToken : userAuthToken;
+  const {useAdmin, useAdvertiser, headers, ...rest} = options;
+  const token = useAdvertiser
+    ? advertiserAuthToken
+    : useAdmin
+      ? adminAuthToken || userAuthToken
+      : userAuthToken;
   const mergedHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(headers as Record<string, string> | undefined),

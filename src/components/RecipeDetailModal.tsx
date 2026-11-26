@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ArrowLeftRight,
   BadgeCheck,
@@ -7,7 +7,6 @@ import {
   Check,
   ChefHat,
   Clock,
-  Copy,
   GitFork,
   Lock,
   MessageSquare,
@@ -35,8 +34,16 @@ import {
   formatQuantity,
   toFaDigits,
 } from '../shared/persianEngine.ts';
+import {
+  DEFAULT_AD_HARMONY,
+  matchContextualToolOrSubAd,
+  matchInlineIngredientAds,
+} from '../shared/nativeAdEngine.ts';
 import type {
+  EcosystemConfig,
   IngredientItem,
+  LocalVenueSuggestion,
+  NativeAdUnit,
   Partner,
   Recipe,
   RecipePhoto,
@@ -47,6 +54,8 @@ import type {
 import {CookModeOverlay} from './CookModeOverlay.tsx';
 import {EditorialImage} from './EditorialImage.tsx';
 import {RecipeDetailSkeleton} from './EditorialSkeletons.tsx';
+import {NativeAdSlot} from './NativeAdSlot.tsx';
+import {NearbyVenueCard} from './NearbyVenueCard.tsx';
 
 interface RecipeDetailModalProps {
   recipeId: string;
@@ -62,7 +71,10 @@ interface RecipeDetailModalProps {
   onOpenChef: (chefId: string) => void;
   onOpenPartner: (partner: Partner) => void;
   onOpenVariationSubmit: (parentRecipe: Recipe) => void;
-  onJumpToOrder: (dishId: string) => void;
+  ecosystemConfig?: EcosystemConfig;
+  nativeAds?: NativeAdUnit[];
+  localVenues?: LocalVenueSuggestion[];
+  partners?: Partner[];
   onRefreshUser: () => void;
   onRequireAuth: () => void;
   onNotify: (msg: string) => void;
@@ -80,7 +92,10 @@ export function RecipeDetailModal({
   onOpenChef,
   onOpenPartner,
   onOpenVariationSubmit,
-  onJumpToOrder,
+  ecosystemConfig,
+  nativeAds = [],
+  localVenues = [],
+  partners = [],
   onRefreshUser,
   onRequireAuth,
   onNotify,
@@ -496,6 +511,32 @@ export function RecipeDetailModal({
     }
   };
 
+  const adHarmony = ecosystemConfig?.adHarmony ?? DEFAULT_AD_HARMONY;
+  const allKnownPartners = useMemo(() => {
+    const map = new Map<string, Partner>();
+    [...partners, ...contextualPartners].forEach((p) => map.set(p.id, p));
+    return Array.from(map.values());
+  }, [partners, contextualPartners]);
+
+  const inlineAdByIndex = useMemo(() => {
+    const map = new Map<number, NativeAdUnit>();
+    if (!recipe) return map;
+    const matched = matchInlineIngredientAds(recipe.ingredients, nativeAds, adHarmony, recipe);
+    matched.forEach((m) => map.set(m.ingredientIndex, m.ad));
+    return map;
+  }, [recipe, nativeAds, adHarmony]);
+
+  const contextualToolAd = useMemo(() => {
+    if (!recipe) return null;
+    const terms = [
+      ...(recipe.tools || []),
+      recipe.category,
+      recipe.title,
+      ...(subIngredient ? [subIngredient] : []),
+    ];
+    return matchContextualToolOrSubAd(terms, nativeAds, adHarmony, recipe);
+  }, [recipe, subIngredient, nativeAds, adHarmony]);
+
   if (cookMode && recipe) {
     return (
       <CookModeOverlay
@@ -658,19 +699,6 @@ export function RecipeDetailModal({
                       </button>
                     )}
 
-                    {recipe.linkedMenuDishId && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onClose();
-                          onJumpToOrder(recipe.linkedMenuDishId!);
-                        }}
-                        className="w-full sm:w-auto justify-center min-h-[48px] px-5 sm:px-6 rounded-full border border-[#111110]/15 dark:border-white/15 bg-[#FFFFFF]/60 dark:bg-white/[0.04] hover:bg-[#EFEFED] dark:hover:bg-white/[0.08] text-sm font-medium inline-flex items-center transition-colors whitespace-nowrap"
-                      >
-                        حوصله پخت نداری؟ آماده سفارش بده
-                      </button>
-                    )}
-
                     <button
                       type="button"
                       onClick={handleShareText}
@@ -825,54 +853,65 @@ export function RecipeDetailModal({
                     </p>
 
                     <ul className="divide-y divide-[#111110]/[0.07] dark:divide-white/[0.08] border-y border-[#111110]/[0.07] dark:border-white/[0.08]">
-                      {recipe.ingredients.map((ing: IngredientItem) => {
+                      {recipe.ingredients.map((ing: IngredientItem, idx: number) => {
                         const checked = haveSet.has(ing.name);
+                        const inlineAd = inlineAdByIndex.get(idx);
                         return (
-                          <li key={ing.name} className="flex items-center justify-between gap-3 py-3.5">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setHaveSet((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(ing.name)) next.delete(ing.name);
-                                  else next.add(ing.name);
-                                  return next;
-                                })
-                              }
-                              className="flex-1 flex items-center gap-3 text-right min-h-[40px]"
-                            >
-                              <span
-                                className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
-                                  checked
-                                    ? 'bg-[#B54B1F] border-[#B54B1F] text-white dark:bg-[#E29A6F] dark:border-[#E29A6F] dark:text-[#0B0B0B]'
-                                    : 'border-[#5C5C58]/35'
-                                }`}
-                              >
-                                {checked && <Check className="w-3.5 h-3.5" />}
-                              </span>
-                              <span
-                                className={`text-sm leading-relaxed ${
-                                  checked ? 'line-through opacity-45' : 'text-[#0D0D0D] dark:text-[#FAFAFA]'
-                                }`}
-                              >
-                                {ing.name}
-                              </span>
-                            </button>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-xs font-semibold text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
-                                {formatQuantity(ing.amount * scale)} {ing.unit}
-                              </span>
+                          <li key={ing.name} className="py-3.5">
+                            <div className="flex items-center justify-between gap-3">
                               <button
                                 type="button"
-                                aria-label={`یافتن جایگزین برای ${ing.name}`}
-                                title="یافتن جایگزین"
-                                onClick={() => handleFindSubstitute(ing.name)}
-                                className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-full text-[#5C5C58] hover:text-[#111110] hover:bg-[#EFEFED] dark:hover:text-[#FAFAFA] dark:hover:bg-[#20201E] transition-colors"
+                                onClick={() =>
+                                  setHaveSet((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(ing.name)) next.delete(ing.name);
+                                    else next.add(ing.name);
+                                    return next;
+                                  })
+                                }
+                                className="flex-1 flex items-center gap-3 text-right min-h-[40px]"
                               >
-                                <ArrowLeftRight className="w-3.5 h-3.5" />
+                                <span
+                                  className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+                                    checked
+                                      ? 'bg-[#B54B1F] border-[#B54B1F] text-white dark:bg-[#E29A6F] dark:border-[#E29A6F] dark:text-[#0B0B0B]'
+                                      : 'border-[#5C5C58]/35'
+                                  }`}
+                                >
+                                  {checked && <Check className="w-3.5 h-3.5" />}
+                                </span>
+                                <span
+                                  className={`text-sm leading-relaxed ${
+                                    checked ? 'line-through opacity-45' : 'text-[#0D0D0D] dark:text-[#FAFAFA]'
+                                  }`}
+                                >
+                                  {ing.name}
+                                </span>
                               </button>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-xs font-semibold text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
+                                  {formatQuantity(ing.amount * scale)} {ing.unit}
+                                </span>
+                                <button
+                                  type="button"
+                                  aria-label={`یافتن جایگزین برای ${ing.name}`}
+                                  title="یافتن جایگزین"
+                                  onClick={() => handleFindSubstitute(ing.name)}
+                                  className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-full text-[#5C5C58] hover:text-[#111110] hover:bg-[#EFEFED] dark:hover:text-[#FAFAFA] dark:hover:bg-[#20201E] transition-colors"
+                                >
+                                  <ArrowLeftRight className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
+                            {inlineAd && (
+                              <NativeAdSlot
+                                ad={inlineAd}
+                                disclosureLabel={adHarmony.disclosureLabel}
+                                partners={allKnownPartners}
+                                onOpenPartner={onOpenPartner}
+                              />
+                            )}
                           </li>
                         );
                       })}
@@ -1005,11 +1044,38 @@ export function RecipeDetailModal({
                       </ol>
                     </div>
 
-                    {/* Quiet Contextual Partner Suggestion (Strictly capped by Admin Panel) */}
+                    {/* Calm Contextual Tool / Technique Brand Recommendation (Max 1 per Recipe) */}
+                    {contextualToolAd && (
+                      <div className="border-t border-[#111110]/[0.07] dark:border-white/[0.08] pt-8">
+                        <NativeAdSlot
+                          ad={contextualToolAd}
+                          disclosureLabel={adHarmony.disclosureLabel}
+                          partners={allKnownPartners}
+                          onOpenPartner={onOpenPartner}
+                        />
+                      </div>
+                    )}
+
+                    {/* Location-Matched Nearby Restaurants, Cafes & Fast-Foods ("حوصله پختش رو نداری؟") */}
+                    {adHarmony.adsEnabled && adHarmony.nearbyVenuesEnabled !== false && localVenues.length > 0 && (
+                      <div className="border-t border-[#111110]/[0.07] dark:border-white/[0.08] pt-8">
+                        <NearbyVenueCard
+                          recipe={recipe}
+                          venues={localVenues}
+                          defaultCity={user?.city || city || 'تهران'}
+                          defaultNeighborhood={user?.neighborhood || ''}
+                          partners={allKnownPartners}
+                          onOpenPartner={onOpenPartner}
+                          onNotify={onNotify}
+                        />
+                      </div>
+                    )}
+
+                    {/* Quiet Contextual Partner Suggestion (Zero Hollow Coupons) */}
                     {contextualPartners.length > 0 && (
                       <div className="space-y-4 border-t border-[#111110]/[0.07] dark:border-white/[0.08] pt-10">
                         <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
-                          تامین مواد و تجهیزات مرتبط با این دستور
+                          برندهای همکار مرتبط با این دستور
                         </p>
                         {contextualPartners.map((partner) => (
                           <div
@@ -1027,34 +1093,17 @@ export function RecipeDetailModal({
                               >
                                 {partner.name}
                               </button>
-                              {partner.promoLabel && (
-                                <p className="text-xs text-[#B54B1F] dark:text-[#E29A6F]">{partner.promoLabel}</p>
-                              )}
+                              <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] line-clamp-1">
+                                {partner.description}
+                              </p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              {partner.promoCode && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(partner.promoCode!).catch(() => {});
-                                    apiRequest(`/api/partners/${partner.id}/events`, {
-                                      method: 'POST',
-                                      body: JSON.stringify({eventType: 'coupon_copy'}),
-                                    }).catch(() => {});
-                                    onNotify(`کد تخفیف ${partner.promoCode} کپی شد.`);
-                                  }}
-                                  className="min-h-[44px] px-3.5 rounded-xl border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium inline-flex items-center gap-1.5"
-                                >
-                                  <Copy className="w-3.5 h-3.5" />
-                                  <span dir="ltr">{partner.promoCode}</span>
-                                </button>
-                              )}
                               <button
                                 type="button"
                                 onClick={() => onOpenPartner(partner)}
                                 className="min-h-[44px] px-4 rounded-xl bg-[#EFEFED] dark:bg-[#20201E] text-xs font-medium"
                               >
-                                مشاهده صفحه
+                                مشاهده صفحه برند
                               </button>
                             </div>
                           </div>

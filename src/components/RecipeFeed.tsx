@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {Fragment, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {AnimatePresence, motion} from 'motion/react';
 import {
   ArrowUpLeft,
@@ -7,7 +7,6 @@ import {
   Camera,
   Clock,
   Coins,
-  Copy,
   Flame,
   Lock,
   Search,
@@ -18,13 +17,14 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import {apiRequest} from '../lib/api.ts';
 import {prefetchNextRecipes, prefetchRecipeDetail} from '../lib/recipePrefetch.ts';
 import {shareRecipeWithWebShare} from '../lib/webShare.ts';
+import {DEFAULT_AD_HARMONY, selectSmartFeedNativeAds} from '../shared/nativeAdEngine.ts';
 import {PARTNER_ROLE_LABELS, estimateRecipeCost, formatToman, toFaDigits} from '../shared/persianEngine.ts';
-import type {EcosystemConfig, Partner, Recipe, SponsorCampaign} from '../shared/types.ts';
+import type {EcosystemConfig, NativeAdUnit, Partner, Recipe} from '../shared/types.ts';
 import {EditorialImage} from './EditorialImage.tsx';
 import {RecipeFeedSkeleton} from './EditorialSkeletons.tsx';
+import {NativeAdSlot} from './NativeAdSlot.tsx';
 import {ScrollTastePrompt, type QuickFlyoutFocus} from './ScrollTastePrompt.tsx';
 
 export interface RecipeFilterState {
@@ -51,11 +51,10 @@ interface RecipeFeedProps {
   onOpenRecipe: (recipe: Recipe) => void;
   onOpenChef: (chefId: string) => void;
   onQuickAddShopping: (recipe: Recipe) => void;
-  onJumpToOrder: (dishId?: string | null) => void;
   onJumpToKitchen?: () => void;
   ecosystemConfig: EcosystemConfig;
   showcasePartners: Partner[];
-  activeCampaigns?: SponsorCampaign[];
+  nativeAds?: NativeAdUnit[];
   onOpenPartner: (partner: Partner) => void;
   onNotify: (msg: string) => void;
 }
@@ -296,11 +295,10 @@ export function RecipeFeed({
   onOpenRecipe,
   onOpenChef,
   onQuickAddShopping,
-  onJumpToOrder,
   onJumpToKitchen,
   ecosystemConfig,
   showcasePartners,
-  activeCampaigns = [],
+  nativeAds = [],
   onOpenPartner,
   onNotify,
 }: RecipeFeedProps) {
@@ -443,12 +441,43 @@ export function RecipeFeed({
     return () => observer.disconnect();
   }, [gridRecipes, city]);
 
-  const exploreCampaign = activeCampaigns.find((c) => c.placement === 'explore_showcase');
+  const appSections = ecosystemConfig.appSections;
+  const adHarmony = ecosystemConfig.adHarmony ?? DEFAULT_AD_HARMONY;
+  const heroEnabled = appSections?.heroEnabled !== false;
+  const searchBarEnabled = appSections?.searchBarEnabled !== false;
+  const quickCategoriesEnabled = appSections?.quickCategoriesEnabled !== false;
+
+  const quickCategories = useMemo(() => {
+    const custom = appSections?.featuredCategories?.filter((c) => c.trim().length > 0) || [];
+    if (custom.length === 0) return QUICK_CATEGORIES;
+    return custom.includes('همه') ? custom : ['همه', ...custom];
+  }, [appSections?.featuredCategories]);
+
+  const feedStoryAdMap = useMemo(
+    () =>
+      selectSmartFeedNativeAds(
+        gridRecipes,
+        nativeAds,
+        [...filters.categories, ...filters.diets, ...filters.regions, filters.q],
+        adHarmony
+      ),
+    [gridRecipes, nativeAds, filters.categories, filters.diets, filters.regions, filters.q, adHarmony]
+  );
 
   return (
     <div className="space-y-10 sm:space-y-14">
+      {/* Optional Dynamic Editorial Notice Controlled from Super Admin Panel */}
+      {appSections?.editorialNotice && appSections.editorialNotice.trim().length > 0 && (
+        <div
+          role="note"
+          className="rounded-2xl border border-[#E6E6E3] dark:border-[#262624] bg-[#FFFFFF] dark:bg-[#141413] px-4 py-3 text-xs sm:text-sm text-[#3F3F3B] dark:text-[#D1D1CC] flex items-center justify-between gap-3"
+        >
+          <p className="leading-relaxed">{appSections.editorialNotice}</p>
+        </div>
+      )}
+
       {/* Full-Bleed Dramatic Glassmorphic Editor's Pick Cover */}
-      {heroRecipe && isCleanHome && (
+      {heroEnabled && heroRecipe && isCleanHome && (
         <motion.section
           aria-label="انتخاب سردبیر"
           initial={{opacity: 0, y: 10}}
@@ -460,10 +489,16 @@ export function RecipeFeed({
           <div className="hidden md:flex flex-wrap items-center justify-between gap-3 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
             <div className="flex items-center gap-2.5">
               <span className="font-semibold text-[#0D0D0D] dark:text-[#FAFAFA]">
-                آرشیو مرجع آشپزی لاقلی
+                {appSections?.heroTitle || 'آرشیو مرجع آشپزی لاقلی'}
               </span>
               <span aria-hidden="true">·</span>
               <span className="tabular-nums">{toFaDigits(recipes.length)} دستور پخت فعال</span>
+              {appSections?.heroSubtitle && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="truncate max-w-md">{appSections.heroSubtitle}</span>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-4">
               {photoLessCount > 0 && (
@@ -476,7 +511,7 @@ export function RecipeFeed({
                   <span>{toFaDigits(photoLessCount)} دستور در انتظار عکس واقعی (+۴۰ جِم)</span>
                 </button>
               )}
-              {onJumpToKitchen && (
+              {onJumpToKitchen && appSections?.kitchenTabEnabled !== false && (
                 <button
                   type="button"
                   onClick={onJumpToKitchen}
@@ -645,20 +680,6 @@ export function RecipeFeed({
                       <span className="hidden sm:inline">مشاهده دستور و شروع آشپزی</span>
                       <ArrowUpLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 group-hover:-translate-x-0.5 group-hover:-translate-y-0.5" />
                     </button>
-
-                    {heroRecipe.linkedMenuDishId && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onJumpToOrder(heroRecipe.linkedMenuDishId);
-                        }}
-                        className="min-h-[40px] sm:min-h-[46px] px-3.5 sm:px-5 rounded-full bg-white/14 hover:bg-white/24 active:scale-[0.98] text-white border border-white/24 backdrop-blur-md text-xs sm:text-sm font-semibold transition-all whitespace-nowrap"
-                      >
-                        <span className="sm:hidden">سفارش آماده</span>
-                        <span className="hidden sm:inline">سفارش آماده امروز</span>
-                      </button>
-                    )}
                   </div>
 
                   <button
@@ -682,7 +703,9 @@ export function RecipeFeed({
       )}
 
       {/* Calm Search & Structured Category Filter Bar */}
+      {(searchBarEnabled || quickCategoriesEnabled) && (
       <section aria-label="جست‌وجو و فیلتر دستورها" className="space-y-4">
+        {searchBarEnabled && (
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-[#5C5C58] dark:text-[#A3A39E] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -713,10 +736,12 @@ export function RecipeFeed({
             )}
           </button>
         </div>
+        )}
 
         {/* Interactive Category Segmented Bar + Community Photo Contribution Filter */}
+        {quickCategoriesEnabled && (
         <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {QUICK_CATEGORIES.map((cat) => {
+          {quickCategories.map((cat) => {
             const isAll = cat === 'همه';
             const active = isAll
               ? filters.categories.length === 0 && !filters.needsPhotoOnly
@@ -755,6 +780,7 @@ export function RecipeFeed({
             </button>
           )}
         </div>
+        )}
 
         {/* Expandable Faceted OR/AND Filter Drawer */}
         {showAdvanced && (
@@ -898,6 +924,7 @@ export function RecipeFeed({
           </div>
         )}
       </section>
+      )}
 
       {/* Minimalist Editorial Recipe Cards Grid */}
       <section ref={feedSectionRef} aria-label="فهرست دستورهای پخت" className="space-y-6 scroll-mt-24">
@@ -1000,9 +1027,10 @@ export function RecipeFeed({
                 recipe.estimatedCost ?? estimateRecipeCost(recipe.ingredients, recipe.servings);
               const timeBreakdown = `زمان پخت تقریبی: ${toFaDigits(totalTime)} دقیقه (آماده‌سازی ${toFaDigits(recipe.prepMinutes)} + پخت ${toFaDigits(recipe.cookMinutes)} دقیقه)`;
               const costBreakdown = `سطح اقتصادی: ${estimatedCost.tier} — برآورد میانگین مواد اولیه حدود ${formatToman(estimatedCost.perServingToman)} تومان برای هر پرس (مجموع ${formatToman(estimatedCost.totalToman)} تومان)`;
+              const storyAd = feedStoryAdMap.get(idx);
               return (
+                <Fragment key={recipe.id}>
                 <article
-                  key={recipe.id}
                   data-prefetch-id={recipe.id}
                   data-prefetch-index={idx}
                   onClick={() => onOpenRecipe(recipe)}
@@ -1141,76 +1169,32 @@ export function RecipeFeed({
                     </div>
                   </div>
                 </article>
+                {storyAd && (
+                  <NativeAdSlot
+                    ad={storyAd}
+                    disclosureLabel={adHarmony.disclosureLabel}
+                    partners={showcasePartners}
+                    onOpenPartner={onOpenPartner}
+                  />
+                )}
+                </Fragment>
               );
             })}
           </div>
         )}
       </section>
 
-      {/* Quiet Editorial Sponsor Campaign Slot (Controlled by Admin Sponsors Manager) */}
-      {ecosystemConfig.exploreShowcaseEnabled && exploreCampaign && (
-        <section
-          aria-label="کمپین اسپانسر منتخب"
-          className="rounded-3xl border border-[#E6E6E3] dark:border-[#282825] bg-gradient-to-l from-[#FFFFFF] via-[#F6F6F5] to-[#EFEFED] dark:from-[#151514] dark:via-[#151514] dark:to-[#0B0B0B] p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6"
-        >
-          <div className="space-y-2 max-w-2xl">
-            <div className="flex items-center gap-2 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
-              <span>پیشنهاد اسپانسر منتخب</span>
-              <span aria-hidden="true">·</span>
-              <span className="font-semibold text-[#B54B1F] dark:text-[#E29A6F]">{exploreCampaign.partnerName}</span>
-            </div>
-            <h3 className="text-xl font-bold text-[#0D0D0D] dark:text-[#FAFAFA]">{exploreCampaign.title}</h3>
-            {exploreCampaign.subtitle && (
-              <p className="text-sm text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">{exploreCampaign.subtitle}</p>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            {exploreCampaign.promoCode && (
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(exploreCampaign.promoCode!).catch(() => {});
-                  apiRequest(`/api/campaigns/${exploreCampaign.id}/event`, {
-                    method: 'POST',
-                    body: JSON.stringify({eventType: 'click'}),
-                  }).catch(() => {});
-                  onNotify(`کد تخفیف ${exploreCampaign.promoCode} کپی شد.`);
-                }}
-                className="min-h-[46px] px-4 rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] text-xs font-mono font-bold inline-flex items-center gap-1.5"
-              >
-                <Copy className="w-3.5 h-3.5" />
-                <span dir="ltr">{exploreCampaign.promoCode}</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                apiRequest(`/api/campaigns/${exploreCampaign.id}/event`, {
-                  method: 'POST',
-                  body: JSON.stringify({eventType: 'click'}),
-                }).catch(() => {});
-                const partner = showcasePartners.find((p) => p.id === exploreCampaign.partnerId);
-                if (partner) onOpenPartner(partner);
-              }}
-              className="min-h-[46px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] text-xs font-medium"
-            >
-              {exploreCampaign.ctaLabel}
-            </button>
-          </div>
-        </section>
-      )}
-
-      {/* Quiet Admin-Controlled Partner Showcase */}
+      {/* Quiet Editorial Partner Showcase (Zero Hollow Discounts) */}
       {ecosystemConfig.exploreShowcaseEnabled && showcasePartners.length > 0 && (
         <section
-          aria-label="همکاران منتخب صنعت غذا"
+          aria-label="برندهای همکار منتخب آشپزخانه"
           className="border-t border-[#E6E6E3] dark:border-[#282825] pt-10 space-y-5"
         >
           <div className="flex items-baseline justify-between gap-4">
             <div>
-              <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">اکوسیستم اصناف لاقلی</p>
+              <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">اکوسیستم برندهای همکار لاقلی</p>
               <h2 className="text-lg font-bold mt-0.5">
-                {ecosystemConfig.activeCampaignTitle || 'همکاران منتخب آشپزخانه'}
+                {ecosystemConfig.activeCampaignTitle || 'برندها و تولیدکنندگان منتخب آشپزخانه'}
               </h2>
             </div>
           </div>
@@ -1236,11 +1220,9 @@ export function RecipeFeed({
                 <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] line-clamp-2 leading-relaxed">
                   {partner.description}
                 </p>
-                {partner.promoLabel && (
-                  <p className="text-xs font-medium text-[#B54B1F] dark:text-[#E29A6F] pt-1">
-                    {partner.promoLabel}
-                  </p>
-                )}
+                <p className="text-xs font-medium text-[#B54B1F] dark:text-[#E29A6F] pt-1">
+                  مشاهده صفحه برند
+                </p>
               </button>
             ))}
           </div>

@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {BadgeCheck, Building2, Copy, ExternalLink, MapPin, Phone, Plus, Search, ShieldCheck, X} from 'lucide-react';
+import {BadgeCheck, Building2, ExternalLink, MapPin, Phone, Plus, Search, ShieldCheck, X} from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
 import {PARTNER_ROLES, PARTNER_ROLE_LABELS, formatToman, toFaDigits} from '../shared/persianEngine.ts';
 import type {EcosystemConfig, Partner, PartnerRoleId, UserProfile} from '../shared/types.ts';
@@ -153,8 +153,8 @@ export function MarketplaceView({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#E6E6E3] dark:border-[#282825] pb-6">
         <div className="space-y-1">
-          <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">اکوسیستم معرفی اصناف صنعت غذا و آشپزی</p>
-          <h1 className="text-2xl sm:text-3xl font-bold">{ecosystemConfig.marketplaceTitle || 'بازارچه و اصناف'}</h1>
+          <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">معرفی برندها، تولیدکنندگان و تجهیزات منتخب آشپزخانه ایرانی</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">{ecosystemConfig.marketplaceTitle || 'برندهای همکار'}</h1>
         </div>
         <button
           type="button"
@@ -162,7 +162,7 @@ export function MarketplaceView({
           className="min-h-[46px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-[#FAFAFA] text-sm font-medium inline-flex items-center justify-center gap-2 self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
-          <span>ثبت کسب‌وکار یا برند</span>
+          <span>معرفی برند یا کسب‌وکار</span>
         </button>
       </div>
 
@@ -267,7 +267,7 @@ export function MarketplaceView({
 
               <div className="pt-3 border-t border-[#E6E6E3]/70 dark:border-[#282825] flex items-center justify-between text-xs">
                 <span className="text-[#B54B1F] dark:text-[#E29A6F] font-medium truncate">
-                  {partner.promoLabel || 'مشاهده صفحه و کاتالوگ'}
+                  مشاهده صفحه برند و کاتالوگ
                 </span>
                 {partner.claimStatus === 'unclaimed' && (
                   <span className="text-[#A97222] shrink-0">قابل ثبت مالکیت</span>
@@ -327,32 +327,14 @@ export function MarketplaceView({
                     : 'bg-[#B54B1F] text-[#FAFAFA] dark:bg-[#E29A6F] dark:text-[#0B0B0B]'
                 }`}
               >
-                {selectedPartner.isFollowing ? 'دنبال می‌کنید' : 'دنبال کردن کسب‌وکار'} ({toFaDigits(selectedPartner.followersCount)})
+                {selectedPartner.isFollowing ? 'دنبال می‌کنید' : 'دنبال کردن برند'} ({toFaDigits(selectedPartner.followersCount)})
               </button>
-
-              {selectedPartner.promoCode && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(selectedPartner.promoCode!).catch(() => {});
-                    trackEvent(selectedPartner.id, 'coupon_copy');
-                    onNotify(`کد تخفیف ${selectedPartner.promoCode} کپی شد.`);
-                  }}
-                  className="min-h-[44px] px-4 rounded-xl border border-[#E6E6E3] dark:border-[#282825] text-xs font-medium inline-flex items-center gap-2"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>کپی کد تخفیف:</span>
-                  <span dir="ltr" className="font-mono font-bold">
-                    {selectedPartner.promoCode}
-                  </span>
-                </button>
-              )}
             </div>
 
             {/* Catalog */}
             {selectedPartner.catalog.length > 0 && (
               <div className="space-y-3 border-t border-[#E6E6E3] dark:border-[#282825] pt-5">
-                <h3 className="text-base font-bold">ویترین محصولات و خدمات</h3>
+                <h3 className="text-base font-bold">معرفی محصولات و خدمات</h3>
                 <div className="space-y-3">
                   {selectedPartner.catalog.map((item) => (
                     <div
@@ -363,7 +345,6 @@ export function MarketplaceView({
                         <div className="text-sm font-semibold">{item.title}</div>
                         <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E] tabular-nums mt-0.5">
                           {formatToman(item.price)}
-                          {item.discountPercent ? ` · ${toFaDigits(item.discountPercent)}٪ تخفیف لاقلی` : ''}
                         </div>
                       </div>
                       <button
@@ -540,31 +521,17 @@ export function MarketplaceView({
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs text-[#5C5C58] dark:text-[#A3A39E] block">سطح همکاری برند</label>
               <select
                 value={regForm.tier}
                 onChange={(e) => setRegForm({...regForm, tier: e.target.value as 'free' | 'featured' | 'sponsor'})}
-                className="min-h-[46px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
+                className="w-full min-h-[46px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
               >
-                <option value="free">بسته لیست رایگان</option>
-                <option value="featured">بسته برگزیده</option>
-                <option value="sponsor">اسپانسر رسمی دسته</option>
+                <option value="free">حضور استاندارد در فهرست برندها</option>
+                <option value="featured">برند برگزیده در ویترین آشپزی</option>
+                <option value="sponsor">حامی رسمی دسته‌بندی و محتوای بومی</option>
               </select>
-              <input
-                type="text"
-                dir="ltr"
-                placeholder="کد تخفیف (اختیاری)"
-                value={regForm.promoCode}
-                onChange={(e) => setRegForm({...regForm, promoCode: e.target.value})}
-                className="min-h-[46px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-left text-sm"
-              />
-              <input
-                type="text"
-                placeholder="عنوان تخفیف"
-                value={regForm.promoLabel}
-                onChange={(e) => setRegForm({...regForm, promoLabel: e.target.value})}
-                className="min-h-[46px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-sm"
-              />
             </div>
 
             <button

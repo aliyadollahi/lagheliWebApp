@@ -3,17 +3,31 @@ import type express from 'express';
 import fs from 'fs';
 import path from 'path';
 import {z} from 'zod';
-import {db} from './db.ts';
+import {db, getAclRoles, getNativeAds, mapNativeAdRow} from './db.ts';
+import {
+  buildAdminEditorialInsights,
+  type RawSearchLogRow,
+  type RecipeEngagementSignals,
+} from '../shared/editorialInsightsEngine.ts';
 import {normalizePersian} from '../shared/persianEngine.ts';
+import {ALL_ADMIN_PERMISSIONS} from '../shared/rbac.ts';
 import type {
   AdminDashboardStats,
+  AdminPermission,
+  AdminRole,
   AdminUserRow,
   CampaignPlacement,
   Partner,
   PartnerRoleId,
+  PendingRecipeDraftItem,
+  RbacAuditLog,
   Recipe,
   RecipePhoto,
+  RecipeVersion,
+  RecipeVersionSnapshot,
+  RecipeVersionStatus,
   SponsorCampaign,
+  UserRole,
   WalletTransaction,
 } from '../shared/types.ts';
 
@@ -23,11 +37,17 @@ const MAX_UPLOAD_BYTES = 3 * 1024 * 1024; // 3 MB
 export interface SessionContext {
   userId: string;
   isAdmin: boolean;
+  adminRole: AdminRole | null;
+  actorName: string;
 }
 
 export interface RouteDeps {
   getSession: (req: express.Request) => SessionContext | null;
-  requireAdmin: (req: express.Request, res: express.Response) => SessionContext | null;
+  requireAdmin: (
+    req: express.Request,
+    res: express.Response,
+    permission?: AdminPermission
+  ) => SessionContext | null;
   isSafeUrl: (url: string | undefined) => boolean;
   mapRecipeRow: (row: Record<string, unknown>, viewerId?: string) => Recipe;
   mapPartnerRow: (row: Record<string, unknown>, viewerId?: string) => Partner;
@@ -122,6 +142,129 @@ function mapCampaignRow(row: Record<string, unknown>): SponsorCampaign {
   };
 }
 
+function parseJsonSafe<T>(raw: unknown, fallback: T): T {
+  if (typeof raw !== 'string' || !raw.trim()) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function snapshotFromRecipeRow(row: Record<string, unknown>): RecipeVersionSnapshot {
+  const nutrition = parseJsonSafe(row.nutrition_json, {
+    calories: 420,
+    protein: 18,
+    carbs: 45,
+    fat: 14,
+    fiber: 5,
+  });
+  return {
+    title: String(row.title || ''),
+    subtitle: String(row.subtitle || ''),
+    description: String(row.description || ''),
+    imageUrl: String(row.image_url || ''),
+    category: String(row.category || 'ناهار و شام'),
+    region: String(row.region || 'سراسری'),
+    season: String(row.season || 'چهارفصل'),
+    mealType: String(row.meal_type || 'ناهار'),
+    dietTags: parseJsonSafe<string[]>(row.diet_tags_json, ['سنتی']),
+    prepMinutes: Number(row.prep_minutes || 20),
+    cookMinutes: Number(row.cook_minutes || 40),
+    servings: Number(row.servings || 4),
+    difficulty: (row.difficulty === 'آسان' || row.difficulty === 'حرفه‌ای'
+      ? row.difficulty
+      : 'متوسط') as RecipeVersionSnapshot['difficulty'],
+    nutrition,
+    isVip: Number(row.is_vip || 0) === 1,
+    vipGemCost: Number(row.vip_gem_cost || 0),
+    ingredients: parseJsonSafe(row.ingredients_json, []),
+    steps: parseJsonSafe(row.steps_json, []),
+    tools: parseJsonSafe<string[]>(row.tools_json, []),
+  };
+}
+
+function mapVersionRow(row: Record<string, unknown>): RecipeVersion {
+  const emptySnapshot: RecipeVersionSnapshot = {
+    title: '',
+    subtitle: '',
+    description: '',
+    imageUrl: '',
+    category: 'ناهار و شام',
+    region: 'سراسری',
+    season: 'چهارفصل',
+    mealType: 'ناهار',
+    dietTags: [],
+    prepMinutes: 20,
+    cookMinutes: 40,
+    servings: 4,
+    difficulty: 'متوسط',
+    nutrition: {calories: 420, protein: 18, carbs: 45, fat: 14, fiber: 5},
+    isVip: false,
+    vipGemCost: 0,
+    ingredients: [],
+    steps: [],
+    tools: [],
+  };
+  return {
+    id: String(row.id),
+    recipeId: String(row.recipe_id),
+    versionNumber: Number(row.version_number || 1),
+    status: row.status as RecipeVersionStatus,
+    changeSummary: String(row.change_summary || ''),
+    snapshot: parseJsonSafe<RecipeVersionSnapshot>(row.snapshot_json, emptySnapshot),
+    createdById: String(row.created_by_id || 'system'),
+    createdByName: String(row.created_by_name || 'تحریریه لاقلی'),
+    reviewedById: row.reviewed_by_id ? String(row.reviewed_by_id) : null,
+    reviewedByName: row.reviewed_by_name ? String(row.reviewed_by_name) : null,
+    reviewNote: String(row.review_note || ''),
+    createdAt: String(row.created_at),
+    reviewedAt: row.reviewed_at ? String(row.reviewed_at) : null,
+  };
+}
+
+function ensureBaselineVersion(recipeRow: Record<string, unknown>): void {
+  const recipeId = String(recipeRow.id);
+  const existingCount = (
+    db.prepare('SELECT COUNT(*) as c FROM recipe_versions WHERE recipe_id = ?').get(recipeId) as {c: number}
+  ).c;
+  if (existingCount > 0) return;
+
+  const authorRow = db
+    .prepare('SELECT name FROM users WHERE id = ?')
+    .get(String(recipeRow.author_id || '')) as {name: string} | undefined;
+  const authorName = authorRow?.name || 'تحریریه لاقلی';
+  const isPublished = String(recipeRow.status) === 'published';
+  const createdAt = String(recipeRow.created_at || new Date().toISOString());
+
+  db.prepare(
+    `INSERT INTO recipe_versions (
+      id, recipe_id, version_number, status, change_summary, snapshot_json,
+      created_by_id, created_by_name, reviewed_by_id, reviewed_by_name, review_note, created_at, reviewed_at
+    ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    `ver-${crypto.randomUUID().slice(0, 8)}`,
+    recipeId,
+    isPublished ? 'published' : 'draft',
+    isPublished ? 'نسخه پایه منتشرشده' : 'نسخه اولیه در انتظار تایید',
+    JSON.stringify(snapshotFromRecipeRow(recipeRow)),
+    String(recipeRow.author_id || 'system'),
+    authorName,
+    isPublished ? 'system' : null,
+    isPublished ? 'انتشار اولیه' : null,
+    '',
+    createdAt,
+    isPublished ? createdAt : null
+  );
+}
+
+function getNextVersionNumber(recipeId: string): number {
+  const row = db
+    .prepare('SELECT COALESCE(MAX(version_number), 0) as max_ver FROM recipe_versions WHERE recipe_id = ?')
+    .get(recipeId) as {max_ver: number};
+  return Number(row.max_ver || 0) + 1;
+}
+
 const adminRecipePayloadSchema = z.object({
   title: z.string().min(2).max(140),
   subtitle: z.string().max(220).optional().default(''),
@@ -145,6 +288,7 @@ const adminRecipePayloadSchema = z.object({
   isVip: z.boolean().optional().default(false),
   vipGemCost: z.number().int().min(0).max(5000).optional().default(0),
   status: z.enum(['published', 'pending']).optional().default('published'),
+  changeSummary: z.string().max(240).optional().default(''),
   ingredients: z
     .array(
       z.object({
@@ -307,7 +451,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   // ADMIN STATS OVERVIEW
   // =========================================================================
   app.get('/api/admin/stats', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'dashboard.view')) return;
 
     const totalRecipes = (db.prepare('SELECT COUNT(*) as c FROM recipes').get() as {c: number}).c;
     const recipesWithoutPhoto = (
@@ -315,6 +459,9 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
     ).c;
     const pendingRecipesCount = (
       db.prepare("SELECT COUNT(*) as c FROM recipes WHERE status = 'pending'").get() as {c: number}
+    ).c;
+    const pendingDraftVersionsCount = (
+      db.prepare("SELECT COUNT(*) as c FROM recipe_versions WHERE status = 'draft'").get() as {c: number}
     ).c;
     const pendingPhotosCount = (
       db.prepare("SELECT COUNT(*) as c FROM recipe_photos WHERE status = 'pending'").get() as {c: number}
@@ -347,6 +494,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
       totalRecipes,
       recipesWithoutPhoto,
       pendingRecipesCount,
+      pendingDraftVersionsCount,
       pendingPhotosCount,
       approvedPhotosCount,
       totalUsers,
@@ -362,18 +510,146 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   });
 
   // =========================================================================
+  // ADMIN SMART EDITORIAL RECOMMENDATIONS (SEARCH TRENDS × ATTENTION SIGNALS)
+  // =========================================================================
+  app.get('/api/admin/editorial-insights', (req, res) => {
+    if (!requireAdmin(req, res, 'content.recipes')) return;
+
+    const rawDays = Number(req.query.days);
+    const days = Number.isFinite(rawDays) && rawDays >= 1 && rawDays <= 90 ? Math.round(rawDays) : 30;
+    const cutoffIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+    const recipeRows = db.prepare('SELECT * FROM recipes ORDER BY created_at DESC').all() as Record<string, unknown>[];
+    const versionAggRows = db
+      .prepare(
+        `SELECT recipe_id,
+                MAX(version_number) AS max_version,
+                SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) AS pending_drafts
+         FROM recipe_versions
+         GROUP BY recipe_id`
+      )
+      .all() as {recipe_id: string; max_version: number; pending_drafts: number}[];
+    const versionMap = new Map(versionAggRows.map((v) => [v.recipe_id, v]));
+
+    const recipes = recipeRows.map((r) => {
+      const mapped = mapRecipeRow(r);
+      const agg = versionMap.get(mapped.id);
+      return {
+        ...mapped,
+        latestVersionNumber: agg ? Number(agg.max_version || 1) : 1,
+        pendingDraftsCount: agg ? Number(agg.pending_drafts || 0) : 0,
+      };
+    });
+
+    const bookmarkAgg = db
+      .prepare('SELECT recipe_id, COUNT(*) AS cnt FROM bookmarks GROUP BY recipe_id')
+      .all() as {recipe_id: string; cnt: number}[];
+    const questionAgg = db
+      .prepare(
+        `SELECT recipe_id,
+                COUNT(*) AS total_q,
+                SUM(CASE WHEN solved = 0 THEN 1 ELSE 0 END) AS unsolved_q
+         FROM recipe_questions
+         GROUP BY recipe_id`
+      )
+      .all() as {recipe_id: string; total_q: number; unsolved_q: number}[];
+    const pendingPhotoAgg = db
+      .prepare("SELECT recipe_id, COUNT(*) AS cnt FROM recipe_photos WHERE status = 'pending' GROUP BY recipe_id")
+      .all() as {recipe_id: string; cnt: number}[];
+
+    const signalsByRecipe = new Map<string, RecipeEngagementSignals>();
+    const ensureSignal = (recipeId: string): RecipeEngagementSignals => {
+      let existing = signalsByRecipe.get(recipeId);
+      if (!existing) {
+        existing = {
+          bookmarksCount: 0,
+          questionsCount: 0,
+          unsolvedQuestionsCount: 0,
+          pendingPhotosCount: 0,
+          pendingDraftsCount: 0,
+        };
+        signalsByRecipe.set(recipeId, existing);
+      }
+      return existing;
+    };
+
+    for (const r of recipes) {
+      ensureSignal(r.id).pendingDraftsCount = r.pendingDraftsCount || 0;
+    }
+    for (const b of bookmarkAgg) {
+      ensureSignal(b.recipe_id).bookmarksCount = Number(b.cnt || 0);
+    }
+    for (const q of questionAgg) {
+      const s = ensureSignal(q.recipe_id);
+      s.questionsCount = Number(q.total_q || 0);
+      s.unsolvedQuestionsCount = Number(q.unsolved_q || 0);
+    }
+    for (const p of pendingPhotoAgg) {
+      ensureSignal(p.recipe_id).pendingPhotosCount = Number(p.cnt || 0);
+    }
+
+    const rawLogRows = db
+      .prepare(
+        `SELECT query_raw, query_norm, source, results_count, created_at
+         FROM search_logs
+         WHERE created_at >= ?
+         ORDER BY created_at DESC
+         LIMIT 5000`
+      )
+      .all(cutoffIso) as {
+      query_raw: string;
+      query_norm: string;
+      source: string;
+      results_count: number;
+      created_at: string;
+    }[];
+
+    const searchLogs: RawSearchLogRow[] = rawLogRows.map((row) => ({
+      queryRaw: row.query_raw,
+      queryNorm: row.query_norm,
+      source: row.source === 'fridge' ? 'fridge' : 'search',
+      resultsCount: Number(row.results_count || 0),
+      createdAt: row.created_at,
+    }));
+
+    const report = buildAdminEditorialInsights(recipes, searchLogs, signalsByRecipe);
+    res.json({report});
+  });
+
+  // =========================================================================
   // ADMIN RECIPES CMS + BULK IMPORT (FOR THOUSANDS OF PHOTO-LESS RECIPES)
   // =========================================================================
   app.get('/api/admin/recipes', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'content.recipes')) return;
     const q = typeof req.query.q === 'string' ? normalizePersian(req.query.q) : '';
     const statusFilter = typeof req.query.status === 'string' ? req.query.status : 'all';
     const photoFilter = typeof req.query.photo === 'string' ? req.query.photo : 'all';
 
+    const versionAggRows = db
+      .prepare(
+        `SELECT recipe_id,
+                MAX(version_number) AS max_version,
+                SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) AS pending_drafts
+         FROM recipe_versions
+         GROUP BY recipe_id`
+      )
+      .all() as {recipe_id: string; max_version: number; pending_drafts: number}[];
+    const versionMap = new Map(versionAggRows.map((v) => [v.recipe_id, v]));
+
     const rows = db.prepare('SELECT * FROM recipes ORDER BY created_at DESC').all() as Record<string, unknown>[];
-    let recipes = rows.map((r) => mapRecipeRow(r));
+    let recipes = rows.map((r) => {
+      const mapped = mapRecipeRow(r);
+      const agg = versionMap.get(mapped.id);
+      return {
+        ...mapped,
+        latestVersionNumber: agg ? Number(agg.max_version || 1) : 1,
+        pendingDraftsCount: agg ? Number(agg.pending_drafts || 0) : 0,
+      };
+    });
     if (statusFilter === 'published' || statusFilter === 'pending') {
       recipes = recipes.filter((r) => r.status === statusFilter);
+    } else if (statusFilter === 'has_draft') {
+      recipes = recipes.filter((r) => (r.pendingDraftsCount || 0) > 0 || r.status === 'pending');
     }
     if (photoFilter === 'without') {
       recipes = recipes.filter((r) => !r.imageUrl || r.imageUrl.trim().length === 0);
@@ -390,7 +666,8 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   });
 
   app.post('/api/admin/recipes', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    const session = requireAdmin(req, res, 'content.recipes');
+    if (!session) return;
     const parsed = adminRecipePayloadSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({error: 'اطلاعات دستور پخت کامل نیست (حداقل عنوان، ۱ ماده اولیه و ۱ مرحله لازم است).'});
@@ -409,52 +686,99 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
     const id = `rec-${crypto.randomUUID().slice(0, 8)}`;
     const slug = `lagheli-${Date.now()}-${crypto.randomBytes(2).toString('hex')}`;
     const now = new Date().toISOString();
+    const nutrition = {
+      calories: d.calories,
+      protein: d.protein,
+      carbs: d.carbs,
+      fat: d.fat,
+      fiber: d.fiber,
+    };
+    const snapshot: RecipeVersionSnapshot = {
+      title: d.title.trim(),
+      subtitle: d.subtitle.trim() || `${d.category} · ${d.region}`,
+      description: d.description.trim() || d.subtitle.trim() || d.title.trim(),
+      imageUrl: finalImageUrl,
+      category: d.category,
+      region: d.region,
+      season: d.season,
+      mealType: d.mealType,
+      dietTags: d.dietTags,
+      prepMinutes: d.prepMinutes,
+      cookMinutes: d.cookMinutes,
+      servings: d.servings,
+      difficulty: d.difficulty,
+      nutrition,
+      isVip: d.isVip,
+      vipGemCost: d.isVip ? d.vipGemCost : 0,
+      ingredients: d.ingredients,
+      steps: d.steps,
+      tools: d.tools,
+    };
 
-    db.prepare(
-      `INSERT INTO recipes (
-        id, slug, title, subtitle, description, image_url, category, region, season, meal_type,
-        diet_tags_json, prep_minutes, cook_minutes, servings, difficulty, nutrition_json,
-        is_vip, vip_gem_cost, parent_recipe_id, variation_note, author_id, status,
-        ingredients_json, steps_json, tools_json, linked_menu_dish_id, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 'chef-mahsa', ?, ?, ?, ?, NULL, ?)`
-    ).run(
-      id,
-      slug,
-      d.title.trim(),
-      d.subtitle.trim() || `${d.category} · ${d.region}`,
-      d.description.trim() || d.subtitle.trim() || d.title.trim(),
-      finalImageUrl,
-      d.category,
-      d.region,
-      d.season,
-      d.mealType,
-      JSON.stringify(d.dietTags),
-      d.prepMinutes,
-      d.cookMinutes,
-      d.servings,
-      d.difficulty,
-      JSON.stringify({
-        calories: d.calories,
-        protein: d.protein,
-        carbs: d.carbs,
-        fat: d.fat,
-        fiber: d.fiber,
-      }),
-      d.isVip ? 1 : 0,
-      d.isVip ? d.vipGemCost : 0,
-      d.status,
-      JSON.stringify(d.ingredients),
-      JSON.stringify(d.steps),
-      JSON.stringify(d.tools),
-      now
-    );
+    const runCreate = db.transaction(() => {
+      db.prepare(
+        `INSERT INTO recipes (
+          id, slug, title, subtitle, description, image_url, category, region, season, meal_type,
+          diet_tags_json, prep_minutes, cook_minutes, servings, difficulty, nutrition_json,
+          is_vip, vip_gem_cost, parent_recipe_id, variation_note, author_id, status,
+          ingredients_json, steps_json, tools_json, linked_menu_dish_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 'chef-mahsa', ?, ?, ?, ?, NULL, ?)`
+      ).run(
+        id,
+        slug,
+        snapshot.title,
+        snapshot.subtitle,
+        snapshot.description,
+        snapshot.imageUrl,
+        snapshot.category,
+        snapshot.region,
+        snapshot.season,
+        snapshot.mealType,
+        JSON.stringify(snapshot.dietTags),
+        snapshot.prepMinutes,
+        snapshot.cookMinutes,
+        snapshot.servings,
+        snapshot.difficulty,
+        JSON.stringify(snapshot.nutrition),
+        snapshot.isVip ? 1 : 0,
+        snapshot.vipGemCost,
+        d.status,
+        JSON.stringify(snapshot.ingredients),
+        JSON.stringify(snapshot.steps),
+        JSON.stringify(snapshot.tools),
+        now
+      );
+
+      const isPublished = d.status === 'published';
+      db.prepare(
+        `INSERT INTO recipe_versions (
+          id, recipe_id, version_number, status, change_summary, snapshot_json,
+          created_by_id, created_by_name, reviewed_by_id, reviewed_by_name, review_note, created_at, reviewed_at
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        `ver-${crypto.randomUUID().slice(0, 8)}`,
+        id,
+        isPublished ? 'published' : 'draft',
+        d.changeSummary.trim() || (isPublished ? 'ایجاد و انتشار نسخه اولیه' : 'ایجاد پیش‌نویس اولیه برای بررسی'),
+        JSON.stringify(snapshot),
+        session.userId,
+        session.actorName,
+        isPublished ? session.userId : null,
+        isPublished ? session.actorName : null,
+        '',
+        now,
+        isPublished ? now : null
+      );
+    });
+    runCreate();
 
     const row = db.prepare('SELECT * FROM recipes WHERE id = ?').get(id) as Record<string, unknown>;
-    res.status(201).json({recipe: mapRecipeRow(row)});
+    res.status(201).json({recipe: {...mapRecipeRow(row), latestVersionNumber: 1, pendingDraftsCount: d.status === 'pending' ? 1 : 0}});
   });
 
   app.put('/api/admin/recipes/:id', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    const session = requireAdmin(req, res, 'content.recipes');
+    if (!session) return;
     const existing = db.prepare('SELECT * FROM recipes WHERE id = ?').get(req.params.id) as
       | Record<string, unknown>
       | undefined;
@@ -473,57 +797,367 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
       return res.status(400).json({error: 'آدرس تصویر واردشده معتبر نیست.'});
     }
 
-    db.prepare(
-      `UPDATE recipes SET
-        title = ?, subtitle = ?, description = ?, image_url = ?, category = ?, region = ?,
-        season = ?, meal_type = ?, diet_tags_json = ?, prep_minutes = ?, cook_minutes = ?,
-        servings = ?, difficulty = ?, nutrition_json = ?, is_vip = ?, vip_gem_cost = ?,
-        status = ?, ingredients_json = ?, steps_json = ?, tools_json = ?
-       WHERE id = ?`
-    ).run(
-      d.title.trim(),
-      d.subtitle.trim() || `${d.category} · ${d.region}`,
-      d.description.trim() || d.title.trim(),
-      finalImageUrl,
-      d.category,
-      d.region,
-      d.season,
-      d.mealType,
-      JSON.stringify(d.dietTags),
-      d.prepMinutes,
-      d.cookMinutes,
-      d.servings,
-      d.difficulty,
-      JSON.stringify({
-        calories: d.calories,
-        protein: d.protein,
-        carbs: d.carbs,
-        fat: d.fat,
-        fiber: d.fiber,
-      }),
-      d.isVip ? 1 : 0,
-      d.isVip ? d.vipGemCost : 0,
-      d.status,
-      JSON.stringify(d.ingredients),
-      JSON.stringify(d.steps),
-      JSON.stringify(d.tools),
-      req.params.id
-    );
+    const now = new Date().toISOString();
+    const nutrition = {
+      calories: d.calories,
+      protein: d.protein,
+      carbs: d.carbs,
+      fat: d.fat,
+      fiber: d.fiber,
+    };
+    const snapshot: RecipeVersionSnapshot = {
+      title: d.title.trim(),
+      subtitle: d.subtitle.trim() || `${d.category} · ${d.region}`,
+      description: d.description.trim() || d.title.trim(),
+      imageUrl: finalImageUrl,
+      category: d.category,
+      region: d.region,
+      season: d.season,
+      mealType: d.mealType,
+      dietTags: d.dietTags,
+      prepMinutes: d.prepMinutes,
+      cookMinutes: d.cookMinutes,
+      servings: d.servings,
+      difficulty: d.difficulty,
+      nutrition,
+      isVip: d.isVip,
+      vipGemCost: d.isVip ? d.vipGemCost : 0,
+      ingredients: d.ingredients,
+      steps: d.steps,
+      tools: d.tools,
+    };
+
+    const runUpdate = db.transaction(() => {
+      ensureBaselineVersion(existing);
+      const nextVer = getNextVersionNumber(req.params.id);
+
+      db.prepare(
+        `UPDATE recipes SET
+          title = ?, subtitle = ?, description = ?, image_url = ?, category = ?, region = ?,
+          season = ?, meal_type = ?, diet_tags_json = ?, prep_minutes = ?, cook_minutes = ?,
+          servings = ?, difficulty = ?, nutrition_json = ?, is_vip = ?, vip_gem_cost = ?,
+          status = ?, ingredients_json = ?, steps_json = ?, tools_json = ?
+         WHERE id = ?`
+      ).run(
+        snapshot.title,
+        snapshot.subtitle,
+        snapshot.description,
+        snapshot.imageUrl,
+        snapshot.category,
+        snapshot.region,
+        snapshot.season,
+        snapshot.mealType,
+        JSON.stringify(snapshot.dietTags),
+        snapshot.prepMinutes,
+        snapshot.cookMinutes,
+        snapshot.servings,
+        snapshot.difficulty,
+        JSON.stringify(snapshot.nutrition),
+        snapshot.isVip ? 1 : 0,
+        snapshot.vipGemCost,
+        d.status,
+        JSON.stringify(snapshot.ingredients),
+        JSON.stringify(snapshot.steps),
+        JSON.stringify(snapshot.tools),
+        req.params.id
+      );
+
+      const isPublished = d.status === 'published';
+      if (isPublished) {
+        db.prepare("UPDATE recipe_versions SET status = 'archived' WHERE recipe_id = ? AND status = 'published'").run(
+          req.params.id
+        );
+      }
+
+      db.prepare(
+        `INSERT INTO recipe_versions (
+          id, recipe_id, version_number, status, change_summary, snapshot_json,
+          created_by_id, created_by_name, reviewed_by_id, reviewed_by_name, review_note, created_at, reviewed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        `ver-${crypto.randomUUID().slice(0, 8)}`,
+        req.params.id,
+        nextVer,
+        isPublished ? 'published' : 'draft',
+        d.changeSummary.trim() || (isPublished ? 'ویرایش و انتشار مستقیم نسخه جدید' : 'بروزرسانی پیش‌نویس'),
+        JSON.stringify(snapshot),
+        session.userId,
+        session.actorName,
+        isPublished ? session.userId : null,
+        isPublished ? session.actorName : null,
+        '',
+        now,
+        isPublished ? now : null
+      );
+    });
+    runUpdate();
 
     const row = db.prepare('SELECT * FROM recipes WHERE id = ?').get(req.params.id) as Record<string, unknown>;
     res.json({recipe: mapRecipeRow(row)});
   });
 
+  // =========================================================================
+  // RECIPE VERSION CONTROL: DRAFTS QUEUE, HISTORY, PREVIEW & APPROVAL
+  // =========================================================================
+  app.get('/api/admin/recipe-drafts', (req, res) => {
+    if (!requireAdmin(req, res, 'content.recipes')) return;
+    const rows = db
+      .prepare(
+        `SELECT rv.*, r.title AS live_title, r.status AS live_status
+         FROM recipe_versions rv
+         INNER JOIN recipes r ON r.id = rv.recipe_id
+         WHERE rv.status = 'draft'
+         ORDER BY rv.created_at DESC`
+      )
+      .all() as Record<string, unknown>[];
+
+    const drafts: PendingRecipeDraftItem[] = rows.map((row) => {
+      const mapped = mapVersionRow(row);
+      return {
+        versionId: mapped.id,
+        recipeId: mapped.recipeId,
+        recipeTitle: String(row.live_title || mapped.snapshot.title),
+        recipeStatus: (row.live_status === 'pending' ? 'pending' : 'published') as 'published' | 'pending',
+        versionNumber: mapped.versionNumber,
+        changeSummary: mapped.changeSummary,
+        createdByName: mapped.createdByName,
+        createdAt: mapped.createdAt,
+        snapshot: mapped.snapshot,
+      };
+    });
+
+    res.json({drafts});
+  });
+
+  app.get('/api/admin/recipes/:id/versions', (req, res) => {
+    if (!requireAdmin(req, res, 'content.recipes')) return;
+    const recipeRow = db.prepare('SELECT * FROM recipes WHERE id = ?').get(req.params.id) as
+      | Record<string, unknown>
+      | undefined;
+    if (!recipeRow) return res.status(404).json({error: 'دستور پخت مورد نظر یافت نشد.'});
+
+    ensureBaselineVersion(recipeRow);
+    const versionRows = db
+      .prepare('SELECT * FROM recipe_versions WHERE recipe_id = ? ORDER BY version_number DESC')
+      .all(req.params.id) as Record<string, unknown>[];
+
+    res.json({
+      recipe: mapRecipeRow(recipeRow),
+      versions: versionRows.map(mapVersionRow),
+    });
+  });
+
+  app.post('/api/admin/recipes/:id/drafts', (req, res) => {
+    const session = requireAdmin(req, res, 'content.recipes');
+    if (!session) return;
+
+    const existing = db.prepare('SELECT * FROM recipes WHERE id = ?').get(req.params.id) as
+      | Record<string, unknown>
+      | undefined;
+    if (!existing) return res.status(404).json({error: 'دستور پخت مورد نظر یافت نشد.'});
+
+    const parsed = adminRecipePayloadSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({error: 'اطلاعات پیش‌نویس کامل یا معتبر نیست.'});
+    }
+    const d = parsed.data;
+
+    let finalImageUrl = d.imageUrl.trim();
+    if (d.imageDataUrl && d.imageDataUrl.startsWith('data:image/')) {
+      const saved = saveUploadedRecipeImage(d.imageDataUrl);
+      if (!saved.ok) return res.status(400).json({error: saved.error});
+      finalImageUrl = saved.url;
+    } else if (finalImageUrl && !isSafeUrl(finalImageUrl)) {
+      return res.status(400).json({error: 'آدرس تصویر واردشده معتبر نیست.'});
+    }
+
+    const now = new Date().toISOString();
+    const versionId = `ver-${crypto.randomUUID().slice(0, 8)}`;
+    const snapshot: RecipeVersionSnapshot = {
+      title: d.title.trim(),
+      subtitle: d.subtitle.trim() || `${d.category} · ${d.region}`,
+      description: d.description.trim() || d.title.trim(),
+      imageUrl: finalImageUrl,
+      category: d.category,
+      region: d.region,
+      season: d.season,
+      mealType: d.mealType,
+      dietTags: d.dietTags,
+      prepMinutes: d.prepMinutes,
+      cookMinutes: d.cookMinutes,
+      servings: d.servings,
+      difficulty: d.difficulty,
+      nutrition: {
+        calories: d.calories,
+        protein: d.protein,
+        carbs: d.carbs,
+        fat: d.fat,
+        fiber: d.fiber,
+      },
+      isVip: d.isVip,
+      vipGemCost: d.isVip ? d.vipGemCost : 0,
+      ingredients: d.ingredients,
+      steps: d.steps,
+      tools: d.tools,
+    };
+
+    const runDraft = db.transaction(() => {
+      ensureBaselineVersion(existing);
+      const nextVer = getNextVersionNumber(req.params.id);
+      db.prepare(
+        `INSERT INTO recipe_versions (
+          id, recipe_id, version_number, status, change_summary, snapshot_json,
+          created_by_id, created_by_name, reviewed_by_id, reviewed_by_name, review_note, created_at, reviewed_at
+        ) VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, NULL, NULL, '', ?, NULL)`
+      ).run(
+        versionId,
+        req.params.id,
+        nextVer,
+        d.changeSummary.trim() || 'پیش‌نویس ویرایشی در انتظار پیش‌نمایش و تایید',
+        JSON.stringify(snapshot),
+        session.userId,
+        session.actorName,
+        now
+      );
+    });
+    runDraft();
+
+    const row = db.prepare('SELECT * FROM recipe_versions WHERE id = ?').get(versionId) as Record<string, unknown>;
+    res.status(201).json({version: mapVersionRow(row)});
+  });
+
+  app.post('/api/admin/recipes/:id/versions/:versionId/approve', (req, res) => {
+    const session = requireAdmin(req, res, 'content.recipes');
+    if (!session) return;
+
+    const schema = z.object({reviewNote: z.string().max(240).optional().default('')});
+    const parsed = schema.safeParse(req.body || {});
+    if (!parsed.success) return res.status(400).json({error: 'یادداشت تایید بیش از حد مجاز طولانی است.'});
+
+    const versionRow = db
+      .prepare('SELECT * FROM recipe_versions WHERE id = ? AND recipe_id = ?')
+      .get(req.params.versionId, req.params.id) as Record<string, unknown> | undefined;
+    if (!versionRow) return res.status(404).json({error: 'نسخه مورد نظر برای این دستور پخت یافت نشد.'});
+
+    const recipeRow = db.prepare('SELECT id FROM recipes WHERE id = ?').get(req.params.id) as {id: string} | undefined;
+    if (!recipeRow) return res.status(404).json({error: 'دستور پخت اصلی یافت نشد.'});
+
+    const mappedVersion = mapVersionRow(versionRow);
+    const snap = mappedVersion.snapshot;
+    if (snap.imageUrl && !isSafeUrl(snap.imageUrl)) {
+      return res.status(400).json({error: 'آدرس تصویر ذخیره‌شده در این نسخه معتبر نیست.'});
+    }
+
+    const now = new Date().toISOString();
+    const runApprove = db.transaction(() => {
+      db.prepare(
+        `UPDATE recipes SET
+          title = ?, subtitle = ?, description = ?, image_url = ?, category = ?, region = ?,
+          season = ?, meal_type = ?, diet_tags_json = ?, prep_minutes = ?, cook_minutes = ?,
+          servings = ?, difficulty = ?, nutrition_json = ?, is_vip = ?, vip_gem_cost = ?,
+          status = 'published', ingredients_json = ?, steps_json = ?, tools_json = ?
+         WHERE id = ?`
+      ).run(
+        snap.title,
+        snap.subtitle,
+        snap.description,
+        snap.imageUrl,
+        snap.category,
+        snap.region,
+        snap.season,
+        snap.mealType,
+        JSON.stringify(snap.dietTags),
+        snap.prepMinutes,
+        snap.cookMinutes,
+        snap.servings,
+        snap.difficulty,
+        JSON.stringify(snap.nutrition),
+        snap.isVip ? 1 : 0,
+        snap.isVip ? snap.vipGemCost : 0,
+        JSON.stringify(snap.ingredients),
+        JSON.stringify(snap.steps),
+        JSON.stringify(snap.tools),
+        req.params.id
+      );
+
+      db.prepare(
+        "UPDATE recipe_versions SET status = 'archived' WHERE recipe_id = ? AND status = 'published' AND id != ?"
+      ).run(req.params.id, req.params.versionId);
+
+      db.prepare(
+        `UPDATE recipe_versions
+         SET status = 'published', reviewed_by_id = ?, reviewed_by_name = ?, review_note = ?, reviewed_at = ?
+         WHERE id = ?`
+      ).run(
+        session.userId,
+        session.actorName,
+        parsed.data.reviewNote.trim() || 'تایید و انتشار نهایی پس از پیش‌نمایش',
+        now,
+        req.params.versionId
+      );
+    });
+    runApprove();
+
+    const updatedRecipe = db.prepare('SELECT * FROM recipes WHERE id = ?').get(req.params.id) as Record<string, unknown>;
+    const updatedVersion = db
+      .prepare('SELECT * FROM recipe_versions WHERE id = ?')
+      .get(req.params.versionId) as Record<string, unknown>;
+    res.json({
+      ok: true,
+      recipe: mapRecipeRow(updatedRecipe),
+      version: mapVersionRow(updatedVersion),
+    });
+  });
+
+  app.post('/api/admin/recipes/:id/versions/:versionId/reject', (req, res) => {
+    const session = requireAdmin(req, res, 'content.recipes');
+    if (!session) return;
+
+    const schema = z.object({reviewNote: z.string().max(240).optional().default('')});
+    const parsed = schema.safeParse(req.body || {});
+    if (!parsed.success) return res.status(400).json({error: 'یادداشت رد پیش‌نویس معتبر نیست.'});
+
+    const versionRow = db
+      .prepare('SELECT * FROM recipe_versions WHERE id = ? AND recipe_id = ?')
+      .get(req.params.versionId, req.params.id) as Record<string, unknown> | undefined;
+    if (!versionRow) return res.status(404).json({error: 'نسخه مورد نظر یافت نشد.'});
+    if (String(versionRow.status) !== 'draft') {
+      return res.status(400).json({error: 'تنها پیش‌نویس‌های در انتظار بررسی قابل رد کردن هستند.'});
+    }
+
+    const now = new Date().toISOString();
+    db.prepare(
+      `UPDATE recipe_versions
+       SET status = 'rejected', reviewed_by_id = ?, reviewed_by_name = ?, review_note = ?, reviewed_at = ?
+       WHERE id = ?`
+    ).run(
+      session.userId,
+      session.actorName,
+      parsed.data.reviewNote.trim() || 'نیاز به بازبینی بیشتر قبل از انتشار',
+      now,
+      req.params.versionId
+    );
+
+    const updated = db
+      .prepare('SELECT * FROM recipe_versions WHERE id = ?')
+      .get(req.params.versionId) as Record<string, unknown>;
+    res.json({ok: true, version: mapVersionRow(updated)});
+  });
+
   app.delete('/api/admin/recipes/:id', (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    db.prepare('DELETE FROM recipe_photos WHERE recipe_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM bookmarks WHERE recipe_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM recipes WHERE id = ?').run(req.params.id);
+    if (!requireAdmin(req, res, 'content.recipes')) return;
+    const runDelete = db.transaction(() => {
+      db.prepare('DELETE FROM recipe_versions WHERE recipe_id = ?').run(req.params.id);
+      db.prepare('DELETE FROM recipe_photos WHERE recipe_id = ?').run(req.params.id);
+      db.prepare('DELETE FROM bookmarks WHERE recipe_id = ?').run(req.params.id);
+      db.prepare('DELETE FROM recipes WHERE id = ?').run(req.params.id);
+    });
+    runDelete();
     res.json({ok: true});
   });
 
   app.post('/api/admin/recipes/bulk-import', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'content.recipes')) return;
     const bulkSchema = z.object({
       recipes: z.array(z.record(z.string(), z.unknown())).min(1).max(2000),
       defaultStatus: z.enum(['published', 'pending']).optional().default('published'),
@@ -669,7 +1303,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   // ADMIN COMMUNITY PHOTO MODERATION & COVER PROMOTION
   // =========================================================================
   app.get('/api/admin/photos', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'content.photos')) return;
     const statusFilter = typeof req.query.status === 'string' ? req.query.status : 'all';
     const rows = (
       statusFilter === 'pending' || statusFilter === 'approved' || statusFilter === 'rejected'
@@ -695,7 +1329,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   });
 
   app.post('/api/admin/photos/:id/moderate', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'content.photos')) return;
     const schema = z.object({action: z.enum(['approve', 'approve_cover', 'reject'])});
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({error: 'عملیات بررسی عکس نامعتبر است.'});
@@ -746,16 +1380,16 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   });
 
   app.delete('/api/admin/photos/:id', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'content.photos')) return;
     db.prepare('DELETE FROM recipe_photos WHERE id = ?').run(req.params.id);
     res.json({ok: true});
   });
 
   // =========================================================================
-  // ADMIN USERS MANAGEMENT & USER WALLET (TOMAN / GEM) TOP-UP
+  // ADMIN USERS MANAGEMENT, RBAC ROLE ASSIGNMENT & USER WALLET TOP-UP
   // =========================================================================
   app.get('/api/admin/users', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'users.view')) return;
     const rows = db
       .prepare(
         `SELECT u.*,
@@ -788,9 +1422,9 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   });
 
   app.patch('/api/admin/users/:id', (req, res) => {
-    if (!requireAdmin(req, res)) return;
     const schema = z.object({
-      role: z.enum(['user', 'chef', 'partner', 'admin']).optional(),
+      role: z.string().min(2).max(48).optional(),
+      roleNote: z.string().max(180).optional(),
       isVerifiedChef: z.boolean().optional(),
       isSuspended: z.boolean().optional(),
       name: z.string().min(2).max(80).optional(),
@@ -799,13 +1433,28 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({error: 'اطلاعات ویرایش کاربر معتبر نیست.'});
 
+    const d = parsed.data;
+    if (d.role !== undefined) {
+      const validRoles = new Set(['user', 'chef', 'partner', 'admin', ...getAclRoles().map((r) => r.id)]);
+      if (!validRoles.has(d.role)) {
+        return res.status(400).json({error: 'نقش انتخاب‌شده در ماتریس دسترسی تعریف نشده است.'});
+      }
+    }
+    const requiredPerm: AdminPermission = d.role !== undefined ? 'rbac.manage' : 'users.manage';
+    const session = requireAdmin(req, res, requiredPerm);
+    if (!session) return;
+
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id) as
       | Record<string, unknown>
       | undefined;
     if (!user) return res.status(404).json({error: 'کاربر یافت نشد.'});
 
-    const d = parsed.data;
-    const nextRole = d.role ?? String(user.role);
+    if (session.userId === req.params.id && (d.isSuspended === true || (d.role && d.role !== 'senior_admin' && d.role !== 'admin'))) {
+      return res.status(400).json({error: 'امکان کاهش سطح دسترسی یا مسدودسازی حساب فعلی خودتان وجود ندارد.'});
+    }
+
+    const prevRole = String(user.role) as UserRole;
+    const nextRole = (d.role === 'admin' ? 'senior_admin' : d.role ?? prevRole) as UserRole;
     const nextVerified = d.isVerifiedChef !== undefined ? (d.isVerifiedChef ? 1 : 0) : Number(user.is_verified_chef);
     const nextChefStatus =
       d.isVerifiedChef !== undefined
@@ -815,24 +1464,398 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
         : String(user.chef_verification_status);
     const nextSuspended = d.isSuspended !== undefined ? (d.isSuspended ? 1 : 0) : Number(user.is_suspended || 0);
 
-    db.prepare(
-      `UPDATE users SET role = ?, is_verified_chef = ?, chef_verification_status = ?, is_suspended = ?, name = ?, city = ?
-       WHERE id = ?`
-    ).run(
-      nextRole,
-      nextVerified,
-      nextChefStatus,
-      nextSuspended,
-      d.name?.trim() || String(user.name),
-      d.city?.trim() || String(user.city),
-      req.params.id
-    );
+    const runUpdate = db.transaction(() => {
+      db.prepare(
+        `UPDATE users SET role = ?, is_verified_chef = ?, chef_verification_status = ?, is_suspended = ?, name = ?, city = ?
+         WHERE id = ?`
+      ).run(
+        nextRole,
+        nextVerified,
+        nextChefStatus,
+        nextSuspended,
+        d.name?.trim() || String(user.name),
+        d.city?.trim() || String(user.city),
+        req.params.id
+      );
+
+      if (d.role !== undefined && prevRole !== nextRole) {
+        db.prepare(
+          `INSERT INTO rbac_audit_logs (
+            id, actor_id, actor_name, actor_role, target_user_id, target_user_name,
+            previous_role, new_role, note, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          `rbac-${crypto.randomUUID().slice(0, 8)}`,
+          session.userId,
+          session.actorName,
+          session.adminRole || 'senior_admin',
+          String(user.id),
+          String(user.name),
+          prevRole,
+          nextRole,
+          d.roleNote?.trim() || 'تغییر سطح دسترسی توسط مدیر ارشد',
+          new Date().toISOString()
+        );
+      }
+    });
+    runUpdate();
 
     res.json({ok: true});
   });
 
+  app.get('/api/admin/rbac/audit', (req, res) => {
+    if (!requireAdmin(req, res, 'rbac.manage')) return;
+    const rows = db
+      .prepare('SELECT * FROM rbac_audit_logs ORDER BY created_at DESC LIMIT 60')
+      .all() as Record<string, unknown>[];
+    const logs: RbacAuditLog[] = rows.map((r) => ({
+      id: String(r.id),
+      actorId: String(r.actor_id),
+      actorName: String(r.actor_name),
+      actorRole: r.actor_role as AdminRole,
+      targetUserId: String(r.target_user_id),
+      targetUserName: String(r.target_user_name),
+      previousRole: r.previous_role as UserRole,
+      newRole: r.new_role as UserRole,
+      note: String(r.note || ''),
+      createdAt: String(r.created_at),
+    }));
+    res.json({logs});
+  });
+
+  app.post('/api/admin/rbac/assign', (req, res) => {
+    const session = requireAdmin(req, res, 'rbac.manage');
+    if (!session) return;
+
+    const schema = z.object({
+      userId: z.string().min(2).max(80),
+      role: z.string().min(2).max(48),
+      note: z.string().max(180).optional().default(''),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({error: 'کاربر یا نقش انتخاب‌شده معتبر نیست.'});
+
+    const {userId, role, note} = parsed.data;
+    const validRoles = new Set(['user', 'chef', 'partner', ...getAclRoles().map((r) => r.id)]);
+    if (!validRoles.has(role)) {
+      return res.status(400).json({error: 'نقش انتخاب‌شده در ماتریس دسترسی تعریف نشده است.'});
+    }
+
+    if (session.userId === userId && role !== 'senior_admin') {
+      return res.status(400).json({error: 'مدیر ارشد نمی‌تواند نقش فعلی خود را تنزل دهد.'});
+    }
+
+    const user = db.prepare('SELECT id, name, role FROM users WHERE id = ?').get(userId) as
+      | {id: string; name: string; role: string}
+      | undefined;
+    if (!user) return res.status(404).json({error: 'کاربر مورد نظر یافت نشد.'});
+
+    const prevRole = user.role as UserRole;
+    if (prevRole === role) {
+      return res.json({ok: true, unchanged: true});
+    }
+
+    const now = new Date().toISOString();
+    const runAssign = db.transaction(() => {
+      db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, user.id);
+      db.prepare(
+        `INSERT INTO rbac_audit_logs (
+          id, actor_id, actor_name, actor_role, target_user_id, target_user_name,
+          previous_role, new_role, note, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        `rbac-${crypto.randomUUID().slice(0, 8)}`,
+        session.userId,
+        session.actorName,
+        session.adminRole || 'senior_admin',
+        user.id,
+        user.name,
+        prevRole,
+        role,
+        note.trim() || 'تخصیص نقش از کنسول سطوح دسترسی پویا',
+        now
+      );
+    });
+    runAssign();
+    res.json({ok: true});
+  });
+
+  // =========================================================================
+  // DYNAMIC ACL ROLE & PERMISSION MATRIX CRUD
+  // =========================================================================
+  const allowedPermSet = new Set<string>(ALL_ADMIN_PERMISSIONS);
+
+  app.get('/api/admin/acl/roles', (req, res) => {
+    if (!requireAdmin(req, res, 'dashboard.view')) return;
+    res.json({roles: getAclRoles()});
+  });
+
+  app.post('/api/admin/acl/roles', (req, res) => {
+    const session = requireAdmin(req, res, 'rbac.manage');
+    if (!session) return;
+
+    const schema = z.object({
+      id: z
+        .string()
+        .min(3)
+        .max(36)
+        .regex(/^[a-z][a-z0-9_]*$/, 'شناسه نقش باید با حروف کوچک لاتین و زیرخط باشد.'),
+      label: z.string().min(2).max(60),
+      shortLabel: z.string().min(2).max(28).optional(),
+      description: z.string().max(220).optional().default(''),
+      permissions: z.array(z.string()).min(1).max(30),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({error: 'مشخصات نقش جدید معتبر نیست.'});
+    }
+
+    const d = parsed.data;
+    if (['user', 'chef', 'partner', 'admin'].includes(d.id)) {
+      return res.status(400).json({error: 'این شناسه سیستمی رزرو شده است.'});
+    }
+    const exists = db.prepare('SELECT 1 FROM acl_roles WHERE id = ?').get(d.id);
+    if (exists) {
+      return res.status(409).json({error: 'نقشی با این شناسه از قبل وجود دارد.'});
+    }
+
+    const cleanPerms = Array.from(
+      new Set<string>(['dashboard.view', ...d.permissions.filter((p) => allowedPermSet.has(p))])
+    );
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO acl_roles (id, label, short_label, description, permissions_json, is_system, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
+    ).run(d.id, d.label.trim(), (d.shortLabel || d.label).trim(), d.description.trim(), JSON.stringify(cleanPerms), now, now);
+
+    db.prepare(
+      `INSERT INTO rbac_audit_logs (
+        id, actor_id, actor_name, actor_role, target_user_id, target_user_name,
+        previous_role, new_role, note, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      `rbac-${crypto.randomUUID().slice(0, 8)}`,
+      session.userId,
+      session.actorName,
+      session.adminRole || 'senior_admin',
+      `role:${d.id}`,
+      `نقش «${d.label.trim()}»`,
+      'new_role',
+      d.id,
+      `ایجاد نقش سفارشی با ${cleanPerms.length} مجوز`,
+      now
+    );
+
+    res.status(201).json({roles: getAclRoles()});
+  });
+
+  app.put('/api/admin/acl/roles/:id', (req, res) => {
+    const session = requireAdmin(req, res, 'rbac.manage');
+    if (!session) return;
+
+    const existing = db.prepare('SELECT * FROM acl_roles WHERE id = ?').get(req.params.id) as
+      | Record<string, unknown>
+      | undefined;
+    if (!existing) return res.status(404).json({error: 'نقش مورد نظر یافت نشد.'});
+
+    const schema = z.object({
+      label: z.string().min(2).max(60).optional(),
+      shortLabel: z.string().min(2).max(28).optional(),
+      description: z.string().max(220).optional(),
+      permissions: z.array(z.string()).max(30),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({error: 'اطلاعات ویرایش مجوزها معتبر نیست.'});
+
+    const cleanPerms = new Set<string>(['dashboard.view', ...parsed.data.permissions.filter((p) => allowedPermSet.has(p))]);
+    if (req.params.id === 'senior_admin') {
+      cleanPerms.add('rbac.manage');
+      cleanPerms.add('app.layout');
+      cleanPerms.add('ecosystem.manage');
+    }
+
+    const now = new Date().toISOString();
+    const nextLabel = parsed.data.label?.trim() || String(existing.label);
+    const nextShort = parsed.data.shortLabel?.trim() || String(existing.short_label);
+    const nextDesc = parsed.data.description !== undefined ? parsed.data.description.trim() : String(existing.description);
+
+    db.prepare(
+      `UPDATE acl_roles SET label = ?, short_label = ?, description = ?, permissions_json = ?, updated_at = ?
+       WHERE id = ?`
+    ).run(nextLabel, nextShort, nextDesc, JSON.stringify(Array.from(cleanPerms)), now, req.params.id);
+
+    db.prepare(
+      `INSERT INTO rbac_audit_logs (
+        id, actor_id, actor_name, actor_role, target_user_id, target_user_name,
+        previous_role, new_role, note, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      `rbac-${crypto.randomUUID().slice(0, 8)}`,
+      session.userId,
+      session.actorName,
+      session.adminRole || 'senior_admin',
+      `role:${req.params.id}`,
+      `ماتریس نقش «${nextLabel}»`,
+      req.params.id,
+      req.params.id,
+      `بروزرسانی ماتریس مجوزها (${cleanPerms.size} مجوز فعال)`,
+      now
+    );
+
+    res.json({roles: getAclRoles()});
+  });
+
+  app.delete('/api/admin/acl/roles/:id', (req, res) => {
+    const session = requireAdmin(req, res, 'rbac.manage');
+    if (!session) return;
+
+    const existing = db.prepare('SELECT * FROM acl_roles WHERE id = ?').get(req.params.id) as
+      | Record<string, unknown>
+      | undefined;
+    if (!existing) return res.status(404).json({error: 'نقش مورد نظر یافت نشد.'});
+    if (Number(existing.is_system) === 1) {
+      return res.status(400).json({error: 'نقش‌های پایه سیستم قابل حذف نیستند؛ فقط مجوزهای آن‌ها را ویرایش کنید.'});
+    }
+
+    const now = new Date().toISOString();
+    db.transaction(() => {
+      db.prepare("UPDATE users SET role = 'user' WHERE role = ?").run(req.params.id);
+      db.prepare('DELETE FROM acl_roles WHERE id = ?').run(req.params.id);
+      db.prepare(
+        `INSERT INTO rbac_audit_logs (
+          id, actor_id, actor_name, actor_role, target_user_id, target_user_name,
+          previous_role, new_role, note, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        `rbac-${crypto.randomUUID().slice(0, 8)}`,
+        session.userId,
+        session.actorName,
+        session.adminRole || 'senior_admin',
+        `role:${req.params.id}`,
+        `حذف نقش «${String(existing.label)}»`,
+        req.params.id,
+        'user',
+        'حذف نقش سفارشی و بازگرداندن اعضا به کاربر عادی',
+        now
+      );
+    })();
+    res.json({roles: getAclRoles()});
+  });
+
+  // =========================================================================
+  // NATIVE MULTI-FORMAT AD STUDIO CRUD (TEXT / CLICK / EDITORIAL BANNER / PANTRY)
+  // =========================================================================
+  const nativeAdSchema = z.object({
+    partnerId: z.string().min(2).max(80),
+    format: z.enum(['inline_ingredient', 'contextual_tool', 'feed_editorial_story', 'pantry_companion']),
+    title: z.string().min(3).max(120),
+    subtitle: z.string().max(160).optional().default(''),
+    editorialCopy: z.string().max(320).optional().default(''),
+    ctaLabel: z.string().min(2).max(40).optional().default('آشنایی با برند'),
+    targetUrl: z.string().max(300).optional().nullable(),
+    matchKeywords: z.array(z.string().min(1).max(50)).max(20).optional().default([]),
+    matchCategories: z.array(z.string().min(1).max(60)).max(12).optional().default([]),
+    priority: z.number().int().min(1).max(10).optional().default(5),
+    status: z.enum(['active', 'paused']).optional().default('active'),
+  });
+
+  app.get('/api/admin/native-ads', (req, res) => {
+    if (!requireAdmin(req, res, 'ads.manage')) return;
+    res.json({nativeAds: getNativeAds(false)});
+  });
+
+  app.post('/api/admin/native-ads', (req, res) => {
+    if (!requireAdmin(req, res, 'ads.manage')) return;
+    const parsed = nativeAdSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({error: 'اطلاعات واحد تبلیغاتی بومی معتبر نیست.'});
+    const d = parsed.data;
+    if (d.targetUrl && !isSafeUrl(d.targetUrl)) {
+      return res.status(400).json({error: 'نشانی مقصد تبلیغ باید یک پیوند معتبر وب باشد.'});
+    }
+
+    const id = `nad-${crypto.randomUUID().slice(0, 8)}`;
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO native_ads (
+        id, partner_id, format, title, subtitle, editorial_copy, cta_label, target_url,
+        match_keywords_json, match_categories_json, priority, status, impressions, clicks, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)`
+    ).run(
+      id,
+      d.partnerId,
+      d.format,
+      d.title.trim(),
+      d.subtitle.trim(),
+      d.editorialCopy.trim(),
+      d.ctaLabel.trim(),
+      d.targetUrl?.trim() || null,
+      JSON.stringify(d.matchKeywords.map((k) => k.trim()).filter(Boolean)),
+      JSON.stringify(d.matchCategories),
+      d.priority,
+      d.status,
+      now
+    );
+
+    const row = db
+      .prepare('SELECT na.*, p.name AS partner_name FROM native_ads na LEFT JOIN partners p ON p.id = na.partner_id WHERE na.id = ?')
+      .get(id) as Record<string, unknown>;
+    res.status(201).json({nativeAd: mapNativeAdRow(row)});
+  });
+
+  app.put('/api/admin/native-ads/:id', (req, res) => {
+    if (!requireAdmin(req, res, 'ads.manage')) return;
+    const existing = db.prepare('SELECT * FROM native_ads WHERE id = ?').get(req.params.id) as
+      | Record<string, unknown>
+      | undefined;
+    if (!existing) return res.status(404).json({error: 'واحد تبلیغاتی یافت نشد.'});
+
+    const parsed = nativeAdSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({error: 'اطلاعات ویرایش تبلیغ معتبر نیست.'});
+    const d = parsed.data;
+    if (d.targetUrl && !isSafeUrl(d.targetUrl)) {
+      return res.status(400).json({error: 'نشانی مقصد تبلیغ معتبر نیست.'});
+    }
+
+    db.prepare(
+      `UPDATE native_ads SET
+        partner_id = ?, format = ?, title = ?, subtitle = ?, editorial_copy = ?,
+        cta_label = ?, target_url = ?, match_keywords_json = ?, match_categories_json = ?,
+        priority = ?, status = ?
+       WHERE id = ?`
+    ).run(
+      d.partnerId ?? String(existing.partner_id),
+      d.format ?? String(existing.format),
+      d.title?.trim() ?? String(existing.title),
+      d.subtitle !== undefined ? d.subtitle.trim() : String(existing.subtitle || ''),
+      d.editorialCopy !== undefined ? d.editorialCopy.trim() : String(existing.editorial_copy || ''),
+      d.ctaLabel?.trim() ?? String(existing.cta_label || 'آشنایی با برند'),
+      d.targetUrl !== undefined ? d.targetUrl?.trim() || null : existing.target_url,
+      d.matchKeywords !== undefined
+        ? JSON.stringify(d.matchKeywords.map((k) => k.trim()).filter(Boolean))
+        : String(existing.match_keywords_json || '[]'),
+      d.matchCategories !== undefined
+        ? JSON.stringify(d.matchCategories)
+        : String(existing.match_categories_json || '[]'),
+      d.priority ?? Number(existing.priority || 5),
+      d.status ?? String(existing.status),
+      req.params.id
+    );
+
+    const row = db
+      .prepare('SELECT na.*, p.name AS partner_name FROM native_ads na LEFT JOIN partners p ON p.id = na.partner_id WHERE na.id = ?')
+      .get(req.params.id) as Record<string, unknown>;
+    res.json({nativeAd: mapNativeAdRow(row)});
+  });
+
+  app.delete('/api/admin/native-ads/:id', (req, res) => {
+    if (!requireAdmin(req, res, 'ads.manage')) return;
+    db.prepare('DELETE FROM native_ads WHERE id = ?').run(req.params.id);
+    res.json({ok: true});
+  });
+
   app.post('/api/admin/users/:id/wallet', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    const session = requireAdmin(req, res, 'finance.wallets');
+    if (!session) return;
     const schema = z.object({
       currency: z.enum(['toman', 'gem']),
       amount: z.number().int().refine((n) => n !== 0, 'مبلغ نمی‌تواند صفر باشد'),
@@ -871,8 +1894,8 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
       }
       db.prepare(
         `INSERT INTO wallet_transactions (id, account_type, account_id, account_name, currency, amount, balance_after, reason, created_by, created_at)
-         VALUES (?, 'user', ?, ?, ?, ?, ?, ?, 'admin', ?)`
-      ).run(txId, user.id, user.name, currency, amount, nextBalance, reason.trim(), now);
+         VALUES (?, 'user', ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(txId, user.id, user.name, currency, amount, nextBalance, reason.trim(), session.actorName, now);
     });
 
     runTx();
@@ -883,13 +1906,14 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   // ADMIN PARTNERS & COMMERCIAL ACCOUNT WALLET TOP-UP
   // =========================================================================
   app.get('/api/admin/partners', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'finance.partners')) return;
     const rows = db.prepare('SELECT * FROM partners ORDER BY created_at DESC').all() as Record<string, unknown>[];
     res.json({partners: rows.map((r) => mapPartnerRow(r))});
   });
 
   app.post('/api/admin/partners', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    const session = requireAdmin(req, res, 'finance.partners');
+    if (!session) return;
     const schema = z.object({
       name: z.string().min(2).max(120),
       roleType: z.string().min(2).max(50),
@@ -945,8 +1969,8 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
     if (d.initialBalance > 0) {
       db.prepare(
         `INSERT INTO wallet_transactions (id, account_type, account_id, account_name, currency, amount, balance_after, reason, created_by, created_at)
-         VALUES (?, 'partner', ?, ?, 'toman', ?, ?, 'شارژ اولیه حساب تجاری هنگام ثبت', 'admin', ?)`
-      ).run(`wtx-${crypto.randomUUID().slice(0, 8)}`, id, d.name.trim(), d.initialBalance, d.initialBalance, now);
+         VALUES (?, 'partner', ?, ?, 'toman', ?, ?, 'شارژ اولیه حساب تجاری هنگام ثبت', ?, ?)`
+      ).run(`wtx-${crypto.randomUUID().slice(0, 8)}`, id, d.name.trim(), d.initialBalance, d.initialBalance, session.actorName, now);
     }
 
     const row = db.prepare('SELECT * FROM partners WHERE id = ?').get(id) as Record<string, unknown>;
@@ -954,7 +1978,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   });
 
   app.put('/api/admin/partners/:id', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'finance.partners')) return;
     const existing = db.prepare('SELECT * FROM partners WHERE id = ?').get(req.params.id) as
       | Record<string, unknown>
       | undefined;
@@ -989,7 +2013,8 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   });
 
   app.post('/api/admin/partners/:id/wallet', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    const session = requireAdmin(req, res, 'finance.wallets');
+    if (!session) return;
     const schema = z.object({
       amount: z.number().int().refine((n) => n !== 0, 'مبلغ نمی‌تواند صفر باشد'),
       reason: z.string().min(3).max(160),
@@ -1012,7 +2037,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
       db.prepare('UPDATE partners SET business_balance = ? WHERE id = ?').run(nextBalance, partner.id);
       db.prepare(
         `INSERT INTO wallet_transactions (id, account_type, account_id, account_name, currency, amount, balance_after, reason, created_by, created_at)
-         VALUES (?, 'partner', ?, ?, 'toman', ?, ?, ?, 'admin', ?)`
+         VALUES (?, 'partner', ?, ?, 'toman', ?, ?, ?, ?, ?)`
       ).run(
         `wtx-${crypto.randomUUID().slice(0, 8)}`,
         partner.id,
@@ -1020,6 +2045,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
         parsed.data.amount,
         nextBalance,
         parsed.data.reason.trim(),
+        session.actorName,
         now
       );
     });
@@ -1031,7 +2057,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   // ADMIN SPONSORS & ADS CAMPAIGNS MANAGER
   // =========================================================================
   app.get('/api/admin/campaigns', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'finance.campaigns')) return;
     const rows = db
       .prepare(
         `SELECT sc.*, p.name AS partner_name
@@ -1057,7 +2083,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   });
 
   app.post('/api/admin/campaigns', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'finance.campaigns')) return;
     const parsed = campaignSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({error: 'اطلاعات کمپین اسپانسری کامل نیست.'});
     const d = parsed.data;
@@ -1097,7 +2123,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   });
 
   app.put('/api/admin/campaigns/:id', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'finance.campaigns')) return;
     const existing = db.prepare('SELECT * FROM sponsor_campaigns WHERE id = ?').get(req.params.id) as
       | Record<string, unknown>
       | undefined;
@@ -1136,7 +2162,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   });
 
   app.delete('/api/admin/campaigns/:id', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'finance.campaigns')) return;
     db.prepare('DELETE FROM sponsor_campaigns WHERE id = ?').run(req.params.id);
     res.json({ok: true});
   });
@@ -1145,7 +2171,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   // ADMIN FINANCIAL LEDGER & DAILY FOOD ORDERS
   // =========================================================================
   app.get('/api/admin/transactions', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'finance.wallets')) return;
     const rows = db
       .prepare('SELECT * FROM wallet_transactions ORDER BY created_at DESC LIMIT 100')
       .all() as Record<string, unknown>[];
@@ -1165,7 +2191,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   });
 
   app.get('/api/admin/orders', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'finance.orders')) return;
     const rows = db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 100').all() as Record<
       string,
       unknown
@@ -1191,7 +2217,7 @@ export function registerAdminAndMediaRoutes(app: express.Express, deps: RouteDep
   });
 
   app.patch('/api/admin/orders/:id/status', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'finance.orders')) return;
     const schema = z.object({status: z.enum(['confirmed', 'preparing', 'delivering', 'delivered'])});
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({error: 'وضعیت سفارش معتبر نیست.'});

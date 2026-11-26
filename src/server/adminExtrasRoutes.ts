@@ -4,6 +4,7 @@ import {z} from 'zod';
 import {db} from './db.ts';
 import {saveUploadedRecipeImage} from './adminAndMediaRoutes.ts';
 import type {
+  AdminPermission,
   DeliveryPricingConfig,
   EditorialMenuItem,
   GemStoreOffer,
@@ -111,7 +112,7 @@ function mapMenuRow(r: Record<string, unknown>): EditorialMenuItem {
 }
 
 interface AdminExtrasDeps {
-  requireAdmin: (req: express.Request, res: express.Response) => unknown;
+  requireAdmin: (req: express.Request, res: express.Response, permission?: AdminPermission) => unknown;
   isSafeUrl: (url: string | undefined) => boolean;
   defaultGemOffers: GemStoreOffer[];
 }
@@ -123,7 +124,8 @@ export function registerAdminExtrasRoutes(app: express.Express, deps: AdminExtra
   // 1. DAILY EDITORIAL MENU CMS & DELIVERY PRICING
   // =========================================================================
   app.get('/api/admin/menu', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    // Allow both menu editors (content.menu) and finance managers viewing pricing (finance.pricing)
+    if (!requireAdmin(req, res, 'dashboard.view')) return;
     const rows = db.prepare('SELECT * FROM menu_items ORDER BY featured DESC, id DESC').all() as Record<
       string,
       unknown
@@ -154,7 +156,7 @@ export function registerAdminExtrasRoutes(app: express.Express, deps: AdminExtra
   });
 
   app.post('/api/admin/menu', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'content.menu')) return;
     const parsed = menuItemSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({error: 'اطلاعات غذای منوی روز کامل یا معتبر نیست.'});
@@ -202,7 +204,7 @@ export function registerAdminExtrasRoutes(app: express.Express, deps: AdminExtra
   });
 
   app.put('/api/admin/menu/:id', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'content.menu')) return;
     const existing = db.prepare('SELECT * FROM menu_items WHERE id = ?').get(req.params.id) as
       | Record<string, unknown>
       | undefined;
@@ -259,13 +261,13 @@ export function registerAdminExtrasRoutes(app: express.Express, deps: AdminExtra
   });
 
   app.delete('/api/admin/menu/:id', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'content.menu')) return;
     db.prepare('DELETE FROM menu_items WHERE id = ?').run(req.params.id);
     res.json({ok: true});
   });
 
   app.put('/api/admin/menu-pricing', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'finance.pricing')) return;
     const schema = z.object({
       freeDeliveryThreshold: z.number().int().min(0).max(50_000_000),
       packagingFee: z.number().int().min(0).max(2_000_000),
@@ -283,12 +285,12 @@ export function registerAdminExtrasRoutes(app: express.Express, deps: AdminExtra
   // 2. SMART KITCHEN / FRIDGE ITEMS & CUSTOM SUBSTITUTIONS CMS
   // =========================================================================
   app.get('/api/admin/kitchen-config', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'content.kitchen')) return;
     res.json({kitchenConfig: getKitchenConfig()});
   });
 
   app.put('/api/admin/kitchen-config', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'content.kitchen')) return;
     const schema = z.object({
       quickFridgeItems: z.array(z.string().min(1).max(60)).min(1).max(60),
       quickSubQueries: z.array(z.string().min(1).max(60)).min(1).max(30),
@@ -318,12 +320,12 @@ export function registerAdminExtrasRoutes(app: express.Express, deps: AdminExtra
   // 3. GEM STORE OFFERS CMS
   // =========================================================================
   app.get('/api/admin/gem-offers', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'finance.pricing')) return;
     res.json({offers: getGemStoreOffers(defaultGemOffers)});
   });
 
   app.put('/api/admin/gem-offers', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'finance.pricing')) return;
     const schema = z.object({
       offers: z
         .array(
@@ -350,7 +352,7 @@ export function registerAdminExtrasRoutes(app: express.Express, deps: AdminExtra
   // 4. RECIPE Q&A MODERATION
   // =========================================================================
   app.get('/api/admin/questions', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'content.qa')) return;
     const qRows = db
       .prepare(
         `SELECT q.*, COALESCE(r.title, 'دستور حذف‌شده') as recipe_title
@@ -391,7 +393,7 @@ export function registerAdminExtrasRoutes(app: express.Express, deps: AdminExtra
   });
 
   app.delete('/api/admin/questions/:id', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'content.qa')) return;
     const tx = db.transaction(() => {
       db.prepare('DELETE FROM recipe_answers WHERE question_id = ?').run(req.params.id);
       db.prepare('DELETE FROM recipe_questions WHERE id = ?').run(req.params.id);
@@ -401,7 +403,7 @@ export function registerAdminExtrasRoutes(app: express.Express, deps: AdminExtra
   });
 
   app.delete('/api/admin/answers/:id', (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    if (!requireAdmin(req, res, 'content.qa')) return;
     db.prepare('DELETE FROM recipe_answers WHERE id = ?').run(req.params.id);
     res.json({ok: true});
   });

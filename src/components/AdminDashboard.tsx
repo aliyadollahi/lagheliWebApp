@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {
   BadgeCheck,
   BarChart3,
@@ -7,9 +7,13 @@ import {
   Check,
   CheckCircle2,
   Coins,
+  Eye,
   FileSpreadsheet,
+  Gavel,
+  History,
   Image as ImageIcon,
   Layers,
+  LayoutGrid,
   LogOut,
   Megaphone,
   Menu,
@@ -19,9 +23,11 @@ import {
   Search,
   Settings,
   Shield,
-  ShoppingBag,
+  ShieldCheck,
+  Sparkles,
   Store,
   Trash2,
+  TrendingUp,
   Upload,
   Users,
   Utensils,
@@ -37,33 +43,59 @@ import {
   formatToman,
   toFaDigits,
 } from '../shared/persianEngine.ts';
+import {
+  DEFAULT_DYNAMIC_ROLES,
+  getRoleBadgeClass,
+  getRoleLabel,
+  hasAdminPermission,
+  normalizeAdminRole,
+} from '../shared/rbac.ts';
 import type {
   AdminDashboardStats,
+  AdminEditorialInsightsReport,
+  AdminPermission,
+  AdminRole,
   AdminUserRow,
   CampaignPlacement,
+  DynamicRoleDefinition,
   EcosystemConfig,
-  OrderRecord,
+  NativeAdUnit,
   Partner,
   PartnerAnalyticsSummary,
   PartnerRoleId,
+  PendingRecipeDraftItem,
+  RbacAuditLog,
   Recipe,
   RecipePhoto,
+  RecipeVersionSnapshot,
   SponsorCampaign,
   WalletTransaction,
 } from '../shared/types.ts';
+import {AdminAdMarketplacePanel} from './AdminAdMarketplacePanel.tsx';
+import {AdminBehavioralIntelligencePanel} from './AdminBehavioralIntelligencePanel.tsx';
+import {AdminDynamicAppControlPanel} from './AdminDynamicAppControlPanel.tsx';
+import {AdminEditorialInsightsPanel} from './AdminEditorialInsightsPanel.tsx';
 import {AdminFrontendOpsPanel} from './AdminFrontendOpsPanel.tsx';
+import {AdminNativeAdsPanel} from './AdminNativeAdsPanel.tsx';
+import {AdminRbacPanel} from './AdminRbacPanel.tsx';
+import {AdminRecipeVersionModal, EditorialSnapshotPreview} from './AdminRecipeVersionModal.tsx';
 import {EditorialImage} from './EditorialImage.tsx';
 import {AdminWorkspaceSkeleton} from './EditorialSkeletons.tsx';
 
 type AdminNavId =
   | 'overview'
+  | 'behavioral_intel'
+  | 'app_control'
+  | 'native_ads'
+  | 'ad_market'
   | 'recipes'
   | 'photos'
   | 'users'
   | 'partners'
   | 'campaigns'
   | 'frontend_ops'
-  | 'ecosystem';
+  | 'ecosystem'
+  | 'rbac';
 
 interface AdminDashboardProps {
   onRefreshAppConfig: () => void;
@@ -75,15 +107,8 @@ interface AdminDashboardProps {
 const PLACEMENT_LABELS: Record<CampaignPlacement, string> = {
   explore_showcase: 'ویترین صفحه کاوش',
   recipe_context: 'کارت زمینه‌ای دستور پخت',
-  shopping_delivery: 'پیشنهاد ارسال در لیست خرید',
-  marketplace_banner: 'بنر بالای بازارچه اصناف',
-};
-
-const ORDER_STATUS_LABELS: Record<OrderRecord['status'], string> = {
-  confirmed: 'تاییدشده',
-  preparing: 'در حال آماده‌سازی',
-  delivering: 'ارسال با پیک',
-  delivered: 'تحویل‌شده',
+  shopping_delivery: 'همراه لیست خرید',
+  marketplace_banner: 'بنر صفحه برندهای همکار',
 };
 
 const SAMPLE_BULK_JSON = JSON.stringify(
@@ -147,6 +172,10 @@ export function AdminDashboard({
   const [quickTestEnabled, setQuickTestEnabled] = useState(false);
   const [explicitLogout, setExplicitLogout] = useState(false);
   const [adminAuthed, setAdminAuthed] = useState(Boolean(getAdminToken()));
+  const [activeRole, setActiveRole] = useState<AdminRole>('senior_admin');
+  const [activePermissions, setActivePermissions] = useState<AdminPermission[]>([]);
+  const [aclRoles, setAclRoles] = useState<DynamicRoleDefinition[]>(DEFAULT_DYNAMIC_ROLES);
+  const [actorName, setActorName] = useState<string>('مدیر ارشد سیستم');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [activeNav, setActiveNav] = useState<AdminNavId>('overview');
@@ -162,19 +191,31 @@ export function AdminDashboard({
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [campaigns, setCampaigns] = useState<SponsorCampaign[]>([]);
+  const [nativeAds, setNativeAds] = useState<NativeAdUnit[]>([]);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
-  const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [rbacAuditLogs, setRbacAuditLogs] = useState<RbacAuditLog[]>([]);
+  const [pendingDrafts, setPendingDrafts] = useState<PendingRecipeDraftItem[]>([]);
+  const [editorialInsights, setEditorialInsights] = useState<AdminEditorialInsightsReport | null>(null);
+  const [insightsDays, setInsightsDays] = useState<number>(30);
+  const insightsDaysRef = useRef<number>(30);
+  insightsDaysRef.current = insightsDays;
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [recipesSubTab, setRecipesSubTab] = useState<'catalog' | 'insights'>('catalog');
   const [pendingChefs, setPendingChefs] = useState<{id: string; name: string; city: string; specialty: string}[]>([]);
 
   // Filters
   const [recipeSearch, setRecipeSearch] = useState('');
-  const [recipeStatusFilter, setRecipeStatusFilter] = useState<'all' | 'published' | 'pending'>('all');
+  const [recipeStatusFilter, setRecipeStatusFilter] = useState<'all' | 'published' | 'pending' | 'has_draft'>('all');
   const [recipePhotoFilter, setRecipePhotoFilter] = useState<'all' | 'without' | 'with'>('all');
   const [photoStatusFilter, setPhotoStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [userSearch, setUserSearch] = useState('');
 
-  // Modals: Recipe Editor / Bulk Import / Wallet Top-up / Partner Create / Campaign Create
+  // Modals: Recipe Editor / Version Control Preview / Bulk Import / Wallet Top-up / Partner Create / Campaign Create
   const [editingRecipe, setEditingRecipe] = useState<Recipe | 'new' | null>(null);
+  const [draftSeedTitle, setDraftSeedTitle] = useState('');
+  const [versionModalTarget, setVersionModalTarget] = useState<{recipeId: string; versionId?: string | null} | null>(
+    null
+  );
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkJson, setBulkJson] = useState(SAMPLE_BULK_JSON);
   const [bulkImporting, setBulkImporting] = useState(false);
@@ -223,21 +264,41 @@ export function AdminDashboard({
         configured: boolean;
         authenticated: boolean;
         quickTestLoginEnabled?: boolean;
+        role?: AdminRole | null;
+        permissions?: AdminPermission[];
+        roles?: DynamicRoleDefinition[];
+        actorName?: string | null;
       }>('/api/admin/status', {
         useAdmin: true,
       });
       setAdminConfigured(statusRes.configured);
       setQuickTestEnabled(Boolean(statusRes.quickTestLoginEnabled));
+      const knownRoles =
+        Array.isArray(statusRes.roles) && statusRes.roles.length > 0 ? statusRes.roles : DEFAULT_DYNAMIC_ROLES;
+      setAclRoles(knownRoles);
 
       let isAuthed = statusRes.authenticated;
+      let resolvedRole: AdminRole = statusRes.role || 'senior_admin';
+      let resolvedPerms: AdminPermission[] = statusRes.permissions || [];
+      let resolvedActor = statusRes.actorName || 'مدیر ارشد سیستم';
+
       // Seamless Test-Mode Auto-Login (automatically disabled in production when ADMIN_PASSCODE/DISABLE_QUICK_TEST_AUTH is set)
       if (!isAuthed && statusRes.quickTestLoginEnabled && !explicitLogout) {
         try {
-          const quickRes = await apiRequest<{adminToken: string}>('/api/admin/quick-test-login', {
+          const quickRes = await apiRequest<{
+            adminToken: string;
+            role: AdminRole;
+            permissions?: AdminPermission[];
+            actorName: string;
+          }>('/api/admin/quick-test-login', {
             method: 'POST',
+            body: JSON.stringify({role: 'senior_admin'}),
           });
           setAdminToken(quickRes.adminToken);
           isAuthed = true;
+          resolvedRole = quickRes.role || 'senior_admin';
+          resolvedPerms = quickRes.permissions || [];
+          resolvedActor = quickRes.actorName || 'مدیر ارشد سیستم';
         } catch {
           // Fall back cleanly to standard login screen
         }
@@ -249,36 +310,123 @@ export function AdminDashboard({
         return;
       }
 
-      const [ov, st, recRes, phRes, usrRes, prtRes, cmpRes, txRes, ordRes] = await Promise.all([
+      setActiveRole(resolvedRole);
+      setActivePermissions(resolvedPerms);
+      setActorName(resolvedActor);
+
+      const checkPerm = (perm: AdminPermission) =>
+        hasAdminPermission(resolvedRole, perm, knownRoles, resolvedPerms);
+
+      // Permission-aware parallel fetching (never calls endpoints disallowed for the active role)
+      const tasks: Promise<void>[] = [
         apiRequest<{
           config: EcosystemConfig;
           pendingChefs: {id: string; name: string; city: string; specialty: string}[];
           analytics: PartnerAnalyticsSummary;
-        }>('/api/admin/overview', {useAdmin: true}),
-        apiRequest<{stats: AdminDashboardStats}>('/api/admin/stats', {useAdmin: true}),
-        apiRequest<{recipes: Recipe[]}>('/api/admin/recipes', {useAdmin: true}),
-        apiRequest<{photos: RecipePhoto[]}>('/api/admin/photos', {useAdmin: true}),
-        apiRequest<{users: AdminUserRow[]}>('/api/admin/users', {useAdmin: true}),
-        apiRequest<{partners: Partner[]}>('/api/admin/partners', {useAdmin: true}),
-        apiRequest<{campaigns: SponsorCampaign[]}>('/api/admin/campaigns', {useAdmin: true}),
-        apiRequest<{transactions: WalletTransaction[]}>('/api/admin/transactions', {useAdmin: true}),
-        apiRequest<{orders: OrderRecord[]}>('/api/admin/orders', {useAdmin: true}),
-      ]);
+        }>('/api/admin/overview', {useAdmin: true}).then((ov) => {
+          setConfig(ov.config);
+          setPendingChefs(ov.pendingChefs);
+          setAnalytics(ov.analytics);
+        }),
+        apiRequest<{stats: AdminDashboardStats}>('/api/admin/stats', {useAdmin: true}).then((st) => {
+          setStats(st.stats);
+        }),
+      ];
 
-      setConfig(ov.config);
-      setPendingChefs(ov.pendingChefs);
-      setAnalytics(ov.analytics);
-      setStats(st.stats);
-      setRecipes(recRes.recipes);
-      setPhotos(phRes.photos);
-      setUsers(usrRes.users);
-      setPartners(prtRes.partners);
-      setCampaigns(cmpRes.campaigns);
-      setTransactions(txRes.transactions);
-      setOrders(ordRes.orders);
-      if (prtRes.partners.length > 0) {
-        setNewCampaign((prev) => (prev.partnerId ? prev : {...prev, partnerId: prtRes.partners[0].id}));
+      if (checkPerm('content.recipes')) {
+        tasks.push(
+          apiRequest<{recipes: Recipe[]}>('/api/admin/recipes', {useAdmin: true}).then((r) => setRecipes(r.recipes)),
+          apiRequest<{drafts: PendingRecipeDraftItem[]}>('/api/admin/recipe-drafts', {useAdmin: true}).then((d) =>
+            setPendingDrafts(d.drafts)
+          ),
+          apiRequest<{report: AdminEditorialInsightsReport}>(
+            `/api/admin/editorial-insights?days=${insightsDaysRef.current}`,
+            {
+              useAdmin: true,
+            }
+          ).then((ins) => setEditorialInsights(ins.report))
+        );
+      } else {
+        setRecipes([]);
+        setPendingDrafts([]);
+        setEditorialInsights(null);
       }
+
+      if (checkPerm('content.photos')) {
+        tasks.push(
+          apiRequest<{photos: RecipePhoto[]}>('/api/admin/photos', {useAdmin: true}).then((p) => setPhotos(p.photos))
+        );
+      } else {
+        setPhotos([]);
+      }
+
+      if (checkPerm('users.view')) {
+        tasks.push(
+          apiRequest<{users: AdminUserRow[]}>('/api/admin/users', {useAdmin: true}).then((u) => setUsers(u.users))
+        );
+      } else {
+        setUsers([]);
+      }
+
+      if (checkPerm('finance.partners') || checkPerm('ads.manage')) {
+        tasks.push(
+          apiRequest<{partners: Partner[]}>('/api/admin/partners', {useAdmin: true})
+            .then((prtRes) => {
+              setPartners(prtRes.partners);
+              if (prtRes.partners.length > 0) {
+                setNewCampaign((prev) => (prev.partnerId ? prev : {...prev, partnerId: prtRes.partners[0].id}));
+              }
+            })
+            .catch(() => {})
+        );
+      } else {
+        setPartners([]);
+      }
+
+      if (checkPerm('ads.manage')) {
+        tasks.push(
+          apiRequest<{nativeAds: NativeAdUnit[]}>('/api/admin/native-ads', {useAdmin: true}).then((res) =>
+            setNativeAds(res.nativeAds || [])
+          )
+        );
+      } else {
+        setNativeAds([]);
+      }
+
+      if (checkPerm('finance.campaigns')) {
+        tasks.push(
+          apiRequest<{campaigns: SponsorCampaign[]}>('/api/admin/campaigns', {useAdmin: true}).then((c) =>
+            setCampaigns(c.campaigns)
+          )
+        );
+      } else {
+        setCampaigns([]);
+      }
+
+      if (checkPerm('finance.wallets')) {
+        tasks.push(
+          apiRequest<{transactions: WalletTransaction[]}>('/api/admin/transactions', {useAdmin: true}).then((t) =>
+            setTransactions(t.transactions)
+          )
+        );
+      } else {
+        setTransactions([]);
+      }
+
+      if (checkPerm('rbac.manage')) {
+        tasks.push(
+          apiRequest<{logs: RbacAuditLog[]}>('/api/admin/rbac/audit', {useAdmin: true}).then((a) =>
+            setRbacAuditLogs(a.logs)
+          ),
+          apiRequest<{roles: DynamicRoleDefinition[]}>('/api/admin/acl/roles', {useAdmin: true}).then((r) => {
+            if (Array.isArray(r.roles) && r.roles.length > 0) setAclRoles(r.roles);
+          })
+        );
+      } else {
+        setRbacAuditLogs([]);
+      }
+
+      await Promise.all(tasks);
     } catch (err) {
       onNotify(err instanceof Error ? err.message : 'خطا در بارگذاری داده‌های پنل مدیریت');
     } finally {
@@ -286,20 +434,49 @@ export function AdminDashboard({
     }
   }, [onNotify, explicitLogout]);
 
+  const refreshEditorialInsights = useCallback(
+    async (targetDays = insightsDays) => {
+      setInsightsLoading(true);
+      try {
+        const res = await apiRequest<{report: AdminEditorialInsightsReport}>(
+          `/api/admin/editorial-insights?days=${targetDays}`,
+          {useAdmin: true}
+        );
+        setEditorialInsights(res.report);
+      } catch (err) {
+        onNotify(err instanceof Error ? err.message : 'خطا در تحلیل ترندهای جستجو');
+      } finally {
+        setInsightsLoading(false);
+      }
+    },
+    [insightsDays, onNotify]
+  );
+
   useEffect(() => {
     loadAllAdminData();
   }, [loadAllAdminData]);
 
-  const handleQuickAdminTestLogin = async () => {
+  const handleQuickAdminTestLogin = async (role: AdminRole = 'senior_admin') => {
     setAuthError(null);
     setExplicitLogout(false);
     try {
-      const res = await apiRequest<{adminToken: string; message?: string}>('/api/admin/quick-test-login', {
+      const res = await apiRequest<{
+        adminToken: string;
+        role: AdminRole;
+        permissions?: AdminPermission[];
+        actorName: string;
+        message?: string;
+      }>('/api/admin/quick-test-login', {
         method: 'POST',
+        body: JSON.stringify({role}),
       });
       setAdminToken(res.adminToken);
+      setActiveRole(res.role);
+      setActivePermissions(res.permissions || []);
+      setActorName(res.actorName);
+      setActiveNav('overview');
       setAdminAuthed(true);
-      onNotify(res.message || 'ورود سریع آزمایشی به پنل مدیریت انجام شد.');
+      onNotify(res.message || `ورود آزمایشی با نقش «${getRoleLabel(role, aclRoles)}» انجام شد.`);
       loadAllAdminData();
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : 'ورود سریع ناموفق بود.');
@@ -312,11 +489,18 @@ export function AdminDashboard({
     setExplicitLogout(false);
     try {
       const endpoint = adminConfigured ? '/api/admin/login' : '/api/admin/setup';
-      const res = await apiRequest<{adminToken: string; message?: string}>(endpoint, {
+      const res = await apiRequest<{
+        adminToken: string;
+        role?: AdminRole;
+        actorName?: string;
+        message?: string;
+      }>(endpoint, {
         method: 'POST',
         body: JSON.stringify({password}),
       });
       setAdminToken(res.adminToken);
+      setActiveRole(res.role || 'senior_admin');
+      setActorName(res.actorName || 'مدیر ارشد سیستم');
       setPassword('');
       setAdminAuthed(true);
       onNotify(res.message || 'به پنل مدیریت جامع لاقلی خوش آمدید.');
@@ -502,13 +686,27 @@ export function AdminDashboard({
           {authError && <p className="text-xs text-red-600 font-medium">{authError}</p>}
 
           {quickTestEnabled && (
-            <button
-              type="button"
-              onClick={handleQuickAdminTestLogin}
-              className="w-full min-h-[48px] rounded-full bg-[#0D0D0D] hover:bg-[#242422] dark:bg-[#FAFAFA] dark:text-[#0B0B0B] text-[#FFFFFF] text-sm font-semibold transition-all active:scale-[0.98]"
-            >
-              ورود سریع آزمایشی به پنل مدیریت (بدون رمز)
-            </button>
+            <div className="space-y-2 pt-1">
+              <div className="text-[11px] font-semibold text-[#5C5C58] dark:text-[#A3A39E]">
+                ورود سریع آزمایشی بر اساس نقش مدیریتی:
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {aclRoles.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => handleQuickAdminTestLogin(r.id)}
+                    className={`min-h-[42px] px-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${
+                      r.id === 'senior_admin'
+                        ? 'bg-[#0D0D0D] hover:bg-[#242422] dark:bg-[#FAFAFA] dark:text-[#0B0B0B] text-[#FFFFFF]'
+                        : 'border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] hover:border-[#B54B1F]'
+                    }`}
+                  >
+                    {r.shortLabel}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
           <input
@@ -541,34 +739,110 @@ export function AdminDashboard({
     );
   }
 
-  const navItems: {id: AdminNavId; label: string; icon: typeof BarChart3; badge?: number}[] = [
-    {id: 'overview', label: 'داشبورد و آمار', icon: BarChart3},
+  const can = (perm: AdminPermission) => hasAdminPermission(activeRole, perm, aclRoles, activePermissions);
+
+  const staffMembersCount = users.filter((u) => normalizeAdminRole(u.role, aclRoles) !== null).length;
+  const activeNativeAdsCount = nativeAds.filter((a) => a.status === 'active').length;
+  const totalNativeAdImpressions = nativeAds.reduce((sum, a) => sum + (a.impressions || 0), 0);
+  const totalNativeAdClicks = nativeAds.reduce((sum, a) => sum + (a.clicks || 0), 0);
+
+  const allNavItems: {
+    id: AdminNavId;
+    label: string;
+    icon: typeof BarChart3;
+    badge?: number;
+    visible: boolean;
+  }[] = [
+    {id: 'overview', label: 'داشبورد و آمار', icon: BarChart3, visible: can('dashboard.view')},
+    {
+      id: 'behavioral_intel',
+      label: 'هوش رفتاری و شناخت کاربر',
+      icon: TrendingUp,
+      visible: activeRole === 'senior_admin',
+    },
+    {
+      id: 'app_control',
+      label: 'کنترل داینامیک اپ کاربر',
+      icon: LayoutGrid,
+      visible: can('app.layout') || can('ecosystem.manage'),
+    },
+    {
+      id: 'native_ads',
+      label: 'استودیو تبلیغات بومی',
+      icon: Megaphone,
+      badge: activeNativeAdsCount || undefined,
+      visible: can('ads.manage'),
+    },
+    {
+      id: 'ad_market',
+      label: 'مزایده، حامی ویژه و پنل برندها',
+      icon: Gavel,
+      visible: can('ads.manage'),
+    },
     {
       id: 'recipes',
-      label: 'دستورهای پخت و ورود دسته‌ای',
+      label: 'دستورهای پخت و کنترل نسخه',
       icon: BookOpen,
-      badge: stats?.recipesWithoutPhoto || undefined,
+      badge: (stats?.pendingDraftVersionsCount || 0) > 0 ? stats?.pendingDraftVersionsCount : stats?.recipesWithoutPhoto || undefined,
+      visible: can('content.recipes'),
     },
     {
       id: 'photos',
       label: 'مدیریت عکس‌های کاربران',
       icon: Camera,
       badge: stats?.pendingPhotosCount || undefined,
+      visible: can('content.photos'),
     },
-    {id: 'users', label: 'کاربران و شارژ حساب کاربری', icon: Users},
     {
       id: 'partners',
-      label: 'اصناف و شارژ حساب تجاری',
+      label: 'برندهای همکار و اصناف',
       icon: Store,
       badge: stats?.pendingPartnersCount || undefined,
+      visible: can('finance.partners'),
     },
-    {id: 'campaigns', label: 'اسپانسرها و تبلیغات', icon: Megaphone, badge: stats?.activeCampaignsCount || undefined},
-    {id: 'frontend_ops', label: 'منوی روز، یخچال، جِم و نظرات', icon: Utensils},
-    {id: 'ecosystem', label: 'اکوسیستم، سفارش‌ها و مالی', icon: Settings},
+    {
+      id: 'campaigns',
+      label: 'کمپین‌های ویژه برندها',
+      icon: Sparkles,
+      badge: stats?.activeCampaignsCount || undefined,
+      visible: can('finance.campaigns'),
+    },
+    {
+      id: 'frontend_ops',
+      label: 'یخچال هوشمند و پرسش‌وپاسخ',
+      icon: Utensils,
+      visible: can('content.kitchen') || can('content.qa'),
+    },
+    {
+      id: 'users',
+      label: can('users.manage') ? 'کاربران و سرآشپزها' : 'کیف جِم کاربران',
+      icon: Users,
+      visible: can('users.view'),
+    },
+    {
+      id: 'ecosystem',
+      label: 'دفتر کل مالی و تراکنش‌ها',
+      icon: Settings,
+      visible: can('finance.wallets'),
+    },
+    {
+      id: 'rbac',
+      label: 'ماتریس دسترسی پویا و نقش‌ها',
+      icon: ShieldCheck,
+      badge: staffMembersCount || undefined,
+      visible: can('rbac.manage'),
+    },
   ];
 
+  const navItems = allNavItems.filter((item) => item.visible);
+  const currentNav: AdminNavId = navItems.some((n) => n.id === activeNav) ? activeNav : 'overview';
+
   const filteredRecipes = recipes.filter((r) => {
-    if (recipeStatusFilter !== 'all' && r.status !== recipeStatusFilter) return false;
+    if (recipeStatusFilter === 'has_draft') {
+      if ((r.pendingDraftsCount || 0) === 0 && r.status !== 'pending') return false;
+    } else if (recipeStatusFilter !== 'all' && r.status !== recipeStatusFilter) {
+      return false;
+    }
     const hasPhoto = Boolean(r.imageUrl && r.imageUrl.trim().length > 0);
     if (recipePhotoFilter === 'without' && hasPhoto) return false;
     if (recipePhotoFilter === 'with' && !hasPhoto) return false;
@@ -605,18 +879,43 @@ export function AdminDashboard({
             <Menu className="w-5 h-5" />
           </button>
           <div>
-            <div className="flex items-center gap-2 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
-              <span>میز کار جامع مدیریت لاقلی</span>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
+              <span>سوپرپنل ایزوله مدیریت لاقلی</span>
               <span aria-hidden="true">·</span>
-              <span>کنترل محتوا، عکس کاربران، مالی و اسپانسرها</span>
+              <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${getRoleBadgeClass(activeRole)}`}>
+                {getRoleLabel(activeRole, aclRoles)}
+              </span>
+              <span className="hidden sm:inline text-[11px]">({actorName})</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight mt-0.5">
-              {navItems.find((n) => n.id === activeNav)?.label}
+              {navItems.find((n) => n.id === currentNav)?.label}
             </h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {quickTestEnabled && (
+            <div
+              role="group"
+              aria-label="تغییر سریع نقش آزمایشی"
+              className="inline-flex flex-wrap items-center rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] p-1 gap-1"
+            >
+              {aclRoles.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => handleQuickAdminTestLogin(r.id)}
+                  className={`min-h-[32px] px-2.5 rounded-lg text-[11px] font-semibold transition-colors ${
+                    activeRole === r.id
+                      ? 'bg-[#111110] text-white dark:bg-[#FAFAFA] dark:text-[#111110]'
+                      : 'text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#111110] dark:hover:text-[#FAFAFA]'
+                  }`}
+                >
+                  {r.shortLabel}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             type="button"
             onClick={loadAllAdminData}
@@ -658,7 +957,7 @@ export function AdminDashboard({
         >
           {navItems.map((item) => {
             const Icon = item.icon;
-            const active = activeNav === item.id;
+            const active = currentNav === item.id;
             return (
               <button
                 key={item.id}
@@ -700,7 +999,7 @@ export function AdminDashboard({
           {/* =========================================================
               1. OVERVIEW & ANALYTICS
           ========================================================= */}
-          {activeNav === 'overview' && stats && (
+          {currentNav === 'overview' && stats && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 tabular-nums">
                 <KpiCard
@@ -724,28 +1023,36 @@ export function AdminDashboard({
                   value={toFaDigits(stats.totalPartners)}
                   hint={`${toFaDigits(stats.activeCampaignsCount)} کمپین اسپانسری فعال`}
                 />
-                <KpiCard
-                  label="مجموع کیف پول کاربران"
-                  value={formatToman(stats.totalUserWalletToman)}
-                  hint="تومان (قابل شارژ از بخش کاربران)"
-                />
-                <KpiCard
-                  label="مجموع حساب تجاری اصناف"
-                  value={formatToman(stats.totalPartnerWalletToman)}
-                  hint="تومان (بودجه تبلیغات و اسپانسری)"
-                />
-                <KpiCard
-                  label="سفارش‌های غذای روز"
-                  value={toFaDigits(stats.totalOrdersCount)}
-                  hint="سفره ادیتوریال لاقلی"
-                />
-                <KpiCard
-                  label="تعاملات اسپانسری"
-                  value={toFaDigits(
-                    (analytics?.totalImpressions || 0) + (analytics?.totalAffiliateClicks || 0)
-                  )}
-                  hint={`${toFaDigits(analytics?.totalCouponCopies || 0)} کپی کد تخفیف`}
-                />
+                {can('finance.wallets') && (
+                  <KpiCard
+                    label="مجموع کیف پول کاربران"
+                    value={formatToman(stats.totalUserWalletToman)}
+                    hint="تومان (قابل شارژ از بخش کاربران)"
+                  />
+                )}
+                {can('finance.wallets') && (
+                  <KpiCard
+                    label="مجموع حساب تجاری اصناف"
+                    value={formatToman(stats.totalPartnerWalletToman)}
+                    hint="تومان (بودجه تبلیغات و اسپانسری)"
+                  />
+                )}
+                {can('ads.manage') && (
+                  <KpiCard
+                    label="واحدهای تبلیغ بومی فعال"
+                    value={toFaDigits(activeNativeAdsCount)}
+                    hint={`${toFaDigits(totalNativeAdImpressions)} نمایش · ${toFaDigits(totalNativeAdClicks)} کلیک`}
+                  />
+                )}
+                {can('finance.campaigns') && (
+                  <KpiCard
+                    label="تعاملات برندهای همکار"
+                    value={toFaDigits(
+                      (analytics?.totalImpressions || 0) + (analytics?.totalAffiliateClicks || 0)
+                    )}
+                    hint={`${toFaDigits(analytics?.totalProfileOpens || 0)} بازدید صفحه برند`}
+                  />
+                )}
               </div>
 
               {/* Actionable Quick Queues */}
@@ -753,84 +1060,135 @@ export function AdminDashboard({
                 <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-base font-bold">اقدامات فوری مدیریت</h2>
-                    <button
-                      type="button"
-                      onClick={() => setBulkOpen(true)}
-                      className="text-xs font-medium text-[#B54B1F] dark:text-[#E29A6F] hover:underline"
-                    >
-                      + ورود دسته‌ای دستورها
-                    </button>
+                    {can('content.recipes') && (
+                      <button
+                        type="button"
+                        onClick={() => setBulkOpen(true)}
+                        className="text-xs font-medium text-[#B54B1F] dark:text-[#E29A6F] hover:underline"
+                      >
+                        + ورود دسته‌ای دستورها
+                      </button>
+                    )}
                   </div>
                   <div className="space-y-2.5 text-sm">
-                    <QuickRow
-                      label="عکس‌های واقعی کاربران در انتظار بررسی"
-                      count={stats.pendingPhotosCount}
-                      actionLabel="بررسی و انتخاب تصویر اصلی"
-                      onClick={() => {
-                        setPhotoStatusFilter('pending');
-                        setActiveNav('photos');
-                      }}
-                    />
-                    <QuickRow
-                      label="دستورهای پخت بدون عکس (آماده عکاسی کاربران)"
-                      count={stats.recipesWithoutPhoto}
-                      actionLabel="مشاهده فهرست"
-                      onClick={() => {
-                        setRecipePhotoFilter('without');
-                        setActiveNav('recipes');
-                      }}
-                    />
-                    <QuickRow
-                      label="دستورهای ارسالی کاربران در انتظار انتشار"
-                      count={stats.pendingRecipesCount}
-                      actionLabel="بررسی دستورها"
-                      onClick={() => {
-                        setRecipeStatusFilter('pending');
-                        setActiveNav('recipes');
-                      }}
-                    />
-                    <QuickRow
-                      label="کسب‌وکارهای در انتظار تایید یا Claim"
-                      count={stats.pendingPartnersCount}
-                      actionLabel="مدیریت اصناف"
-                      onClick={() => setActiveNav('partners')}
-                    />
+                    {can('content.photos') && (
+                      <QuickRow
+                        label="عکس‌های واقعی کاربران در انتظار بررسی"
+                        count={stats.pendingPhotosCount}
+                        actionLabel="بررسی و انتخاب تصویر اصلی"
+                        onClick={() => {
+                          setPhotoStatusFilter('pending');
+                          setActiveNav('photos');
+                        }}
+                      />
+                    )}
+                    {can('content.recipes') && (
+                      <QuickRow
+                        label="دستورهای پخت بدون عکس (آماده عکاسی کاربران)"
+                        count={stats.recipesWithoutPhoto}
+                        actionLabel="مشاهده فهرست"
+                        onClick={() => {
+                          setRecipePhotoFilter('without');
+                          setActiveNav('recipes');
+                        }}
+                      />
+                    )}
+                    {can('content.recipes') && (
+                      <QuickRow
+                        label="پیش‌نویس‌های دستورپخت در انتظار پیش‌نمایش و تایید"
+                        count={stats.pendingDraftVersionsCount}
+                        actionLabel="بررسی و تایید پیش‌نویس‌ها"
+                        onClick={() => {
+                          setRecipeStatusFilter('has_draft');
+                          setActiveNav('recipes');
+                        }}
+                      />
+                    )}
+                    {can('content.recipes') && (
+                      <QuickRow
+                        label="دستورهای ارسالی کاربران در انتظار انتشار"
+                        count={stats.pendingRecipesCount}
+                        actionLabel="بررسی دستورها"
+                        onClick={() => {
+                          setRecipeStatusFilter('pending');
+                          setActiveNav('recipes');
+                        }}
+                      />
+                    )}
+                    {can('finance.partners') && (
+                      <QuickRow
+                        label="کسب‌وکارهای در انتظار تایید یا مالکیت"
+                        count={stats.pendingPartnersCount}
+                        actionLabel="مدیریت اصناف"
+                        onClick={() => setActiveNav('partners')}
+                      />
+                    )}
+                    {can('rbac.manage') && (
+                      <QuickRow
+                        label="اعضای تیم مدیریت دارای سطح دسترسی فعال"
+                        count={staffMembersCount}
+                        actionLabel="مدیریت نقش‌ها"
+                        onClick={() => setActiveNav('rbac')}
+                      />
+                    )}
                   </div>
                 </div>
 
                 {/* Pending Chef Verifications & Partner Analytics */}
                 <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
-                  <h2 className="text-base font-bold">عملکرد اصناف و اسپانسرها</h2>
-                  {analytics && analytics.byPartner.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs text-right tabular-nums">
-                        <thead>
-                          <tr className="border-b border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58]">
-                            <th className="py-2 font-medium">نام همکار</th>
-                            <th className="py-2 font-medium">نمایش</th>
-                            <th className="py-2 font-medium">بازدید</th>
-                            <th className="py-2 font-medium">کوپن</th>
-                            <th className="py-2 font-medium">کلیک خرید</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#E6E6E3]/60 dark:divide-[#282825]">
-                          {analytics.byPartner.slice(0, 6).map((row) => (
-                            <tr key={row.partnerId}>
-                              <td className="py-2.5 font-medium">{row.partnerName}</td>
-                              <td className="py-2.5">{toFaDigits(row.impressions)}</td>
-                              <td className="py-2.5">{toFaDigits(row.profileOpens)}</td>
-                              <td className="py-2.5">{toFaDigits(row.couponCopies)}</td>
-                              <td className="py-2.5">{toFaDigits(row.affiliateClicks)}</td>
+                  <h2 className="text-base font-bold">
+                    {can('finance.partners') ? 'عملکرد اصناف و اسپانسرها' : 'حوزه اختیارات نقش فعلی'}
+                  </h2>
+                  {can('finance.partners') ? (
+                    analytics && analytics.byPartner.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-right tabular-nums">
+                          <thead>
+                            <tr className="border-b border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58]">
+                              <th className="py-2 font-medium">نام همکار</th>
+                              <th className="py-2 font-medium">نمایش</th>
+                              <th className="py-2 font-medium">بازدید</th>
+                              <th className="py-2 font-medium">کوپن</th>
+                              <th className="py-2 font-medium">کلیک خرید</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody className="divide-y divide-[#E6E6E3]/60 dark:divide-[#282825]">
+                            {analytics.byPartner.slice(0, 6).map((row) => (
+                              <tr key={row.partnerId}>
+                                <td className="py-2.5 font-medium">{row.partnerName}</td>
+                                <td className="py-2.5">{toFaDigits(row.impressions)}</td>
+                                <td className="py-2.5">{toFaDigits(row.profileOpens)}</td>
+                                <td className="py-2.5">{toFaDigits(row.couponCopies)}</td>
+                                <td className="py-2.5">{toFaDigits(row.affiliateClicks)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-[#5C5C58]">داده‌ای ثبت نشده است.</p>
+                    )
                   ) : (
-                    <p className="text-xs text-[#5C5C58]">داده‌ای ثبت نشده است.</p>
+                    <div className="space-y-2 text-xs text-[#5C5C58] dark:text-[#A3A39E]">
+                      <p className="leading-relaxed">
+                        {aclRoles.find((r) => r.id === activeRole)?.description ||
+                          'دسترسی‌های این نقش از طریق ماتریس دسترسی پویا تنظیم شده است.'}
+                      </p>
+                      <ul className="space-y-1.5 pt-1">
+                        {navItems
+                          .filter((item) => item.id !== 'overview')
+                          .slice(0, 4)
+                          .map((item) => (
+                            <li key={item.id} className="flex items-center gap-1.5 text-[#0D0D0D] dark:text-[#FAFAFA]">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F] shrink-0" />
+                              <span>{item.label}</span>
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
                   )}
 
-                  {pendingChefs.length > 0 && (
+                  {can('content.chefs') && pendingChefs.length > 0 && (
                     <div className="pt-3 border-t border-[#E6E6E3] dark:border-[#282825] space-y-2">
                       <p className="text-xs font-semibold text-[#A97222]">درخواست‌های نشان سرآشپز تاییدشده</p>
                       {pendingChefs.map((c) => (
@@ -855,14 +1213,218 @@ export function AdminDashboard({
                   )}
                 </div>
               </div>
+
+              {/* Smart Editorial Recommendations Spotlight */}
+              {can('content.recipes') && editorialInsights && editorialInsights.recommendations.length > 0 && (
+                <div className="rounded-2xl border border-[#B54B1F]/25 dark:border-[#E29A6F]/25 bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#B54B1F]/10 dark:bg-[#E29A6F]/15 flex items-center justify-center">
+                        <Sparkles className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
+                      </div>
+                      <div>
+                        <h2 className="text-sm sm:text-base font-extrabold">
+                          پیشنهادهای هوشمند بازبینی (بر اساس ترندهای جستجوی کاربران)
+                        </h2>
+                        <p className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
+                          {toFaDigits(editorialInsights.totalSearchesAnalyzed)} جستجو تحلیل شد ·{' '}
+                          {toFaDigits(editorialInsights.recommendations.length)} دستور نیازمند توجه ·{' '}
+                          {toFaDigits(editorialInsights.contentGaps.length)} ترند بدون دستورپخت
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRecipesSubTab('insights');
+                        setActiveNav('recipes');
+                      }}
+                      className="min-h-[38px] px-4 rounded-xl bg-[#111110] hover:bg-[#242422] dark:bg-[#FAFAFA] dark:text-[#111110] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                    >
+                      <TrendingUp className="w-3.5 h-3.5" />
+                      <span>مشاهده کامل تحلیل و ترندها</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                    {editorialInsights.recommendations.slice(0, 3).map((recItem) => (
+                      <div
+                        key={recItem.recipe.id}
+                        className="rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FAF9F7] dark:bg-[#10100F] p-3.5 flex flex-col justify-between gap-3"
+                      >
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-2 text-[10px] tabular-nums">
+                            <span className="px-2 py-0.5 rounded-md bg-[#B54B1F]/12 text-[#B54B1F] dark:text-[#E29A6F] font-bold">
+                              اولویت {toFaDigits(recItem.priorityScore)} از ۱۰۰
+                            </span>
+                            {recItem.searchHits > 0 && (
+                              <span className="text-[#5C5C58] font-semibold">
+                                {toFaDigits(recItem.searchHits)} جستجوی مرتبط
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs font-extrabold truncate">{recItem.recipe.title}</div>
+                          <p className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E] line-clamp-2 leading-relaxed">
+                            {recItem.reasons[0]?.label}: {recItem.reasons[0]?.detail}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (recItem.recommendedAction === 'review_draft') {
+                              setVersionModalTarget({recipeId: recItem.recipe.id});
+                            } else if (recItem.recommendedAction === 'moderate_photo') {
+                              setPhotoStatusFilter('pending');
+                              setActiveNav('photos');
+                            } else if (recItem.recommendedAction === 'answer_qa') {
+                              setActiveNav('frontend_ops');
+                            } else {
+                              setDraftSeedTitle('');
+                              setEditingRecipe(recItem.recipe);
+                            }
+                          }}
+                          className="w-full min-h-[34px] rounded-lg bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-white text-[11px] font-semibold"
+                        >
+                          {recItem.recommendedActionLabel}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* =========================================================
-              2. RECIPES CMS + BULK IMPORT FOR THOUSANDS OF RECIPES
+              2. RECIPES CMS + VERSION CONTROL + SMART RECOMMENDATIONS
           ========================================================= */}
-          {activeNav === 'recipes' && (
+          {currentNav === 'recipes' && can('content.recipes') && (
             <div className="space-y-5">
+              {/* Recipes Workspace Sub-Tab Switcher */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="inline-flex items-center rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-1 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setRecipesSubTab('catalog')}
+                    className={`min-h-[38px] px-4 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors ${
+                      recipesSubTab === 'catalog'
+                        ? 'bg-[#B54B1F] text-white dark:bg-[#E29A6F] dark:text-[#0B0B0B]'
+                        : 'text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
+                    }`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>فهرست دستورها و کنترل نسخه</span>
+                    {pendingDrafts.length > 0 && (
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[10px] tabular-nums ${
+                          recipesSubTab === 'catalog'
+                            ? 'bg-white/20 text-white dark:bg-black/20 dark:text-[#0B0B0B]'
+                            : 'bg-[#A97222]/15 text-[#8A5A14] dark:text-[#E8C483]'
+                        }`}
+                      >
+                        {toFaDigits(pendingDrafts.length)}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecipesSubTab('insights')}
+                    className={`min-h-[38px] px-4 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors ${
+                      recipesSubTab === 'insights'
+                        ? 'bg-[#B54B1F] text-white dark:bg-[#E29A6F] dark:text-[#0B0B0B]'
+                        : 'text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA]'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>پیشنهاددهنده هوشمند و ترند جستجو</span>
+                    {editorialInsights && editorialInsights.recommendations.length > 0 && (
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[10px] tabular-nums ${
+                          recipesSubTab === 'insights'
+                            ? 'bg-white/20 text-white dark:bg-black/20 dark:text-[#0B0B0B]'
+                            : 'bg-[#B54B1F]/12 text-[#B54B1F] dark:text-[#E29A6F]'
+                        }`}
+                      >
+                        {toFaDigits(editorialInsights.recommendations.length)}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {recipesSubTab === 'insights' ? (
+                <AdminEditorialInsightsPanel
+                  report={editorialInsights}
+                  loading={insightsLoading}
+                  days={insightsDays}
+                  onChangeDays={(d) => {
+                    setInsightsDays(d);
+                    refreshEditorialInsights(d);
+                  }}
+                  onRefresh={() => refreshEditorialInsights(insightsDays)}
+                  onEditRecipeAsDraft={(rec) => {
+                    setDraftSeedTitle('');
+                    setEditingRecipe(rec);
+                  }}
+                  onOpenVersions={(recipeId) => setVersionModalTarget({recipeId})}
+                  onOpenPhotoModeration={() => {
+                    setPhotoStatusFilter('pending');
+                    setActiveNav('photos');
+                  }}
+                  onOpenQaModeration={() => setActiveNav('frontend_ops')}
+                  onCreateRecipeFromTrend={(trendQuery) => {
+                    setDraftSeedTitle(trendQuery);
+                    setEditingRecipe('new');
+                  }}
+                />
+              ) : (
+                <>
+              {/* Pending Drafts Review Queue */}
+              {pendingDrafts.length > 0 && (
+                <div className="rounded-2xl border border-[#A97222]/35 bg-[#A97222]/[0.06] dark:bg-[#D8A85B]/[0.08] p-4 sm:p-5 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <History className="w-4 h-4 text-[#A97222] dark:text-[#E8C483]" />
+                      <h2 className="text-sm font-extrabold text-[#7C5010] dark:text-[#E8C483]">
+                        صف پیش‌نویس‌های در انتظار پیش‌نمایش و تایید نهایی ({toFaDigits(pendingDrafts.length)})
+                      </h2>
+                    </div>
+                    <span className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E]">
+                      نسخه فعال فعلی تا زمان تایید شما تغییری نمی‌کند.
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {pendingDrafts.map((dr) => (
+                      <div
+                        key={dr.versionId}
+                        className="rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-3.5 flex flex-col justify-between gap-3"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-extrabold truncate">{dr.recipeTitle}</span>
+                            <span className="px-2 py-0.5 rounded-md bg-[#A97222]/15 text-[#8A5A14] dark:text-[#E8C483] text-[10px] font-bold shrink-0 tabular-nums">
+                              نسخه {toFaDigits(dr.versionNumber)}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E] line-clamp-2 leading-relaxed">
+                            {dr.changeSummary || 'پیش‌نویس آماده بررسی'}
+                          </p>
+                          <div className="text-[10px] text-[#5C5C58]">ثبت توسط: {dr.createdByName}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setVersionModalTarget({recipeId: dr.recipeId, versionId: dr.versionId})}
+                          className="w-full min-h-[36px] rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>پیش‌نمایش، مقایسه و تایید</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Top Toolbar */}
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                 <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0 w-full sm:w-auto">
@@ -878,10 +1440,13 @@ export function AdminDashboard({
                   </div>
                   <select
                     value={recipeStatusFilter}
-                    onChange={(e) => setRecipeStatusFilter(e.target.value as 'all' | 'published' | 'pending')}
+                    onChange={(e) =>
+                      setRecipeStatusFilter(e.target.value as 'all' | 'published' | 'pending' | 'has_draft')
+                    }
                     className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
                   >
                     <option value="all">همه وضعیت‌ها</option>
+                    <option value="has_draft">دارای پیش‌نویس آماده بررسی</option>
                     <option value="published">منتشرشده</option>
                     <option value="pending">در انتظار تایید</option>
                   </select>
@@ -926,13 +1491,14 @@ export function AdminDashboard({
                         <th className="py-3.5 px-3 font-medium">دسته / منطقه</th>
                         <th className="py-3.5 px-3 font-medium">نویسنده</th>
                         <th className="py-3.5 px-3 font-medium">وضعیت عکس</th>
-                        <th className="py-3.5 px-3 font-medium">وضعیت انتشار</th>
+                        <th className="py-3.5 px-3 font-medium">وضعیت و نسخه</th>
                         <th className="py-3.5 px-4 font-medium text-left">عملیات</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#E6E6E3]/70 dark:divide-[#282825]">
                       {filteredRecipes.map((rec) => {
                         const hasPhoto = Boolean(rec.imageUrl && rec.imageUrl.trim().length > 0);
+                        const hasDrafts = (rec.pendingDraftsCount || 0) > 0;
                         return (
                           <tr
                             key={rec.id}
@@ -974,18 +1540,47 @@ export function AdminDashboard({
                               )}
                             </td>
                             <td className="py-3 px-3 whitespace-nowrap">
-                              <span
-                                className={
-                                  rec.status === 'published'
-                                    ? 'text-[#B54B1F] dark:text-[#E29A6F] font-medium'
-                                    : 'text-[#A97222] font-medium'
-                                }
-                              >
-                                {rec.status === 'published' ? 'منتشرشده' : 'در انتظار تایید'}
-                              </span>
+                              <div className="flex flex-col gap-1 items-start">
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className={
+                                      rec.status === 'published'
+                                        ? 'text-emerald-700 dark:text-emerald-400 font-semibold'
+                                        : 'text-[#A97222] font-semibold'
+                                    }
+                                  >
+                                    {rec.status === 'published' ? 'منتشرشده' : 'پیش‌نویس اولیه'}
+                                  </span>
+                                  <span className="px-1.5 py-0.5 rounded bg-[#EFEFED] dark:bg-[#232320] text-[#5C5C58] dark:text-[#A3A39E] text-[10px] font-bold tabular-nums">
+                                    نسخه {toFaDigits(rec.latestVersionNumber || 1)}
+                                  </span>
+                                </div>
+                                {hasDrafts && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setVersionModalTarget({recipeId: rec.id})}
+                                    className="px-2 py-0.5 rounded-md bg-[#A97222]/15 text-[#8A5A14] dark:text-[#E8C483] text-[10px] font-bold hover:underline tabular-nums"
+                                  >
+                                    {toFaDigits(rec.pendingDraftsCount || 0)} پیش‌نویس در انتظار تایید
+                                  </button>
+                                )}
+                              </div>
                             </td>
                             <td className="py-3 px-4 whitespace-nowrap text-left">
                               <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  title="تاریخچه نسخه‌ها و پیش‌نمایش"
+                                  onClick={() => setVersionModalTarget({recipeId: rec.id})}
+                                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition-colors ${
+                                    hasDrafts
+                                      ? 'bg-[#A97222] text-white hover:bg-[#8E5E1B]'
+                                      : 'border border-[#E6E6E3] dark:border-[#282825] hover:bg-[#EFEFED] dark:hover:bg-[#20201E]'
+                                  }`}
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>{hasDrafts ? 'بررسی پیش‌نویس' : 'نسخه‌ها'}</span>
+                                </button>
                                 {rec.status === 'pending' && (
                                   <button
                                     type="button"
@@ -998,7 +1593,7 @@ export function AdminDashboard({
                                       onRefreshAppRecipes();
                                       loadAllAdminData();
                                     }}
-                                    className="px-2.5 py-1.5 rounded-lg bg-[#B54B1F] text-white text-[11px]"
+                                    className="px-2.5 py-1.5 rounded-lg bg-[#B54B1F] text-white text-[11px] font-semibold"
                                   >
                                     انتشار
                                   </button>
@@ -1036,13 +1631,15 @@ export function AdminDashboard({
                   </table>
                 </div>
               </div>
+                </>
+              )}
             </div>
           )}
 
           {/* =========================================================
               3. COMMUNITY PHOTO MODERATION & COVER PROMOTION
           ========================================================= */}
-          {activeNav === 'photos' && (
+          {currentNav === 'photos' && can('content.photos') && (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                 <div className="space-y-0.5">
@@ -1165,7 +1762,7 @@ export function AdminDashboard({
           {/* =========================================================
               4. USERS MANAGEMENT & USER WALLET (TOMAN & GEMS) TOP-UP
           ========================================================= */}
-          {activeNav === 'users' && (
+          {currentNav === 'users' && can('users.view') && (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                 <div className="relative flex-1 max-w-md">
@@ -1178,8 +1775,18 @@ export function AdminDashboard({
                     className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] pr-9 pl-3 text-xs"
                   />
                 </div>
-                <div className="text-xs text-[#5C5C58] tabular-nums">
-                  مجموع کاربران: {toFaDigits(filteredUsers.length)} نفر
+                <div className="flex items-center gap-3 text-xs text-[#5C5C58] tabular-nums">
+                  <span>مجموع کاربران: {toFaDigits(filteredUsers.length)} نفر</span>
+                  {can('rbac.manage') && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveNav('rbac')}
+                      className="min-h-[36px] px-3 rounded-xl border border-[#B54B1F]/35 text-[#B54B1F] dark:text-[#E29A6F] font-semibold inline-flex items-center gap-1.5 hover:bg-[#B54B1F]/8"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>کنسول سطوح دسترسی</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1189,7 +1796,7 @@ export function AdminDashboard({
                     <thead className="bg-[#F6F6F5] dark:bg-[#0B0B0B] border-b border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58]">
                       <tr>
                         <th className="py-3.5 px-4 font-medium">کاربر و موبایل</th>
-                        <th className="py-3.5 px-3 font-medium">نقش و نشان</th>
+                        <th className="py-3.5 px-3 font-medium">نقش و سطح دسترسی</th>
                         <th className="py-3.5 px-3 font-medium">کیف پول (تومان)</th>
                         <th className="py-3.5 px-3 font-medium">کیف جِم</th>
                         <th className="py-3.5 px-3 font-medium">مشارکت</th>
@@ -1197,103 +1804,142 @@ export function AdminDashboard({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#E6E6E3]/70 dark:divide-[#282825]">
-                      {filteredUsers.map((u) => (
-                        <tr key={u.id} className={u.isSuspended ? 'opacity-55' : ''}>
-                          <td className="py-3.5 px-4">
-                            <div className="font-bold text-sm flex items-center gap-1.5">
-                              <span>{u.name}</span>
-                              {u.isVerifiedChef && (
-                                <BadgeCheck className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
+                      {filteredUsers.map((u) => {
+                        const adminNorm = normalizeAdminRole(u.role, aclRoles);
+                        const selectRoleValue = u.role === 'admin' ? 'senior_admin' : u.role;
+                        return (
+                          <tr key={u.id} className={u.isSuspended ? 'opacity-55' : ''}>
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-sm flex items-center gap-1.5">
+                                <span>{u.name}</span>
+                                {u.isVerifiedChef && (
+                                  <BadgeCheck className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]" />
+                                )}
+                              </div>
+                              <div className="text-[11px] text-[#5C5C58]" dir="ltr">
+                                {toFaDigits(u.phone)} · {u.city}
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-3">
+                              {can('rbac.manage') ? (
+                                <select
+                                  value={selectRoleValue}
+                                  onChange={async (e) => {
+                                    try {
+                                      await apiRequest(`/api/admin/users/${u.id}`, {
+                                        method: 'PATCH',
+                                        useAdmin: true,
+                                        body: JSON.stringify({
+                                          role: e.target.value,
+                                          roleNote: 'بروزرسانی از جدول کاربران',
+                                        }),
+                                      });
+                                      onNotify(
+                                        `نقش ${u.name} به «${getRoleLabel(e.target.value, aclRoles)}» به‌روزرسانی شد.`
+                                      );
+                                      loadAllAdminData();
+                                    } catch (err) {
+                                      onNotify(err instanceof Error ? err.message : 'خطا در تغییر نقش کاربر');
+                                    }
+                                  }}
+                                  className="min-h-[34px] rounded-lg border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-2 text-xs"
+                                >
+                                  <option value="user">کاربر عادی</option>
+                                  <option value="chef">سرآشپز</option>
+                                  <option value="partner">برند همکار</option>
+                                  {aclRoles.map((r) => (
+                                    <option key={r.id} value={r.id}>
+                                      {r.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span
+                                  className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                                    adminNorm
+                                      ? getRoleBadgeClass(adminNorm)
+                                      : 'bg-[#EFEFED] dark:bg-[#20201E] text-[#5C5C58] dark:text-[#A3A39E]'
+                                  }`}
+                                >
+                                  {getRoleLabel(u.role, aclRoles)}
+                                </span>
                               )}
-                            </div>
-                            <div className="text-[11px] text-[#5C5C58]" dir="ltr">
-                              {toFaDigits(u.phone)} · {u.city}
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-3">
-                            <select
-                              value={u.role}
-                              onChange={async (e) => {
-                                await apiRequest(`/api/admin/users/${u.id}`, {
-                                  method: 'PATCH',
-                                  useAdmin: true,
-                                  body: JSON.stringify({role: e.target.value}),
-                                });
-                                onNotify(`نقش ${u.name} به‌روزرسانی شد.`);
-                                loadAllAdminData();
-                              }}
-                              className="min-h-[34px] rounded-lg border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-2 text-xs"
-                            >
-                              <option value="user">کاربر عادی</option>
-                              <option value="chef">سرآشپز</option>
-                              <option value="partner">حساب تجاری</option>
-                              <option value="admin">مدیر</option>
-                            </select>
-                          </td>
-                          <td className="py-3.5 px-3 font-bold text-[#B54B1F] dark:text-[#E29A6F]">
-                            {formatToman(u.walletBalance)}
-                          </td>
-                          <td className="py-3.5 px-3 font-bold text-[#A97222] dark:text-[#D8A85B]">
-                            {toFaDigits(u.gems)} جِم
-                          </td>
-                          <td className="py-3.5 px-3 text-[#5C5C58]">
-                            {toFaDigits(u.recipesCount)} دستور · {toFaDigits(u.photosCount)} عکس
-                          </td>
-                          <td className="py-3.5 px-4 text-left whitespace-nowrap">
-                            <div className="inline-flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setWalletCurrency('toman');
-                                  setWalletAmount('500000');
-                                  setWalletReason('شارژ کیف پول کاربری توسط مدیریت');
-                                  setWalletTarget({
-                                    type: 'user',
-                                    id: u.id,
-                                    name: u.name,
-                                    currentToman: u.walletBalance,
-                                    currentGems: u.gems,
-                                  });
-                                }}
-                                className="px-3 py-1.5 rounded-lg bg-[#B54B1F] text-white text-[11px] font-medium inline-flex items-center gap-1"
-                              >
-                                <Wallet className="w-3.5 h-3.5" />
-                                <span>شارژ حساب / جِم</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  await apiRequest(`/api/admin/users/${u.id}`, {
-                                    method: 'PATCH',
-                                    useAdmin: true,
-                                    body: JSON.stringify({isVerifiedChef: !u.isVerifiedChef}),
-                                  });
-                                  onNotify('وضعیت نشان سرآشپز تغییر یافت.');
-                                  loadAllAdminData();
-                                }}
-                                className="px-2.5 py-1.5 rounded-lg border border-[#E6E6E3] dark:border-[#282825] text-[11px]"
-                              >
-                                {u.isVerifiedChef ? 'لغو نشان' : 'تایید سرآشپز'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  await apiRequest(`/api/admin/users/${u.id}`, {
-                                    method: 'PATCH',
-                                    useAdmin: true,
-                                    body: JSON.stringify({isSuspended: !u.isSuspended}),
-                                  });
-                                  onNotify(u.isSuspended ? 'حساب کاربری فعال شد.' : 'حساب کاربری مسدود شد.');
-                                  loadAllAdminData();
-                                }}
-                                className="px-2.5 py-1.5 rounded-lg border border-[#E6E6E3] dark:border-[#282825] text-[11px] text-red-600"
-                              >
-                                {u.isSuspended ? 'رفع مسدودی' : 'مسدود'}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="py-3.5 px-3 font-bold text-[#B54B1F] dark:text-[#E29A6F]">
+                              {formatToman(u.walletBalance)}
+                            </td>
+                            <td className="py-3.5 px-3 font-bold text-[#A97222] dark:text-[#D8A85B]">
+                              {toFaDigits(u.gems)} جِم
+                            </td>
+                            <td className="py-3.5 px-3 text-[#5C5C58]">
+                              {toFaDigits(u.recipesCount)} دستور · {toFaDigits(u.photosCount)} عکس
+                            </td>
+                            <td className="py-3.5 px-4 text-left whitespace-nowrap">
+                              <div className="inline-flex items-center gap-1.5">
+                                {can('finance.wallets') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setWalletCurrency('toman');
+                                      setWalletAmount('500000');
+                                      setWalletReason('شارژ کیف پول کاربری توسط مدیریت');
+                                      setWalletTarget({
+                                        type: 'user',
+                                        id: u.id,
+                                        name: u.name,
+                                        currentToman: u.walletBalance,
+                                        currentGems: u.gems,
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 rounded-lg bg-[#B54B1F] text-white text-[11px] font-medium inline-flex items-center gap-1"
+                                  >
+                                    <Wallet className="w-3.5 h-3.5" />
+                                    <span>شارژ حساب / جِم</span>
+                                  </button>
+                                )}
+                                {can('users.manage') && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        await apiRequest(`/api/admin/users/${u.id}`, {
+                                          method: 'PATCH',
+                                          useAdmin: true,
+                                          body: JSON.stringify({isVerifiedChef: !u.isVerifiedChef}),
+                                        });
+                                        onNotify('وضعیت نشان سرآشپز تغییر یافت.');
+                                        loadAllAdminData();
+                                      }}
+                                      className="px-2.5 py-1.5 rounded-lg border border-[#E6E6E3] dark:border-[#282825] text-[11px]"
+                                    >
+                                      {u.isVerifiedChef ? 'لغو نشان' : 'تایید سرآشپز'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        try {
+                                          await apiRequest(`/api/admin/users/${u.id}`, {
+                                            method: 'PATCH',
+                                            useAdmin: true,
+                                            body: JSON.stringify({isSuspended: !u.isSuspended}),
+                                          });
+                                          onNotify(u.isSuspended ? 'حساب کاربری فعال شد.' : 'حساب کاربری مسدود شد.');
+                                          loadAllAdminData();
+                                        } catch (err) {
+                                          onNotify(err instanceof Error ? err.message : 'خطا در تغییر وضعیت حساب');
+                                        }
+                                      }}
+                                      className="px-2.5 py-1.5 rounded-lg border border-[#E6E6E3] dark:border-[#282825] text-[11px] text-red-600"
+                                    >
+                                      {u.isSuspended ? 'رفع مسدودی' : 'مسدود'}
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1304,7 +1950,7 @@ export function AdminDashboard({
           {/* =========================================================
               5. PARTNERS & COMMERCIAL ACCOUNT WALLET TOP-UP
           ========================================================= */}
-          {activeNav === 'partners' && (
+          {currentNav === 'partners' && can('finance.partners') && (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                 <div>
@@ -1432,7 +2078,7 @@ export function AdminDashboard({
           {/* =========================================================
               6. SPONSORS & ADS CAMPAIGNS MANAGER
           ========================================================= */}
-          {activeNav === 'campaigns' && (
+          {currentNav === 'campaigns' && can('finance.campaigns') && (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4">
                 <div>
@@ -1543,191 +2189,59 @@ export function AdminDashboard({
           )}
 
           {/* =========================================================
-              7. PROGRAMMABLE ECOSYSTEM, DAILY ORDERS & FINANCIAL LEDGER
+              6B. LIVE DYNAMIC APP CONTROL CENTER
           ========================================================= */}
-          {activeNav === 'ecosystem' && config && (
+          {currentNav === 'app_control' && (can('app.layout') || can('ecosystem.manage')) && config && (
+            <AdminDynamicAppControlPanel
+              config={config}
+              onChangeConfig={setConfig}
+              onSave={handleSaveEcosystem}
+            />
+          )}
+
+          {/* =========================================================
+              6C. MULTI-FORMAT NATIVE AD STUDIO
+          ========================================================= */}
+          {currentNav === 'native_ads' && can('ads.manage') && (
+            <AdminNativeAdsPanel
+              nativeAds={nativeAds}
+              partners={partners}
+              disclosureLabel={config?.adHarmony?.disclosureLabel}
+              onRefresh={() => {
+                onRefreshAppConfig();
+                loadAllAdminData();
+              }}
+              onNotify={onNotify}
+            />
+          )}
+
+          {/* =========================================================
+              6D. AD MARKETPLACE, AUCTIONS, FLAGSHIP & ADVERTISER PORTAL CONTROL
+          ========================================================= */}
+          {currentNav === 'behavioral_intel' && activeRole === 'senior_admin' && (
+            <AdminBehavioralIntelligencePanel onNotify={onNotify} />
+          )}
+
+          {currentNav === 'ad_market' && can('ads.manage') && (
+            <AdminAdMarketplacePanel
+              partners={partners}
+              onRefreshAppConfig={() => {
+                onRefreshAppConfig();
+                loadAllAdminData();
+              }}
+              onNotify={onNotify}
+            />
+          )}
+
+          {/* =========================================================
+              7. FINANCIAL LEDGER (COMMERCIAL & USER WALLET TRANSACTIONS)
+          ========================================================= */}
+          {currentNav === 'ecosystem' && can('finance.wallets') && (
             <div className="space-y-6">
-              {/* Programmable Controls */}
-              <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-6 space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-base font-bold">کنترل برنامه‌پذیر جایگاه‌ها و ۱۰ نقش صنعت غذا</h2>
-                    <p className="text-xs text-[#5C5C58]">اعمال زنده بدون نیاز به تغییر کد</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleSaveEcosystem}
-                    className="min-h-[42px] px-5 rounded-xl bg-[#B54B1F] text-white text-xs font-semibold"
-                  >
-                    ذخیره و اعمال زنده
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                  <label className="flex items-center justify-between rounded-xl border border-[#E6E6E3] dark:border-[#282825] p-3.5 cursor-pointer">
-                    <span>نمایش تب مستقل بازارچه و اصناف</span>
-                    <input
-                      type="checkbox"
-                      checked={config.marketplaceTabEnabled}
-                      onChange={(e) => setConfig({...config, marketplaceTabEnabled: e.target.checked})}
-                      className="w-4 h-4 accent-[#B54B1F]"
-                    />
-                  </label>
-                  <label className="flex items-center justify-between rounded-xl border border-[#E6E6E3] dark:border-[#282825] p-3.5 cursor-pointer">
-                    <span>ویترین همکاران و کمپین در صفحه کاوش</span>
-                    <input
-                      type="checkbox"
-                      checked={config.exploreShowcaseEnabled}
-                      onChange={(e) => setConfig({...config, exploreShowcaseEnabled: e.target.checked})}
-                      className="w-4 h-4 accent-[#B54B1F]"
-                    />
-                  </label>
-                  <label className="flex items-center justify-between rounded-xl border border-[#E6E6E3] dark:border-[#282825] p-3.5 cursor-pointer">
-                    <span>پیوند زمینه‌ای مواد و تجهیزات در دستور پخت</span>
-                    <input
-                      type="checkbox"
-                      checked={config.recipeContextEnabled}
-                      onChange={(e) => setConfig({...config, recipeContextEnabled: e.target.checked})}
-                      className="w-4 h-4 accent-[#B54B1F]"
-                    />
-                  </label>
-                  <label className="flex items-center justify-between rounded-xl border border-[#E6E6E3] dark:border-[#282825] p-3.5 cursor-pointer">
-                    <span>کارت سرویس ارسال فوری در لیست خرید</span>
-                    <input
-                      type="checkbox"
-                      checked={config.shoppingDeliveryCardEnabled}
-                      onChange={(e) => setConfig({...config, shoppingDeliveryCardEnabled: e.target.checked})}
-                      className="w-4 h-4 accent-[#B54B1F]"
-                    />
-                  </label>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs text-[#5C5C58] mb-1">عنوان تب بازارچه</label>
-                    <input
-                      type="text"
-                      value={config.marketplaceTitle}
-                      onChange={(e) => setConfig({...config, marketplaceTitle: e.target.value})}
-                      className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-[#5C5C58] mb-1">عنوان کمپین فعال کاوش</label>
-                    <input
-                      type="text"
-                      value={config.activeCampaignTitle}
-                      onChange={(e) => setConfig({...config, activeCampaignTitle: e.target.value})}
-                      className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-[#5C5C58] mb-1">سقف کارت همکار در هر دستور</label>
-                    <select
-                      value={config.maxPartnerCardsPerRecipe}
-                      onChange={(e) => setConfig({...config, maxPartnerCardsPerRecipe: Number(e.target.value)})}
-                      className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-                    >
-                      <option value={0}>۰ (خاموش)</option>
-                      <option value={1}>۱ کارت (مینیمال پیشنهادی)</option>
-                      <option value={2}>۲ کارت</option>
-                      <option value={3}>۳ کارت</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                  {PARTNER_ROLES.map((r) => {
-                    const enabled = config.enabledPartnerRoles.includes(r.id);
-                    return (
-                      <button
-                        key={r.id}
-                        type="button"
-                        onClick={() =>
-                          setConfig({
-                            ...config,
-                            enabledPartnerRoles: enabled
-                              ? config.enabledPartnerRoles.filter((id) => id !== r.id)
-                              : [...config.enabledPartnerRoles, r.id],
-                          })
-                        }
-                        className={`min-h-[40px] px-3 rounded-xl border text-[11px] flex items-center justify-between gap-1.5 ${
-                          enabled
-                            ? 'border-[#B54B1F] bg-[#B54B1F]/8 font-medium'
-                            : 'border-[#E6E6E3] dark:border-[#282825] opacity-55'
-                        }`}
-                      >
-                        <span className="truncate">{r.shortLabel}</span>
-                        {enabled && <Check className="w-3.5 h-3.5 text-[#B54B1F] shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Daily Food Orders Management */}
-              <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
-                <h2 className="text-base font-bold inline-flex items-center gap-2">
-                  <ShoppingBag className="w-4 h-4 text-[#B54B1F]" />
-                  <span>مدیریت سفارش‌های غذای روز ({toFaDigits(orders.length)})</span>
-                </h2>
-                {orders.length === 0 ? (
-                  <p className="text-xs text-[#5C5C58]">هنوز سفارشی ثبت نشده است.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-right tabular-nums">
-                      <thead className="border-b border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58]">
-                        <tr>
-                          <th className="py-2 font-medium">کد پیگیری</th>
-                          <th className="py-2 font-medium">مقصد / تلفن</th>
-                          <th className="py-2 font-medium">مبلغ کل</th>
-                          <th className="py-2 font-medium">وضعیت سفارش</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#E6E6E3]/60 dark:divide-[#282825]">
-                        {orders.map((ord) => (
-                          <tr key={ord.id}>
-                            <td className="py-2.5 font-mono font-bold" dir="ltr">
-                              {ord.trackingCode}
-                            </td>
-                            <td className="py-2.5">
-                              {ord.city}، {ord.neighborhood} ({toFaDigits(ord.phone)})
-                            </td>
-                            <td className="py-2.5 font-bold">{formatToman(ord.total)}</td>
-                            <td className="py-2.5">
-                              <select
-                                value={ord.status}
-                                onChange={async (e) => {
-                                  await apiRequest(`/api/admin/orders/${ord.id}/status`, {
-                                    method: 'PATCH',
-                                    useAdmin: true,
-                                    body: JSON.stringify({status: e.target.value}),
-                                  });
-                                  onNotify('وضعیت سفارش به‌روزرسانی شد.');
-                                  loadAllAdminData();
-                                }}
-                                className="min-h-[34px] rounded-lg border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-2 text-xs"
-                              >
-                                {(Object.keys(ORDER_STATUS_LABELS) as OrderRecord['status'][]).map((st) => (
-                                  <option key={st} value={st}>
-                                    {ORDER_STATUS_LABELS[st]}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* Financial Ledger (User + Commercial Top-ups) */}
               <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4">
                 <h2 className="text-base font-bold inline-flex items-center gap-2">
                   <Layers className="w-4 h-4 text-[#B54B1F]" />
-                  <span>دفتر کل تراکنش‌های شارژ کاربری و تجاری ({toFaDigits(transactions.length)})</span>
+                  <span>دفتر کل تراکنش‌های شارژ کاربری و حساب تجاری برندها ({toFaDigits(transactions.length)})</span>
                 </h2>
                 {transactions.length === 0 ? (
                   <p className="text-xs text-[#5C5C58]">هنوز تراکنش شارژ دستی توسط مدیریت ثبت نشده است.</p>
@@ -1739,6 +2253,7 @@ export function AdminDashboard({
                           <th className="py-2 font-medium">نوع حساب</th>
                           <th className="py-2 font-medium">نام صاحب حساب</th>
                           <th className="py-2 font-medium">شرح</th>
+                          <th className="py-2 font-medium">ثبت‌کننده</th>
                           <th className="py-2 font-medium">مبلغ</th>
                           <th className="py-2 font-medium">مانده پس از تراکنش</th>
                         </tr>
@@ -1749,6 +2264,7 @@ export function AdminDashboard({
                             <td className="py-2.5">{tx.accountType === 'partner' ? 'حساب تجاری' : 'کاربر'}</td>
                             <td className="py-2.5 font-medium">{tx.accountName}</td>
                             <td className="py-2.5 text-[#5C5C58]">{tx.reason}</td>
+                            <td className="py-2.5 text-[11px] text-[#5C5C58]">{tx.createdBy}</td>
                             <td
                               dir="ltr"
                               className={`py-2.5 font-bold ${
@@ -1774,26 +2290,70 @@ export function AdminDashboard({
           )}
 
           {/* =========================================================
-              8. DAILY MENU, SMART FRIDGE/KITCHEN, GEM STORE & Q&A MODERATION
+              8. SMART KITCHEN / SUBSTITUTIONS & Q&A MODERATION
           ========================================================= */}
-          {activeNav === 'frontend_ops' && (
-            <AdminFrontendOpsPanel onRefreshAppConfig={onRefreshAppConfig} onNotify={onNotify} />
+          {currentNav === 'frontend_ops' && (
+            <AdminFrontendOpsPanel
+              adminRole={activeRole}
+              aclRoles={aclRoles}
+              permissions={activePermissions}
+              onRefreshAppConfig={onRefreshAppConfig}
+              onNotify={onNotify}
+            />
+          )}
+
+          {/* =========================================================
+              9. DYNAMIC ACCESS CONTROL LIST (ACL) CONSOLE
+          ========================================================= */}
+          {currentNav === 'rbac' && can('rbac.manage') && (
+            <AdminRbacPanel
+              users={users}
+              aclRoles={aclRoles}
+              auditLogs={rbacAuditLogs}
+              onRefresh={loadAllAdminData}
+              onNotify={onNotify}
+            />
           )}
         </div>
       </div>
 
       {/* =====================================================================
-          MODAL 1: ADMIN RECIPE CREATE / EDIT CMS MODAL (PHOTO OPTIONAL)
+          MODAL 1: ADMIN RECIPE CREATE / EDIT CMS MODAL (DRAFT + LIVE PREVIEW)
       ===================================================================== */}
       {editingRecipe && (
         <AdminRecipeEditorModal
           initial={editingRecipe === 'new' ? null : editingRecipe}
-          onClose={() => setEditingRecipe(null)}
-          onSaved={() => {
+          prefillTitle={editingRecipe === 'new' ? draftSeedTitle : ''}
+          onClose={() => {
             setEditingRecipe(null);
+            setDraftSeedTitle('');
+          }}
+          onSaved={(savedDraftTarget) => {
+            setEditingRecipe(null);
+            setDraftSeedTitle('');
+            onRefreshAppRecipes();
+            loadAllAdminData();
+            if (savedDraftTarget) {
+              setVersionModalTarget(savedDraftTarget);
+            }
+          }}
+          onNotify={onNotify}
+        />
+      )}
+
+      {/* =====================================================================
+          MODAL 1B: RECIPE VERSION CONTROL, PREVIEW & APPROVAL MODAL
+      ===================================================================== */}
+      {versionModalTarget && (
+        <AdminRecipeVersionModal
+          recipeId={versionModalTarget.recipeId}
+          initialVersionId={versionModalTarget.versionId}
+          onClose={() => setVersionModalTarget(null)}
+          onChanged={() => {
             onRefreshAppRecipes();
             loadAllAdminData();
           }}
+          onEditAsDraft={(rec) => setEditingRecipe(rec)}
           onNotify={onNotify}
         />
       )}
@@ -2233,16 +2793,18 @@ function QuickRow({
 
 function AdminRecipeEditorModal({
   initial,
+  prefillTitle,
   onClose,
   onSaved,
   onNotify,
 }: {
   initial: Recipe | null;
+  prefillTitle?: string;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (openVersionTarget?: {recipeId: string; versionId?: string | null}) => void;
   onNotify: (msg: string) => void;
 }) {
-  const [title, setTitle] = useState(initial?.title || '');
+  const [title, setTitle] = useState(initial?.title || prefillTitle || '');
   const [subtitle, setSubtitle] = useState(initial?.subtitle || '');
   const [description, setDescription] = useState(initial?.description || '');
   const [imageUrl, setImageUrl] = useState(initial?.imageUrl || '');
@@ -2256,7 +2818,11 @@ function AdminRecipeEditorModal({
   const [servings, setServings] = useState(initial?.servings || 4);
   const [isVip, setIsVip] = useState(Boolean(initial?.isVip));
   const [vipGemCost, setVipGemCost] = useState(initial?.vipGemCost || 40);
-  const [status, setStatus] = useState<'published' | 'pending'>(initial?.status || 'published');
+  const [status, setStatus] = useState<'published' | 'pending'>(initial ? initial.status : 'pending');
+  const [changeSummary, setChangeSummary] = useState(
+    !initial && prefillTitle ? `تولید دستورپخت جدید بر اساس ترند جستجوی «${prefillTitle}»` : ''
+  );
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [ingredientsText, setIngredientsText] = useState(
     initial
       ? initial.ingredients.map((i) => `${i.name} | ${i.amount} | ${i.unit}`).join('\n')
@@ -2269,66 +2835,120 @@ function AdminRecipeEditorModal({
   );
   const [saving, setSaving] = useState(false);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const buildParsedPayload = (overrideStatus?: 'published' | 'pending') => {
+    const ingredients = ingredientsText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [name, amt, unit] = line.split('|').map((s) => s.trim());
+        return {name: name || line, amount: Number(amt) > 0 ? Number(amt) : 1, unit: unit || 'عدد'};
+      });
+
+    const steps = stepsText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((l) => l.length >= 3)
+      .map((instruction, idx) => ({order: idx + 1, instruction}));
+
+    return {
+      title,
+      subtitle,
+      description,
+      imageUrl,
+      imageDataUrl: imageDataUrl || undefined,
+      category,
+      region,
+      season,
+      difficulty,
+      prepMinutes: Number(prepMinutes) || 20,
+      cookMinutes: Number(cookMinutes) || 40,
+      servings: Number(servings) || 4,
+      isVip,
+      vipGemCost: isVip ? Number(vipGemCost) || 40 : 0,
+      status: overrideStatus || status,
+      changeSummary: changeSummary.trim(),
+      ingredients,
+      steps,
+    };
+  };
+
+  const previewSnapshot = (): RecipeVersionSnapshot => {
+    const p = buildParsedPayload();
+    return {
+      title: p.title.trim() || 'عنوان دستور پخت',
+      subtitle: p.subtitle.trim() || `${p.category} · ${p.region}`,
+      description: p.description.trim(),
+      imageUrl: imageDataUrl || p.imageUrl,
+      category: p.category,
+      region: p.region,
+      season: p.season,
+      mealType: initial?.mealType || 'ناهار',
+      dietTags: initial?.dietTags || ['سنتی'],
+      prepMinutes: p.prepMinutes,
+      cookMinutes: p.cookMinutes,
+      servings: p.servings,
+      difficulty: p.difficulty,
+      nutrition: initial?.nutrition || {calories: 420, protein: 18, carbs: 45, fat: 14, fiber: 5},
+      isVip: p.isVip,
+      vipGemCost: p.vipGemCost,
+      ingredients: p.ingredients,
+      steps: p.steps,
+      tools: initial?.tools || [],
+    };
+  };
+
+  const submitWithMode = async (mode: 'draft' | 'publish') => {
     setSaving(true);
     try {
-      const ingredients = ingredientsText
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => {
-          const [name, amt, unit] = line.split('|').map((s) => s.trim());
-          return {name: name || line, amount: Number(amt) > 0 ? Number(amt) : 1, unit: unit || 'عدد'};
-        });
-
-      const steps = stepsText
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((l) => l.length >= 3)
-        .map((instruction, idx) => ({order: idx + 1, instruction}));
-
-      const payload = {
-        title,
-        subtitle,
-        description,
-        imageUrl,
-        imageDataUrl: imageDataUrl || undefined,
-        category,
-        region,
-        season,
-        difficulty,
-        prepMinutes: Number(prepMinutes) || 20,
-        cookMinutes: Number(cookMinutes) || 40,
-        servings: Number(servings) || 4,
-        isVip,
-        vipGemCost: isVip ? Number(vipGemCost) || 40 : 0,
-        status,
-        ingredients,
-        steps,
-      };
-
+      const payload = buildParsedPayload(mode === 'publish' ? 'published' : 'pending');
       if (initial) {
-        await apiRequest(`/api/admin/recipes/${initial.id}`, {
-          method: 'PUT',
-          useAdmin: true,
-          body: JSON.stringify(payload),
-        });
-        onNotify('دستور پخت با موفقیت ویرایش شد.');
+        if (mode === 'draft') {
+          const res = await apiRequest<{version: {id: string; versionNumber: number}}>(
+            `/api/admin/recipes/${initial.id}/drafts`,
+            {
+              method: 'POST',
+              useAdmin: true,
+              body: JSON.stringify(payload),
+            }
+          );
+          onNotify(
+            `پیش‌نویس نسخه ${toFaDigits(res.version.versionNumber)} ثبت شد؛ اکنون می‌توانید آن را پیش‌نمایش و تایید کنید.`
+          );
+          onSaved({recipeId: initial.id, versionId: res.version.id});
+        } else {
+          await apiRequest(`/api/admin/recipes/${initial.id}`, {
+            method: 'PUT',
+            useAdmin: true,
+            body: JSON.stringify(payload),
+          });
+          onNotify('نسخه جدید دستور پخت به‌طور مستقیم منتشر و در تاریخچه ثبت شد.');
+          onSaved();
+        }
       } else {
-        await apiRequest('/api/admin/recipes', {
+        const res = await apiRequest<{recipe: Recipe}>('/api/admin/recipes', {
           method: 'POST',
           useAdmin: true,
           body: JSON.stringify(payload),
         });
-        onNotify('دستور پخت جدید با موفقیت ایجاد و ثبت شد.');
+        if (mode === 'draft') {
+          onNotify('پیش‌نویس دستور پخت جدید ایجاد شد؛ آماده پیش‌نمایش و تایید نهایی است.');
+          onSaved({recipeId: res.recipe.id});
+        } else {
+          onNotify('دستور پخت جدید با موفقیت ایجاد و منتشر شد.');
+          onSaved();
+        }
       }
-      onSaved();
     } catch (err) {
       onNotify(err instanceof Error ? err.message : 'خطا در ذخیره دستور پخت');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitWithMode(initial ? 'draft' : status === 'published' ? 'publish' : 'draft');
   };
 
   return (
@@ -2341,210 +2961,249 @@ function AdminRecipeEditorModal({
         onSubmit={handleSave}
         className="w-full max-w-3xl rounded-2xl bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3] dark:border-[#282825] p-6 space-y-4 my-6 max-h-[90vh] overflow-y-auto"
       >
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold">
-            {initial ? `ویرایش دستور: ${initial.title}` : 'تولید دستور پخت جدید (تصویر اختیاری)'}
+            {initial ? `ویرایش و ثبت نسخه جدید: ${initial.title}` : 'تولید دستور پخت جدید (پیش‌نویس یا انتشار)'}
           </h2>
-          <button type="button" onClick={onClose}>
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPreviewOpen((v) => !v)}
+              className={`min-h-[36px] px-3 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 ${
+                previewOpen
+                  ? 'border-[#B54B1F] bg-[#B54B1F]/10 text-[#B54B1F] dark:text-[#E29A6F]'
+                  : 'border-[#E6E6E3] dark:border-[#282825] hover:bg-[#EFEFED] dark:hover:bg-[#20201E]'
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>{previewOpen ? 'بازگشت به فرم ویرایش' : 'پیش‌نمایش زنده (Preview)'}</span>
+            </button>
+            <button type="button" onClick={onClose} aria-label="بستن">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <input
-            type="text"
-            required
-            placeholder="عنوان دستور پخت"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-          />
-          <input
-            type="text"
-            placeholder="زیرعنوان ادیتوریال"
-            value={subtitle}
-            onChange={(e) => setSubtitle(e.target.value)}
-            className="min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-          />
-        </div>
+        {previewOpen ? (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-[#A97222]/30 bg-[#A97222]/8 px-3.5 py-2.5 text-xs text-[#7C5010] dark:text-[#E8C483]">
+              این پیش‌نمایش زنده تغییرات فعلی فرم است. با ثبت به‌عنوان پیش‌نویس، نسخه جدید بدون تغییر در صفحه عمومی کاربران در صف تایید ذخیره می‌شود.
+            </div>
+            <EditorialSnapshotPreview snapshot={previewSnapshot()} authorName={initial?.authorName || 'تحریریه لاقلی'} />
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="text"
+                required
+                placeholder="عنوان دستور پخت"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
+              />
+              <input
+                type="text"
+                placeholder="زیرعنوان ادیتوریال"
+                value={subtitle}
+                onChange={(e) => setSubtitle(e.target.value)}
+                className="min-h-[44px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
+              />
+            </div>
 
-        <textarea
-          rows={2}
-          placeholder="توضیح کامل غذا..."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] p-3 text-xs"
-        />
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-          >
-            <option value="ناهار و شام">ناهار و شام</option>
-            <option value="پیش‌غذا و عصرانه">پیش‌غذا و عصرانه</option>
-            <option value="وگان و گیاهی">وگان و گیاهی</option>
-            <option value="پخت سریع">پخت سریع</option>
-            <option value="رژیمی و سبک">رژیمی و سبک</option>
-            <option value="غذای شمالی">غذای شمالی</option>
-          </select>
-          <input
-            type="text"
-            value={region}
-            onChange={(e) => setRegion(e.target.value)}
-            placeholder="منطقه"
-            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-          />
-          <select
-            value={season}
-            onChange={(e) => setSeason(e.target.value)}
-            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-          >
-            <option value="چهارفصل">چهارفصل</option>
-            <option value="بهار">بهار</option>
-            <option value="تابستان">تابستان</option>
-            <option value="پاییز">پاییز</option>
-            <option value="زمستان">زمستان</option>
-          </select>
-          <select
-            value={difficulty}
-            onChange={(e) => setDifficulty(e.target.value as 'آسان' | 'متوسط' | 'حرفه‌ای')}
-            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-          >
-            <option value="آسان">آسان</option>
-            <option value="متوسط">متوسط</option>
-            <option value="حرفه‌ای">حرفه‌ای</option>
-          </select>
-        </div>
-
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-          <input
-            type="number"
-            min={1}
-            value={prepMinutes}
-            onChange={(e) => setPrepMinutes(Number(e.target.value))}
-            placeholder="آماده‌سازی"
-            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
-          />
-          <input
-            type="number"
-            min={1}
-            value={cookMinutes}
-            onChange={(e) => setCookMinutes(Number(e.target.value))}
-            placeholder="زمان پخت"
-            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
-          />
-          <input
-            type="number"
-            min={1}
-            value={servings}
-            onChange={(e) => setServings(Number(e.target.value))}
-            placeholder="نفرات"
-            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
-          />
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as 'published' | 'pending')}
-            className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-          >
-            <option value="published">منتشرشده</option>
-            <option value="pending">پیش‌نویس / در انتظار</option>
-          </select>
-          <label className="flex items-center gap-2 text-xs px-2">
-            <input
-              type="checkbox"
-              checked={isVip}
-              onChange={(e) => setIsVip(e.target.checked)}
-              className="w-4 h-4 accent-[#A97222]"
+            <textarea
+              rows={2}
+              placeholder="توضیح کامل غذا..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] p-3 text-xs"
             />
-            <span>دستور ویژه (VIP)</span>
-          </label>
-        </div>
 
-        {isVip && (
-          <input
-            type="number"
-            min={10}
-            value={vipGemCost}
-            onChange={(e) => setVipGemCost(Number(e.target.value))}
-            placeholder="هزینه بازگشایی (جِم)"
-            className="w-48 min-h-[40px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
-          />
-        )}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
+              >
+                <option value="ناهار و شام">ناهار و شام</option>
+                <option value="پیش‌غذا و عصرانه">پیش‌غذا و عصرانه</option>
+                <option value="وگان و گیاهی">وگان و گیاهی</option>
+                <option value="پخت سریع">پخت سریع</option>
+                <option value="رژیمی و سبک">رژیمی و سبک</option>
+                <option value="غذای شمالی">غذای شمالی</option>
+              </select>
+              <input
+                type="text"
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                placeholder="منطقه"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
+              />
+              <select
+                value={season}
+                onChange={(e) => setSeason(e.target.value)}
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
+              >
+                <option value="چهارفصل">چهارفصل</option>
+                <option value="بهار">بهار</option>
+                <option value="تابستان">تابستان</option>
+                <option value="پاییز">پاییز</option>
+                <option value="زمستان">زمستان</option>
+              </select>
+              <select
+                value={difficulty}
+                onChange={(e) => setDifficulty(e.target.value as 'آسان' | 'متوسط' | 'حرفه‌ای')}
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
+              >
+                <option value="آسان">آسان</option>
+                <option value="متوسط">متوسط</option>
+                <option value="حرفه‌ای">حرفه‌ای</option>
+              </select>
+            </div>
 
-        {/* Optional Cover Image (Leave Blank for Community Photos!) */}
-        <div className="rounded-xl border border-[#E6E6E3] dark:border-[#282825] p-3.5 space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-medium">
-              تصویر اصلی (اختیاری — خالی بگذارید تا کاربران عکس واقعی غذای پخته‌شده را ارسال کنند)
-            </span>
-            <div className="flex items-center gap-2">
-              <label className="px-3 py-1.5 rounded-lg border border-dashed border-[#B54B1F]/50 text-[11px] font-medium cursor-pointer inline-flex items-center gap-1">
-                <Camera className="w-3.5 h-3.5" />
-                <span>آپلود از سیستم</span>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+              <input
+                type="number"
+                min={1}
+                value={prepMinutes}
+                onChange={(e) => setPrepMinutes(Number(e.target.value))}
+                placeholder="آماده‌سازی"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
+              />
+              <input
+                type="number"
+                min={1}
+                value={cookMinutes}
+                onChange={(e) => setCookMinutes(Number(e.target.value))}
+                placeholder="زمان پخت"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
+              />
+              <input
+                type="number"
+                min={1}
+                value={servings}
+                onChange={(e) => setServings(Number(e.target.value))}
+                placeholder="نفرات"
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
+              />
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as 'published' | 'pending')}
+                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
+              >
+                <option value="pending">پیش‌نویس / در انتظار تایید</option>
+                <option value="published">منتشرشده</option>
+              </select>
+              <label className="flex items-center gap-2 text-xs px-2">
                 <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="sr-only"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const dataUrl = await fileToCompressedDataUrl(file);
-                    setImageDataUrl(dataUrl);
-                    setImageUrl('');
-                  }}
+                  type="checkbox"
+                  checked={isVip}
+                  onChange={(e) => setIsVip(e.target.checked)}
+                  className="w-4 h-4 accent-[#A97222]"
                 />
+                <span>دستور ویژه (VIP)</span>
               </label>
-              {(imageUrl || imageDataUrl) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImageUrl('');
-                    setImageDataUrl('');
-                  }}
-                  className="text-[11px] text-red-600"
-                >
-                  حذف عکس (تبدیل به بدون عکس)
-                </button>
+            </div>
+
+            {isVip && (
+              <input
+                type="number"
+                min={10}
+                value={vipGemCost}
+                onChange={(e) => setVipGemCost(Number(e.target.value))}
+                placeholder="هزینه بازگشایی (جِم)"
+                className="w-48 min-h-[40px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
+              />
+            )}
+
+            {/* Optional Cover Image (Leave Blank for Community Photos!) */}
+            <div className="rounded-xl border border-[#E6E6E3] dark:border-[#282825] p-3.5 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-medium">
+                  تصویر اصلی (اختیاری — خالی بگذارید تا کاربران عکس واقعی غذای پخته‌شده را ارسال کنند)
+                </span>
+                <div className="flex items-center gap-2">
+                  <label className="px-3 py-1.5 rounded-lg border border-dashed border-[#B54B1F]/50 text-[11px] font-medium cursor-pointer inline-flex items-center gap-1">
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>آپلود از سیستم</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const dataUrl = await fileToCompressedDataUrl(file);
+                        setImageDataUrl(dataUrl);
+                        setImageUrl('');
+                      }}
+                    />
+                  </label>
+                  {(imageUrl || imageDataUrl) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImageUrl('');
+                        setImageDataUrl('');
+                      }}
+                      className="text-[11px] text-red-600"
+                    >
+                      حذف عکس (تبدیل به بدون عکس)
+                    </button>
+                  )}
+                </div>
+              </div>
+              {(imageDataUrl || imageUrl) && (
+                <img
+                  src={imageDataUrl || imageUrl}
+                  alt="پیش‌نمایش"
+                  className="w-36 h-24 object-cover rounded-lg border border-[#E6E6E3]"
+                />
               )}
             </div>
-          </div>
-          {(imageDataUrl || imageUrl) && (
-            <img
-              src={imageDataUrl || imageUrl}
-              alt="پیش‌نمایش"
-              className="w-36 h-24 object-cover rounded-lg border border-[#E6E6E3]"
-            />
-          )}
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs text-[#5C5C58] mb-1">
-              مواد اولیه (هر خط: نام ماده | مقدار | واحد)
-            </label>
-            <textarea
-              rows={6}
-              required
-              value={ingredientsText}
-              onChange={(e) => setIngredientsText(e.target.value)}
-              className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] p-3 text-xs leading-relaxed"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-[#5C5C58] mb-1">مراحل پخت (هر مرحله در یک خط)</label>
-            <textarea
-              rows={6}
-              required
-              value={stepsText}
-              onChange={(e) => setStepsText(e.target.value)}
-              className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] p-3 text-xs leading-relaxed"
-            />
-          </div>
-        </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-[#5C5C58] mb-1">
+                  مواد اولیه (هر خط: نام ماده | مقدار | واحد)
+                </label>
+                <textarea
+                  rows={6}
+                  required
+                  value={ingredientsText}
+                  onChange={(e) => setIngredientsText(e.target.value)}
+                  className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] p-3 text-xs leading-relaxed"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-[#5C5C58] mb-1">مراحل پخت (هر مرحله در یک خط)</label>
+                <textarea
+                  rows={6}
+                  required
+                  value={stepsText}
+                  onChange={(e) => setStepsText(e.target.value)}
+                  className="w-full rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] p-3 text-xs leading-relaxed"
+                />
+              </div>
+            </div>
 
-        <div className="flex items-center justify-end gap-2 pt-2">
+            <div>
+              <label className="block text-xs text-[#5C5C58] mb-1">
+                یادداشت تغییرات این نسخه (برای ثبت در تاریخچه کنترل نسخه)
+              </label>
+              <input
+                type="text"
+                maxLength={220}
+                placeholder="مثلاً: اصلاح مقدار زعفران و افزودن نکته دم‌کشی روی حرارت ملایم"
+                value={changeSummary}
+                onChange={(e) => setChangeSummary(e.target.value)}
+                className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
+              />
+            </div>
+          </>
+        )}
+
+        <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-[#E6E6E3]/70 dark:border-[#282825]">
           <button
             type="button"
             onClick={onClose}
@@ -2553,11 +3212,24 @@ function AdminRecipeEditorModal({
             انصراف
           </button>
           <button
-            type="submit"
+            type="button"
             disabled={saving}
-            className="min-h-[44px] px-6 rounded-xl bg-[#B54B1F] text-white text-xs font-semibold disabled:opacity-40"
+            onClick={() => submitWithMode('publish')}
+            className="min-h-[44px] px-4 rounded-xl border border-[#B54B1F]/40 dark:border-[#E29A6F]/40 text-[#B54B1F] dark:text-[#E29A6F] text-xs font-semibold hover:bg-[#B54B1F]/8 disabled:opacity-40"
           >
-            {saving ? 'در حال ذخیره...' : initial ? 'ذخیره تغییرات' : 'ایجاد و ثبت دستور'}
+            {saving ? 'در حال ثبت...' : initial ? 'انتشار مستقیم نسخه جدید' : 'ایجاد و انتشار فوری'}
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => submitWithMode('draft')}
+            className="min-h-[44px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] dark:bg-[#E29A6F] dark:text-[#0B0B0B] text-white text-xs font-bold disabled:opacity-40"
+          >
+            {saving
+              ? 'در حال ذخیره...'
+              : initial
+                ? 'ذخیره به‌عنوان پیش‌نویس و پیش‌نمایش'
+                : 'ثبت پیش‌نویس برای بررسی'}
           </button>
         </div>
       </form>

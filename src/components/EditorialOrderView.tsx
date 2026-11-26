@@ -816,14 +816,39 @@ export function EditorialOrderView({
                       </div>
                     </div>
 
-                    {/* Cart Lines — Crisp Dish Thumbnails & Zero Clipped Titles */}
-                    <div className="rounded-[22px] border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] divide-y divide-[#E6E6E3]/80 dark:divide-[#242422] overflow-hidden">
+                    {/* Minimalist Editorial Cart Items Container */}
+                    <div className="order-cart-container rounded-[26px] bg-[#FFFFFF] dark:bg-[#151514] border border-[#E6E6E3]/80 dark:border-[#262623] shadow-[0_10px_30px_-20px_rgba(13,13,13,0.14)] px-4 sm:px-5 py-1 divide-y divide-[#EFEFED] dark:divide-[#222220]">
                       {cart.map((item, idx) => {
                         const unitPrice =
                           item.portion === 'double' ? item.dish.doublePrice : item.dish.singlePrice;
+                        const isProcessing = item.dish.prepMinutes > 40 || item.quantity >= 3;
+                        const statusLabel = isProcessing ? 'در حال تهیه' : 'موجود';
                         return (
-                          <div key={`${item.dish.id}-${item.portion}`} className="p-4 flex items-start gap-3.5">
-                            <div className="w-16 h-16 rounded-2xl overflow-hidden border border-[#E6E6E3]/80 dark:border-[#282825] shrink-0 bg-[#EFEFED] dark:bg-[#20201E]">
+                          <div
+                            key={`${item.dish.id}-${item.portion}`}
+                            className="cart-item relative pt-10 pb-4 sm:pb-5 flex items-start gap-4"
+                          >
+                            {/* Top-Right Fulfillment Status Badge */}
+                            <span
+                              data-status={isProcessing ? 'processing' : 'in-stock'}
+                              className={`absolute top-3 right-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold leading-5 ${
+                                isProcessing
+                                  ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200/80 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/25'
+                                  : 'bg-green-50 text-green-700 ring-1 ring-green-200/80 dark:bg-green-500/15 dark:text-green-300 dark:ring-green-400/25'
+                              }`}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  isProcessing
+                                    ? 'bg-amber-500 dark:bg-amber-400 animate-pulse'
+                                    : 'bg-green-500 dark:bg-green-400'
+                                }`}
+                              />
+                              <span>{statusLabel}</span>
+                            </span>
+
+                            <div className="w-[72px] h-[72px] rounded-2xl overflow-hidden ring-1 ring-black/[0.05] dark:ring-white/[0.08] shrink-0 bg-[#F6F6F5] dark:bg-[#20201E]">
                               <EditorialImage
                                 src={item.dish.imageUrl}
                                 alt={item.dish.title}
@@ -832,51 +857,58 @@ export function EditorialOrderView({
                               />
                             </div>
 
-                            <div className="flex-1 min-w-0 space-y-2">
-                              <div className="space-y-0.5">
-                                <h3 className="text-sm font-bold text-[#0D0D0D] dark:text-[#FAFAFA] leading-snug break-words">
+                            <div className="flex-1 min-w-0 space-y-2.5">
+                              <div className="space-y-1">
+                                <h3 className="text-[15px] sm:text-base font-bold tracking-tight text-[#0D0D0D] dark:text-[#FAFAFA] leading-[1.45] break-words">
                                   {item.dish.title}
                                 </h3>
-                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#5C5C58] dark:text-[#A3A39E] tabular-nums">
+
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed tabular-nums">
                                   <span>{item.portion === 'double' ? 'پرس دونفره' : 'پرس تک‌نفره'}</span>
-                                  <span aria-hidden="true">·</span>
-                                  <span>هر پرس {formatToman(unitPrice)}</span>
+                                  <span aria-hidden="true" className="opacity-40">
+                                    ·
+                                  </span>
+                                  <span>فی {formatToman(unitPrice)}</span>
                                 </div>
                                 {item.note && (
-                                  <p className="text-[11px] text-[#B54B1F] dark:text-[#E29A6F] leading-relaxed pt-0.5">
-                                    یادداشت: {item.note}
+                                  <p className="text-xs text-[#B54B1F] dark:text-[#E29A6F] leading-relaxed pt-0.5">
+                                    یادداشت سرآشپز: {item.note}
                                   </p>
                                 )}
                               </div>
 
-                              <div className="flex items-center justify-between gap-2 pt-0.5">
-                                <span className="text-sm font-extrabold text-[#0D0D0D] dark:text-[#FAFAFA] tabular-nums">
+                              <div className="flex items-center justify-between gap-3 pt-1">
+                                <span className="text-[15px] font-extrabold tracking-tight text-[#0D0D0D] dark:text-[#FAFAFA] tabular-nums">
                                   {formatToman(unitPrice * item.quantity)}
                                 </span>
 
-                                <div className="inline-flex items-center rounded-full border border-[#E6E6E3] dark:border-[#2C2C29] bg-[#F6F6F5] dark:bg-[#20201E] p-0.5">
+                                {/* Delicate Soft-Rounded Quantity Icons (No Sharp Borders) */}
+                                <div className="inline-flex items-center gap-1 rounded-full bg-[#F6F6F5] dark:bg-[#1F1F1D] px-1.5 py-1">
                                   <button
                                     type="button"
                                     aria-label={item.quantity === 1 ? 'حذف از سبد' : 'کاهش تعداد'}
                                     onClick={() => updateCartQty(idx, -1)}
-                                    className="w-8 h-8 rounded-full flex items-center justify-center text-[#0D0D0D] dark:text-[#FAFAFA] hover:bg-[#FFFFFF] dark:hover:bg-[#151514] transition-colors"
+                                    className="w-8 h-8 rounded-full flex items-center justify-center text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA] hover:bg-[#FFFFFF] dark:hover:bg-[#2B2B28] active:scale-90 transition-all"
                                   >
                                     {item.quantity === 1 ? (
-                                      <Trash2 className="w-3.5 h-3.5 text-[#B54B1F] dark:text-[#E29A6F]" />
+                                      <Trash2
+                                        className="w-4 h-4 text-[#B54B1F] dark:text-[#E29A6F]"
+                                        strokeWidth={1.75}
+                                      />
                                     ) : (
-                                      <Minus className="w-3.5 h-3.5" />
+                                      <Minus className="w-4 h-4" strokeWidth={1.75} />
                                     )}
                                   </button>
-                                  <span className="min-w-[28px] text-center text-xs font-extrabold tabular-nums">
+                                  <span className="min-w-[26px] text-center text-sm font-bold text-[#0D0D0D] dark:text-[#FAFAFA] tabular-nums select-none">
                                     {toFaDigits(item.quantity)}
                                   </span>
                                   <button
                                     type="button"
                                     aria-label="افزایش تعداد"
                                     onClick={() => updateCartQty(idx, 1)}
-                                    className="w-8 h-8 rounded-full flex items-center justify-center text-[#0D0D0D] dark:text-[#FAFAFA] hover:bg-[#FFFFFF] dark:hover:bg-[#151514] transition-colors"
+                                    className="w-8 h-8 rounded-full flex items-center justify-center text-[#5C5C58] dark:text-[#A3A39E] hover:text-[#0D0D0D] dark:hover:text-[#FAFAFA] hover:bg-[#FFFFFF] dark:hover:bg-[#2B2B28] active:scale-90 transition-all"
                                   >
-                                    <Plus className="w-3.5 h-3.5" />
+                                    <Plus className="w-4 h-4" strokeWidth={1.75} />
                                   </button>
                                 </div>
                               </div>

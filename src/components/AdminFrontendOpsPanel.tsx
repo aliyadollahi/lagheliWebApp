@@ -1,57 +1,43 @@
 import {useCallback, useEffect, useState} from 'react';
-import {
-  ChefHat,
-  Gem,
-  MessageSquare,
-  Plus,
-  Save,
-  Star,
-  Trash2,
-  Utensils,
-} from 'lucide-react';
+import {ChefHat, MessageSquare, Trash2} from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
-import {formatToman, toFaDigits} from '../shared/persianEngine.ts';
+import {toFaDigits} from '../shared/persianEngine.ts';
+import {hasAdminPermission} from '../shared/rbac.ts';
 import type {
+  AdminPermission,
   AdminQuestionRow,
+  AdminRole,
   CustomSubstitutionRule,
-  DeliveryPricingConfig,
-  EditorialMenuItem,
-  GemStoreOffer,
+  DynamicRoleDefinition,
   KitchenConfig,
 } from '../shared/types.ts';
 import {AdminWorkspaceSkeleton} from './EditorialSkeletons.tsx';
 
 interface AdminFrontendOpsPanelProps {
+  adminRole: AdminRole;
+  aclRoles?: DynamicRoleDefinition[];
+  permissions?: AdminPermission[];
   onRefreshAppConfig: () => void;
   onNotify: (msg: string) => void;
 }
 
-type SubTab = 'menu' | 'kitchen' | 'gems' | 'qa';
+type SubTab = 'kitchen' | 'qa';
 
-export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFrontendOpsPanelProps) {
-  const [subTab, setSubTab] = useState<SubTab>('menu');
+export function AdminFrontendOpsPanel({
+  adminRole,
+  aclRoles,
+  permissions,
+  onRefreshAppConfig,
+  onNotify,
+}: AdminFrontendOpsPanelProps) {
+  const canEditKitchen = hasAdminPermission(adminRole, 'content.kitchen', aclRoles, permissions);
+  const canModerateQa = hasAdminPermission(adminRole, 'content.qa', aclRoles, permissions);
+
+  const defaultTab: SubTab = canEditKitchen ? 'kitchen' : 'qa';
+  const [subTab, setSubTab] = useState<SubTab>(defaultTab);
   const [loading, setLoading] = useState(false);
 
-  // 1. Daily Menu & Delivery Pricing
-  const [menuItems, setMenuItems] = useState<EditorialMenuItem[]>([]);
-  const [pricing, setPricing] = useState<DeliveryPricingConfig>({
-    freeDeliveryThreshold: 600000,
-    packagingFee: 18000,
-    standardDeliveryFee: 45000,
-  });
-  const [newDish, setNewDish] = useState({
-    title: '',
-    subtitle: '',
-    category: 'اصیل ایرانی',
-    chefName: 'آشپزخانه مرکزی لاقلی',
-    singlePrice: 285000,
-    doublePrice: 520000,
-    prepMinutes: 35,
-    calories: 560,
-    featured: false,
-  });
-
-  // 2. Smart Kitchen / Fridge & Custom Substitutions
+  // Smart Kitchen / Fridge & Custom Substitutions
   const [kitchenConfig, setKitchenConfig] = useState<KitchenConfig>({
     quickFridgeItems: [],
     quickSubQueries: [],
@@ -68,104 +54,40 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
     isVegan: false,
   });
 
-  // 3. Gem Store Offers
-  const [gemOffers, setGemOffers] = useState<GemStoreOffer[]>([]);
-  const [newOffer, setNewOffer] = useState({
-    title: '',
-    partnerName: '',
-    discountLabel: '',
-    gemCost: 80,
-    codePrefix: 'LG',
-  });
-
-  // 4. Q&A Moderation
+  // Q&A Moderation
   const [questions, setQuestions] = useState<AdminQuestionRow[]>([]);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [menuRes, kitchenRes, gemRes, qaRes] = await Promise.all([
-        apiRequest<{items: EditorialMenuItem[]; pricing: DeliveryPricingConfig}>('/api/admin/menu', {useAdmin: true}),
-        apiRequest<{kitchenConfig: KitchenConfig}>('/api/admin/kitchen-config', {useAdmin: true}),
-        apiRequest<{offers: GemStoreOffer[]}>('/api/admin/gem-offers', {useAdmin: true}),
-        apiRequest<{questions: AdminQuestionRow[]}>('/api/admin/questions', {useAdmin: true}),
-      ]);
-      setMenuItems(menuRes.items);
-      setPricing(menuRes.pricing);
-      setKitchenConfig(kitchenRes.kitchenConfig);
-      setGemOffers(gemRes.offers);
-      setQuestions(qaRes.questions);
+      const tasks: Promise<void>[] = [];
+      if (canEditKitchen) {
+        tasks.push(
+          apiRequest<{kitchenConfig: KitchenConfig}>('/api/admin/kitchen-config', {useAdmin: true}).then(
+            (kitchenRes) => setKitchenConfig(kitchenRes.kitchenConfig)
+          )
+        );
+      }
+      if (canModerateQa) {
+        tasks.push(
+          apiRequest<{questions: AdminQuestionRow[]}>('/api/admin/questions', {useAdmin: true}).then((qaRes) =>
+            setQuestions(qaRes.questions)
+          )
+        );
+      }
+      await Promise.all(tasks);
     } catch (err) {
       onNotify(err instanceof Error ? err.message : 'خطا در دریافت داده‌های مدیریتی');
     } finally {
       setLoading(false);
     }
-  }, [onNotify]);
+  }, [onNotify, canEditKitchen, canModerateQa]);
 
   useEffect(() => {
     loadAll();
   }, [loadAll]);
 
-  // --- Menu handlers ---
-  const handleAddMenuDish = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newDish.title.trim() || !newDish.subtitle.trim()) return;
-    try {
-      await apiRequest('/api/admin/menu', {method: 'POST', body: JSON.stringify(newDish), useAdmin: true});
-      setNewDish({
-        title: '',
-        subtitle: '',
-        category: 'اصیل ایرانی',
-        chefName: 'آشپزخانه مرکزی لاقلی',
-        singlePrice: 285000,
-        doublePrice: 520000,
-        prepMinutes: 35,
-        calories: 560,
-        featured: false,
-      });
-      onNotify('غذای جدید به منوی روز اضافه شد.');
-      loadAll();
-    } catch (err) {
-      onNotify(err instanceof Error ? err.message : 'خطا در افزودن غذای منو');
-    }
-  };
-
-  const handleToggleDishFeatured = async (dish: EditorialMenuItem) => {
-    try {
-      await apiRequest(`/api/admin/menu/${dish.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({featured: !dish.featured}),
-        useAdmin: true,
-      });
-      onNotify(dish.featured ? 'از حالت منتخب منو خارج شد.' : 'به‌عنوان غذای منتخب روز تنظیم شد.');
-      loadAll();
-    } catch (err) {
-      onNotify(err instanceof Error ? err.message : 'خطا در بروزرسانی منو');
-    }
-  };
-
-  const handleDeleteDish = async (id: string) => {
-    try {
-      await apiRequest(`/api/admin/menu/${id}`, {method: 'DELETE', useAdmin: true});
-      onNotify('غذا از منوی روز حذف شد.');
-      loadAll();
-    } catch (err) {
-      onNotify(err instanceof Error ? err.message : 'خطا در حذف غذا');
-    }
-  };
-
-  const handleSavePricing = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await apiRequest('/api/admin/menu-pricing', {method: 'PUT', body: JSON.stringify(pricing), useAdmin: true});
-      onNotify('تعرفه‌های ارسال و بسته‌بندی ذخیره شد.');
-    } catch (err) {
-      onNotify(err instanceof Error ? err.message : 'خطا در ذخیره تعرفه‌ها');
-    }
-  };
-
-  // --- Kitchen / Fridge handlers ---
-  const saveKitchenConfig = async (next: KitchenConfig, msg = 'تنظیمات آشپزخانه و یخچال ذخیره شد.') => {
+  const saveKitchenConfig = async (next: KitchenConfig, msg = 'تنظیمات آشپزخانه هوشمند ذخیره شد.') => {
     try {
       const res = await apiRequest<{kitchenConfig: KitchenConfig}>(
         '/api/admin/kitchen-config',
@@ -212,37 +134,6 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
     );
   };
 
-  // --- Gem Store handlers ---
-  const saveGemOffers = async (nextOffers: GemStoreOffer[], msg = 'پیشنهادهای فروشگاه جِم بروزرسانی شد.') => {
-    try {
-      const res = await apiRequest<{offers: GemStoreOffer[]}>(
-        '/api/admin/gem-offers',
-        {method: 'PUT', body: JSON.stringify({offers: nextOffers}), useAdmin: true}
-      );
-      setGemOffers(res.offers);
-      onRefreshAppConfig();
-      onNotify(msg);
-    } catch (err) {
-      onNotify(err instanceof Error ? err.message : 'خطا در ذخیره فروشگاه جِم');
-    }
-  };
-
-  const handleAddGemOffer = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newOffer.title.trim() || !newOffer.partnerName.trim() || !newOffer.discountLabel.trim()) return;
-    const offer: GemStoreOffer = {
-      id: `gem-${Date.now()}`,
-      title: newOffer.title.trim(),
-      partnerName: newOffer.partnerName.trim(),
-      discountLabel: newOffer.discountLabel.trim(),
-      gemCost: Math.max(5, Number(newOffer.gemCost) || 50),
-      codePrefix: newOffer.codePrefix.trim().toUpperCase() || 'LG',
-    };
-    setNewOffer({title: '', partnerName: '', discountLabel: '', gemCost: 80, codePrefix: 'LG'});
-    saveGemOffers([offer, ...gemOffers], 'پیشنهاد جدید به فروشگاه جِم اضافه شد.');
-  };
-
-  // --- Q&A Moderation handlers ---
   const handleDeleteQuestion = async (id: string) => {
     try {
       await apiRequest(`/api/admin/questions/${id}`, {method: 'DELETE', useAdmin: true});
@@ -265,20 +156,32 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
     }
   };
 
-  const tabs: {id: SubTab; label: string; icon: typeof Utensils; count?: number}[] = [
-    {id: 'menu', label: 'منوی غذای روز و ارسال', icon: Utensils, count: menuItems.length},
-    {id: 'kitchen', label: 'یخچال‌گردی و جایگزین مواد', icon: ChefHat, count: kitchenConfig.quickFridgeItems.length},
-    {id: 'gems', label: 'فروشگاه جِم و پاداش‌ها', icon: Gem, count: gemOffers.length},
-    {id: 'qa', label: 'نظارت پرسش‌وپاسخ‌ها', icon: MessageSquare, count: questions.length},
+  const tabs: {id: SubTab; label: string; icon: typeof ChefHat; count?: number; visible: boolean}[] = [
+    {
+      id: 'kitchen',
+      label: 'یخچال‌گردی و جایگزین مواد',
+      icon: ChefHat,
+      count: kitchenConfig.quickFridgeItems.length,
+      visible: canEditKitchen,
+    },
+    {
+      id: 'qa',
+      label: 'نظارت پرسش‌وپاسخ‌ها',
+      icon: MessageSquare,
+      count: questions.length,
+      visible: canModerateQa,
+    },
   ];
+
+  const visibleTabs = tabs.filter((t) => t.visible);
+  const effectiveSubTab = visibleTabs.some((t) => t.id === subTab) ? subTab : visibleTabs[0]?.id || 'kitchen';
 
   return (
     <div className="space-y-6">
-      {/* Sub-navigation bar */}
       <div className="flex flex-wrap items-center gap-2 border-b border-[#E6E6E3] dark:border-[#282825] pb-4">
-        {tabs.map((t) => {
+        {visibleTabs.map((t) => {
           const Icon = t.icon;
-          const active = subTab === t.id;
+          const active = effectiveSubTab === t.id;
           return (
             <button
               key={t.id}
@@ -300,177 +203,11 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
         })}
       </div>
 
-      {loading && menuItems.length === 0 ? <AdminWorkspaceSkeleton /> : null}
+      {loading && kitchenConfig.quickFridgeItems.length === 0 && questions.length === 0 ? (
+        <AdminWorkspaceSkeleton />
+      ) : null}
 
-      {/* 1. DAILY MENU & DELIVERY PRICING */}
-      {!loading && subTab === 'menu' && (
-        <div className="space-y-6">
-          {/* Delivery Pricing Card */}
-          <form
-            onSubmit={handleSavePricing}
-            className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4"
-          >
-            <h3 className="text-sm font-bold">تعرفه‌های ارسال و بسته‌بندی سفارش روزانه</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <label className="space-y-1 text-xs">
-                <span className="text-[#5C5C58] dark:text-[#A3A39E]">سقف ارسال رایگان (تومان)</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={pricing.freeDeliveryThreshold}
-                  onChange={(e) => setPricing({...pricing, freeDeliveryThreshold: Number(e.target.value)})}
-                  className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 tabular-nums"
-                />
-              </label>
-              <label className="space-y-1 text-xs">
-                <span className="text-[#5C5C58] dark:text-[#A3A39E]">هزینه پیک استاندارد (تومان)</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={pricing.standardDeliveryFee}
-                  onChange={(e) => setPricing({...pricing, standardDeliveryFee: Number(e.target.value)})}
-                  className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 tabular-nums"
-                />
-              </label>
-              <label className="space-y-1 text-xs">
-                <span className="text-[#5C5C58] dark:text-[#A3A39E]">هزینه بسته‌بندی (تومان)</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={pricing.packagingFee}
-                  onChange={(e) => setPricing({...pricing, packagingFee: Number(e.target.value)})}
-                  className="w-full min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 tabular-nums"
-                />
-              </label>
-            </div>
-            <button
-              type="submit"
-              className="min-h-[42px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] text-white text-xs font-semibold inline-flex items-center gap-1.5"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>ذخیره تعرفه‌های سفارش</span>
-            </button>
-          </form>
-
-          {/* Add Dish to Daily Menu */}
-          <form
-            onSubmit={handleAddMenuDish}
-            className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4"
-          >
-            <h3 className="text-sm font-bold">افزودن غذای جدید به منوی روزانه</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <input
-                type="text"
-                required
-                placeholder="نام غذا (مثلاً قرمه‌سبزی جاافتاده)"
-                value={newDish.title}
-                onChange={(e) => setNewDish({...newDish, title: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-              />
-              <input
-                type="text"
-                required
-                placeholder="زیرعنوان کوتاه"
-                value={newDish.subtitle}
-                onChange={(e) => setNewDish({...newDish, subtitle: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-              />
-              <select
-                value={newDish.category}
-                onChange={(e) => setNewDish({...newDish, category: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-              >
-                <option value="منتخب سرآشپز">منتخب سرآشپز</option>
-                <option value="اصیل ایرانی">اصیل ایرانی</option>
-                <option value="شمالی">شمالی</option>
-                <option value="گیاهی">گیاهی</option>
-              </select>
-              <input
-                type="number"
-                min={10000}
-                placeholder="قیمت تک‌نفره (تومان)"
-                value={newDish.singlePrice}
-                onChange={(e) => setNewDish({...newDish, singlePrice: Number(e.target.value)})}
-                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
-              />
-              <input
-                type="number"
-                min={10000}
-                placeholder="قیمت دونفره (تومان)"
-                value={newDish.doublePrice}
-                onChange={(e) => setNewDish({...newDish, doublePrice: Number(e.target.value)})}
-                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
-              />
-              <input
-                type="text"
-                placeholder="نام آشپزخانه یا سرآشپز"
-                value={newDish.chefName}
-                onChange={(e) => setNewDish({...newDish, chefName: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-              />
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <label className="inline-flex items-center gap-2 text-xs cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={newDish.featured}
-                  onChange={(e) => setNewDish({...newDish, featured: e.target.checked})}
-                  className="w-4 h-4 accent-[#B54B1F]"
-                />
-                <span>نمایش در جایگاه غذای منتخب روز</span>
-              </label>
-              <button
-                type="submit"
-                className="min-h-[42px] px-5 rounded-xl bg-[#111110] dark:bg-[#FAFAFA] text-white dark:text-[#111110] text-xs font-semibold inline-flex items-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" />
-                <span>افزودن به منوی روز</span>
-              </button>
-            </div>
-          </form>
-
-          {/* Existing Daily Menu List */}
-          <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] divide-y divide-[#E6E6E3]/70 dark:divide-[#282825]">
-            {menuItems.map((dish) => (
-              <div key={dish.id} className="p-4 flex flex-wrap items-center justify-between gap-4">
-                <div className="space-y-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold">{dish.title}</span>
-                    {dish.featured && (
-                      <span className="text-[11px] font-medium text-[#B54B1F] dark:text-[#E29A6F]">· منتخب روز</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
-                    {dish.category} · {dish.chefName} · تک‌نفره {formatToman(dish.singlePrice)} / دونفره{' '}
-                    {formatToman(dish.doublePrice)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleToggleDishFeatured(dish)}
-                    className="min-h-[38px] px-3 rounded-lg border border-[#E6E6E3] dark:border-[#282825] text-xs inline-flex items-center gap-1"
-                  >
-                    <Star className="w-3.5 h-3.5" fill={dish.featured ? 'currentColor' : 'none'} />
-                    <span>{dish.featured ? 'منتخب' : 'تنظیم منتخب'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteDish(dish.id)}
-                    aria-label="حذف از منو"
-                    className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg border border-red-200 dark:border-red-900/50 text-red-600"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 2. SMART KITCHEN / FRIDGE & CUSTOM SUBSTITUTIONS */}
-      {subTab === 'kitchen' && (
+      {effectiveSubTab === 'kitchen' && canEditKitchen && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Quick Fridge Ingredients */}
@@ -478,7 +215,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
               <div className="space-y-1">
                 <h3 className="text-sm font-bold">مواد پیشنهادی سریع بخش یخچال‌گردی</h3>
                 <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
-                  این اقلام در صفحه «آشپزخانه هوشمند» برای انتخاب سریع کاربران نمایش داده می‌شوند (قابل تنظیم بر اساس فصل).
+                  این اقلام در صفحه «آشپزخانه هوشمند» برای انتخاب سریع کاربران نمایش داده می‌شوند.
                 </p>
               </div>
               <div className="flex gap-2">
@@ -670,96 +407,7 @@ export function AdminFrontendOpsPanel({onRefreshAppConfig, onNotify}: AdminFront
         </div>
       )}
 
-      {/* 3. GEM STORE OFFERS CMS */}
-      {subTab === 'gems' && (
-        <div className="space-y-6">
-          <form
-            onSubmit={handleAddGemOffer}
-            className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 space-y-4"
-          >
-            <h3 className="text-sm font-bold">افزودن کوپن جدید به فروشگاه جِم</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-              <input
-                type="text"
-                required
-                placeholder="عنوان کوپن"
-                value={newOffer.title}
-                onChange={(e) => setNewOffer({...newOffer, title: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-              />
-              <input
-                type="text"
-                required
-                placeholder="نام همکار / برند"
-                value={newOffer.partnerName}
-                onChange={(e) => setNewOffer({...newOffer, partnerName: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-              />
-              <input
-                type="text"
-                required
-                placeholder="برچسب تخفیف (مثلاً ۵۰ هزار تومان)"
-                value={newOffer.discountLabel}
-                onChange={(e) => setNewOffer({...newOffer, discountLabel: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-              />
-              <input
-                type="number"
-                min={5}
-                placeholder="هزینه (جِم)"
-                value={newOffer.gemCost}
-                onChange={(e) => setNewOffer({...newOffer, gemCost: Number(e.target.value)})}
-                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs tabular-nums"
-              />
-              <input
-                type="text"
-                dir="ltr"
-                placeholder="پیشوند کد (LG)"
-                value={newOffer.codePrefix}
-                onChange={(e) => setNewOffer({...newOffer, codePrefix: e.target.value})}
-                className="min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3 text-xs"
-              />
-            </div>
-            <button
-              type="submit"
-              className="min-h-[42px] px-5 rounded-xl bg-[#B54B1F] hover:bg-[#963B15] text-white text-xs font-semibold inline-flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              <span>افزودن به فروشگاه جِم</span>
-            </button>
-          </form>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {gemOffers.map((offer) => (
-              <div
-                key={offer.id}
-                className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 flex items-center justify-between gap-4"
-              >
-                <div className="space-y-1">
-                  <div className="text-sm font-bold">{offer.title}</div>
-                  <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
-                    {offer.partnerName} · {offer.discountLabel} · پیشوند <span dir="ltr">{offer.codePrefix}</span>
-                  </div>
-                  <div className="text-xs font-bold text-[#B54B1F] dark:text-[#E29A6F] tabular-nums">
-                    {toFaDigits(offer.gemCost)} جِم
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => saveGemOffers(gemOffers.filter((o) => o.id !== offer.id), 'پیشنهاد از فروشگاه جِم حذف شد.')}
-                  aria-label="حذف پیشنهاد جِم"
-                  className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg border border-red-200 dark:border-red-900/50 text-red-600 shrink-0"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 4. RECIPE Q&A MODERATION */}
-      {subTab === 'qa' && (
+      {effectiveSubTab === 'qa' && canModerateQa && (
         <div className="space-y-4">
           {questions.length === 0 ? (
             <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-8 text-center text-xs text-[#5C5C58]">

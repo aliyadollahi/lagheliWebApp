@@ -15,10 +15,10 @@ export default defineConfig(() => {
         includeAssets: ['icon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
         manifest: {
           id: '/',
-          name: 'لاقلی — آشپزی و سفارش غذای ادیتوریال',
+          name: 'لاقلی — مجله دستورپخت و آشپزخانه هوشمند',
           short_name: 'لاقلی',
           description:
-            'وب‌اپ پیش‌رونده لاقلی: دستورهای پخت، یخچال‌گردی هوشمند، جایگزین مواد، لیست خرید دسته‌بندی‌شده و سفارش غذای مینیمالیست.',
+            'وب‌اپ پیش‌رونده لاقلی: دستورهای پخت اصیل و مدرن، یخچال‌گردی هوشمند، جایگزین مواد، لیست خرید دسته‌بندی‌شده و معرفی برندها و رستوران‌های همکار.',
           lang: 'fa',
           dir: 'rtl',
           theme_color: '#F6F6F5',
@@ -58,13 +58,14 @@ export default defineConfig(() => {
               url: '/?tab=shopping',
             },
             {
-              name: 'سفارش غذای روز',
-              short_name: 'سفارش روز',
-              url: '/?tab=order',
+              name: 'دستورپخت‌های برگزیده',
+              short_name: 'دستورپخت‌ها',
+              url: '/?tab=explore',
             },
           ],
         },
         workbox: {
+          maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,webp,woff,woff2}'],
           navigateFallbackDenylist: [/^\/api\//],
           runtimeCaching: [

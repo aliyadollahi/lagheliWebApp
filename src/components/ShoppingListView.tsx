@@ -12,13 +12,15 @@ import {
   Trash2,
   Truck,
 } from 'lucide-react';
+import {matchPantryCompanionAd} from '../shared/nativeAdEngine.ts';
 import {
   SHOPPING_CATEGORIES,
   classifyIngredientCategory,
   formatQuantity,
   toFaDigits,
 } from '../shared/persianEngine.ts';
-import type {EcosystemConfig, Partner, ShoppingCategory, ShoppingItem} from '../shared/types.ts';
+import type {EcosystemConfig, NativeAdUnit, Partner, ShoppingCategory, ShoppingItem} from '../shared/types.ts';
+import {NativeAdSlot} from './NativeAdSlot.tsx';
 
 interface ShoppingListViewProps {
   items: ShoppingItem[];
@@ -28,7 +30,8 @@ interface ShoppingListViewProps {
   onClearChecked: () => void;
   onClearAll: () => void;
   ecosystemConfig: EcosystemConfig;
-  deliveryPartner?: Partner;
+  nativeAds?: NativeAdUnit[];
+  partners?: Partner[];
   onOpenPartner: (partner: Partner) => void;
   onNotify: (msg: string) => void;
 }
@@ -52,7 +55,8 @@ export function ShoppingListView({
   onClearChecked,
   onClearAll,
   ecosystemConfig,
-  deliveryPartner,
+  nativeAds = [],
+  partners = [],
   onOpenPartner,
   onNotify,
 }: ShoppingListViewProps) {
@@ -556,35 +560,24 @@ export function ShoppingListView({
         </div>
       )}
 
-      {/* Admin-Controlled Delivery Partner Card */}
-      {ecosystemConfig.shoppingDeliveryCardEnabled && deliveryPartner && (
-        <div className="rounded-[24px] border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-2xl bg-[#F6F6F5] dark:bg-[#20201E] flex items-center justify-center shrink-0">
-              <Truck className="w-5 h-5 text-[#B54B1F] dark:text-[#E29A6F]" />
-            </div>
-            <div className="space-y-1">
-              <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#5C5C58] dark:text-[#A3A39E]">
-                <Sparkles className="w-3 h-3 text-[#A97222]" />
-                <span>تامین و ارسال فوری سبد خرید</span>
-              </div>
-              <div className="text-sm font-bold text-[#0D0D0D] dark:text-[#FAFAFA]">{deliveryPartner.name}</div>
-              {deliveryPartner.promoLabel && (
-                <div className="text-xs font-medium text-[#B54B1F] dark:text-[#E29A6F]">
-                  {deliveryPartner.promoLabel}
-                </div>
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => onOpenPartner(deliveryPartner)}
-            className="min-h-[44px] px-5 rounded-full bg-[#0D0D0D] dark:bg-[#FAFAFA] text-[#FFFFFF] dark:text-[#0B0B0B] text-xs font-bold shrink-0 active:scale-[0.98] transition-transform"
-          >
-            مشاهده سرویس ارسال
-          </button>
-        </div>
-      )}
+      {/* Harmonious Native Brand Companion matched to active shopping items */}
+      {(() => {
+        const companionAd = matchPantryCompanionAd(
+          items.map((i) => i.name),
+          nativeAds,
+          'shopping',
+          ecosystemConfig.adHarmony
+        );
+        if (!companionAd) return null;
+        return (
+          <NativeAdSlot
+            ad={companionAd}
+            disclosureLabel={ecosystemConfig.adHarmony?.disclosureLabel}
+            partners={partners}
+            onOpenPartner={onOpenPartner}
+          />
+        );
+      })()}
     </div>
   );
 }

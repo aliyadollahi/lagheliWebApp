@@ -1,12 +1,26 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {AnimatePresence, motion} from 'motion/react';
 import {ArrowLeftRight, Clock, Eye, Flame, Plus, Search, ShoppingBag, Sparkles, Users, X} from 'lucide-react';
 import {apiRequest} from '../lib/api.ts';
 import {prefetchRecipeDetail} from '../lib/recipePrefetch.ts';
+import {
+  DEFAULT_AD_HARMONY,
+  matchContextualToolOrSubAd,
+  matchPantryCompanionAd,
+} from '../shared/nativeAdEngine.ts';
 import {findNativeSubstitutions, toFaDigits} from '../shared/persianEngine.ts';
-import type {IngredientItem, KitchenConfig, Recipe, SubstitutionSuggestion} from '../shared/types.ts';
+import type {
+  EcosystemConfig,
+  IngredientItem,
+  KitchenConfig,
+  NativeAdUnit,
+  Partner,
+  Recipe,
+  SubstitutionSuggestion,
+} from '../shared/types.ts';
 import {EditorialImage} from './EditorialImage.tsx';
 import {FridgeMatchesSkeleton} from './EditorialSkeletons.tsx';
+import {NativeAdSlot} from './NativeAdSlot.tsx';
 
 interface KitchenHubProps {
   city?: string;
@@ -14,6 +28,10 @@ interface KitchenHubProps {
   onAddShoppingItems: (
     items: {name: string; amount: number; unit: string; recipeId?: string; recipeTitle?: string}[]
   ) => void;
+  ecosystemConfig?: EcosystemConfig;
+  nativeAds?: NativeAdUnit[];
+  partners?: Partner[];
+  onOpenPartner?: (partner: Partner) => void;
 }
 
 const COMMON_FRIDGE_ITEMS = [
@@ -43,7 +61,15 @@ interface FridgeMatchResult {
   missingIngredients: IngredientItem[];
 }
 
-export function KitchenHub({city = 'تهران', onOpenRecipe, onAddShoppingItems}: KitchenHubProps) {
+export function KitchenHub({
+  city = 'تهران',
+  onOpenRecipe,
+  onAddShoppingItems,
+  ecosystemConfig,
+  nativeAds = [],
+  partners = [],
+  onOpenPartner,
+}: KitchenHubProps) {
   const [mode, setMode] = useState<'fridge' | 'substitute'>('fridge');
 
   // Admin-managed dynamic chips with offline fallback
@@ -65,6 +91,23 @@ export function KitchenHub({city = 'تهران', onOpenRecipe, onAddShoppingItem
     findNativeSubstitutions('رب انار', 'native')
   );
   const [loadingSub, setLoadingSub] = useState(false);
+
+  const adHarmony = ecosystemConfig?.adHarmony ?? DEFAULT_AD_HARMONY;
+
+  const fridgeCompanionAd = useMemo(
+    () => matchPantryCompanionAd(selectedIngredients, nativeAds, 'fridge', adHarmony),
+    [selectedIngredients, nativeAds, adHarmony]
+  );
+
+  const subContextualAd = useMemo(
+    () =>
+      matchContextualToolOrSubAd(
+        [subQuery, ...subResults.map((s) => s.substitute)],
+        nativeAds,
+        adHarmony
+      ),
+    [subQuery, subResults, nativeAds, adHarmony]
+  );
 
   useEffect(() => {
     if (!previewItem) return;
@@ -441,6 +484,17 @@ export function KitchenHub({city = 'تهران', onOpenRecipe, onAddShoppingItem
                 </div>
               ))
             )}
+
+            {fridgeCompanionAd && (
+              <div className="pt-2">
+                <NativeAdSlot
+                  ad={fridgeCompanionAd}
+                  disclosureLabel={adHarmony.disclosureLabel}
+                  partners={partners}
+                  onOpenPartner={onOpenPartner}
+                />
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -542,6 +596,17 @@ export function KitchenHub({city = 'تهران', onOpenRecipe, onAddShoppingItem
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {subContextualAd && (
+            <div className="pt-2">
+              <NativeAdSlot
+                ad={subContextualAd}
+                disclosureLabel={adHarmony.disclosureLabel}
+                partners={partners}
+                onOpenPartner={onOpenPartner}
+              />
             </div>
           )}
         </div>

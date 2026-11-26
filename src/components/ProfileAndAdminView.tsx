@@ -21,14 +21,17 @@ import {
 } from 'lucide-react';
 import {usePWAInstall} from '../hooks/usePWA.ts';
 import {apiRequest} from '../lib/api.ts';
+import {DIETARY_OPTIONS} from '../shared/behavioralEngine.ts';
 import {formatToman, toFaDigits} from '../shared/persianEngine.ts';
 import type {
   BadgeItem,
+  DietaryTagId,
   GemStoreOffer,
   GemTransaction,
   Recipe,
   RecipeQuestion,
   UserCoupon,
+  UserDietaryPreferences,
   UserProfile,
 } from '../shared/types.ts';
 import {EditorialImage} from './EditorialImage.tsx';
@@ -36,9 +39,11 @@ import {EditorialImage} from './EditorialImage.tsx';
 interface ProfileAndAdminViewProps {
   user: UserProfile | null;
   theme: 'light' | 'dark';
+  dietaryPrefs: UserDietaryPreferences;
+  dietBlockedAdsCount: number;
+  onSaveDietaryPrefs: (next: UserDietaryPreferences) => Promise<void>;
   onToggleTheme: () => void;
   onReplaySplash: () => void;
-  onOpenAdminPanel: () => void;
   onOpenAuth: () => void;
   onLogout: () => void;
   onOpenRecipe: (recipe: Recipe) => void;
@@ -50,9 +55,11 @@ interface ProfileAndAdminViewProps {
 export function ProfileAndAdminView({
   user,
   theme,
+  dietaryPrefs,
+  dietBlockedAdsCount,
+  onSaveDietaryPrefs,
   onToggleTheme,
   onReplaySplash,
-  onOpenAdminPanel,
   onOpenAuth,
   onLogout,
   onOpenRecipe,
@@ -61,6 +68,50 @@ export function ProfileAndAdminView({
   onNotify,
 }: ProfileAndAdminViewProps) {
   const [profileTab, setProfileTab] = useState<'recipes' | 'questions' | 'badges' | 'gems'>('recipes');
+  const [excludedInput, setExcludedInput] = useState(() => dietaryPrefs.excludedIngredients.join('، '));
+  const [savingDiet, setSavingDiet] = useState(false);
+
+  useEffect(() => {
+    setExcludedInput(dietaryPrefs.excludedIngredients.join('، '));
+  }, [dietaryPrefs.excludedIngredients]);
+
+  const handleToggleDiet = async (dietId: DietaryTagId) => {
+    const exists = dietaryPrefs.diets.includes(dietId);
+    const nextDiets = exists
+      ? dietaryPrefs.diets.filter((d) => d !== dietId)
+      : [...dietaryPrefs.diets, dietId];
+    setSavingDiet(true);
+    try {
+      await onSaveDietaryPrefs({
+        ...dietaryPrefs,
+        diets: nextDiets,
+        strictAdFiltering: true,
+      });
+    } finally {
+      setSavingDiet(false);
+    }
+  };
+
+  const handleSaveDietDetails = async (
+    nextFreq?: UserDietaryPreferences['cookingFrequency'],
+    rawExcluded?: string
+  ) => {
+    const cleaned = (rawExcluded ?? excludedInput)
+      .split(/[،,]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    setSavingDiet(true);
+    try {
+      await onSaveDietaryPrefs({
+        ...dietaryPrefs,
+        excludedIngredients: cleaned,
+        cookingFrequency: nextFreq ?? dietaryPrefs.cookingFrequency,
+        strictAdFiltering: true,
+      });
+    } finally {
+      setSavingDiet(false);
+    }
+  };
   const {isInstallable, isInstalled, isIOS, isAndroid, install} = usePWAInstall();
   const [installGuideOpen, setInstallGuideOpen] = useState(false);
   const [guidePlatform, setGuidePlatform] = useState<'android' | 'ios'>('android');
@@ -97,8 +148,6 @@ export function ProfileAndAdminView({
   const [qaStats, setQaStats] = useState({questionsCount: 0, answersCount: 0, bestAnswersCount: 0});
   const [badges, setBadges] = useState<BadgeItem[]>([]);
   const [transactions, setTransactions] = useState<GemTransaction[]>([]);
-  const [coupons, setCoupons] = useState<UserCoupon[]>([]);
-  const [gemOffers, setGemOffers] = useState<GemStoreOffer[]>([]);
 
   const [showChefForm, setShowChefForm] = useState(false);
   const [chefBio, setChefBio] = useState('');
@@ -114,8 +163,6 @@ export function ProfileAndAdminView({
         qaStats: {questionsCount: number; answersCount: number; bestAnswersCount: number};
         badges: BadgeItem[];
         transactions: GemTransaction[];
-        coupons: UserCoupon[];
-        gemStoreOffers: GemStoreOffer[];
       }>('/api/profile/dashboard');
       setMyRecipes(data.myRecipes);
       setBookmarkedRecipes(data.bookmarkedRecipes);
@@ -123,8 +170,6 @@ export function ProfileAndAdminView({
       setQaStats(data.qaStats);
       setBadges(data.badges);
       setTransactions(data.transactions);
-      setCoupons(data.coupons);
-      setGemOffers(data.gemStoreOffers);
     } catch {
       // Ignore offline
     }
@@ -133,20 +178,6 @@ export function ProfileAndAdminView({
   useEffect(() => {
     loadDashboard();
   }, [user]);
-
-  const handleRedeemOffer = async (offerId: string) => {
-    try {
-      const res = await apiRequest<{coupon: UserCoupon}>('/api/gems/redeem', {
-        method: 'POST',
-        body: JSON.stringify({offerId}),
-      });
-      onNotify(`کوپن دریافت شد: ${res.coupon.code}`);
-      onRefreshUser();
-      loadDashboard();
-    } catch (err) {
-      onNotify(err instanceof Error ? err.message : 'خطا در دریافت کوپن');
-    }
-  };
 
   const handleRequestChefVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,15 +235,6 @@ export function ProfileAndAdminView({
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             <span>{theme === 'dark' ? 'روشن' : 'تاریک'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenAdminPanel}
-            className="min-h-[42px] px-4 rounded-full border border-[#B54B1F]/40 dark:border-[#E29A6F]/40 text-xs font-semibold text-[#B54B1F] dark:text-[#E29A6F] hover:bg-[#B54B1F]/8 inline-flex items-center gap-1.5"
-          >
-            <Shield className="w-4 h-4" />
-            <span>پنل مدیریت جامع</span>
           </button>
         </div>
       </div>
@@ -404,6 +426,109 @@ export function ProfileAndAdminView({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Strict Dietary Profile & Safe Ad Guardrail Card (Available for both Guests & Signed-In Users) */}
+      <section className="rounded-3xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 sm:p-6 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-[#E6E6E3] dark:border-[#282825] pb-4">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold text-[#A97222] dark:text-[#D8A85B]">
+              سلیقه غذایی و محافظت هوشمند نمایش
+            </p>
+            <h3 className="text-lg font-extrabold">رژیم غذایی و پرهیزهای من</h3>
+            <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
+              با انتخاب رژیم یا مواد ممنوعه، تمام تبلیغات و پیشنهادهای ناسازگار (مثلاً گوشت، سوسیس یا لبنیات برای کاربران وگان) به‌صورت قطعی مسدود می‌شوند.
+            </p>
+          </div>
+          {dietaryPrefs.diets.length > 0 || dietaryPrefs.excludedIngredients.length > 0 ? (
+            <div className="text-xs text-[#15803D] dark:text-[#4ADE80] font-semibold shrink-0 tabular-nums">
+              محافظت قطعی فعال است
+              {dietBlockedAdsCount > 0 && ` · ${toFaDigits(dietBlockedAdsCount)} مورد ناسازگار پنهان شد`}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {DIETARY_OPTIONS.map((opt) => {
+            const active = dietaryPrefs.diets.includes(opt.id);
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                disabled={savingDiet}
+                onClick={() => handleToggleDiet(opt.id)}
+                className={`text-right rounded-2xl border p-3.5 transition-colors space-y-1 ${
+                  active
+                    ? 'border-[#A97222] dark:border-[#D8A85B] bg-[#FFF8EA] dark:bg-[#231B0E]'
+                    : 'border-[#E6E6E3] dark:border-[#282825] bg-[#FAF9F7] dark:bg-[#10100F] hover:border-[#A97222]/50'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-[#0D0D0D] dark:text-[#FAFAFA]">{opt.label}</span>
+                  <span
+                    className={`text-[11px] font-bold ${
+                      active ? 'text-[#8C5B12] dark:text-[#ECC06E]' : 'text-[#8A8A84]'
+                    }`}
+                  >
+                    {active ? 'انتخاب‌شده' : 'انتخاب'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
+                  {opt.shortNote}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[#E6E6E3] dark:border-[#282825]">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold block">مواد غذایی حذف‌شده دلخواه (با ویرگول جدا کنید)</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={excludedInput}
+                onChange={(e) => setExcludedInput(e.target.value)}
+                placeholder="مثلاً سوسیس، کالباس، سیر، بادام‌زمینی"
+                className="flex-1 min-h-[42px] rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#F6F6F5] dark:bg-[#0B0B0B] px-3.5 text-xs"
+              />
+              <button
+                type="button"
+                disabled={savingDiet}
+                onClick={() => handleSaveDietDetails()}
+                className="min-h-[42px] px-4 rounded-xl bg-[#0D0D0D] dark:bg-[#FAFAFA] text-white dark:text-[#0B0B0B] text-xs font-bold whitespace-nowrap"
+              >
+                ذخیره
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="text-xs font-bold block">عادت آشپزی شما در هفته</span>
+            <div className="grid grid-cols-4 gap-1.5">
+              {[
+                {id: 'daily' as const, label: 'روزانه'},
+                {id: 'weekly' as const, label: 'هفتگی'},
+                {id: 'occasional' as const, label: 'گاه‌به‌گاه'},
+                {id: 'rarely' as const, label: 'کمتر می‌پزم'},
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  disabled={savingDiet}
+                  onClick={() => handleSaveDietDetails(item.id)}
+                  className={`min-h-[42px] px-2 rounded-xl text-xs font-semibold transition-colors whitespace-nowrap ${
+                    dietaryPrefs.cookingFrequency === item.id
+                      ? 'bg-[#0D0D0D] dark:bg-[#FAFAFA] text-white dark:text-[#0B0B0B]'
+                      : 'border border-[#E6E6E3] dark:border-[#282825] text-[#5C5C58] dark:text-[#A3A39E]'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
       {!user ? (
         <div className="rounded-3xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-10 text-center space-y-4">
@@ -691,82 +816,40 @@ export function ProfileAndAdminView({
           )}
 
           {profileTab === 'gems' && (
-            <div className="space-y-8">
-              <div className="space-y-4">
-                <h3 className="text-lg font-bold">تبدیل جِم به کوپن تخفیف همکاران</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {gemOffers.map((offer) => (
-                    <div
-                      key={offer.id}
-                      className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 flex flex-col justify-between gap-4"
-                    >
-                      <div className="space-y-1">
-                        <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">{offer.partnerName}</div>
-                        <h4 className="text-base font-bold">{offer.title}</h4>
-                        <p className="text-xs text-[#B54B1F] dark:text-[#E29A6F]">{offer.discountLabel}</p>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={user.gems < offer.gemCost}
-                        onClick={() => handleRedeemOffer(offer.id)}
-                        className="min-h-[44px] px-4 rounded-full bg-[#111110] hover:bg-[#282825] dark:bg-[#FAFAFA] dark:text-[#111110] text-white text-xs font-medium disabled:opacity-40"
-                      >
-                        دریافت کوپن با {toFaDigits(offer.gemCost)} جِم
-                      </button>
-                    </div>
-                  ))}
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-5 sm:p-6 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Gem className="w-5 h-5 text-[#B54B1F] dark:text-[#E29A6F]" />
+                  <h3 className="text-base font-bold">کاربرد جِم در جامعه آشپزی لاقلی</h3>
                 </div>
+                <p className="text-xs sm:text-sm text-[#5C5C58] dark:text-[#A3A39E] leading-relaxed">
+                  با ارسال عکس واقعی غذاها، ثبت دستورهای اصیل و پاسخ مفید به پرسش دیگران جِم کسب می‌کنید و می‌توانید دستورهای تخصصی و ویژه سرآشپزهای تاییدشده را برای همیشه باز کنید.
+                </p>
               </div>
 
-              {coupons.length > 0 && (
-                <div className="space-y-3 border-t border-[#E6E6E3] dark:border-[#282825] pt-6">
-                  <h3 className="text-base font-bold">کوپن‌های دریافت‌شده من</h3>
-                  <div className="space-y-2.5">
-                    {coupons.map((c) => (
-                      <div
-                        key={c.id}
-                        className="rounded-xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514] p-4 flex items-center justify-between gap-3"
-                      >
-                        <div>
-                          <div className="text-sm font-bold">{c.title}</div>
-                          <div className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
-                            {c.partnerName} · {c.used ? 'استفاده‌شده' : 'قابل استفاده'}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(c.code).catch(() => {});
-                            onNotify(`کد ${c.code} کپی شد.`);
-                          }}
-                          className="min-h-[40px] px-3.5 rounded-full border border-[#E6E6E3] dark:border-[#282825] text-xs font-mono font-bold inline-flex items-center gap-1.5"
+              <div className="space-y-3">
+                <h3 className="text-base font-bold">تاریخچه جِم‌های آشپزی</h3>
+                {transactions.length === 0 ? (
+                  <p className="text-xs text-[#5C5C58] dark:text-[#A3A39E]">
+                    هنوز تراکنش جِمی ثبت نشده است.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-[#E6E6E3]/70 dark:divide-[#282825] rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514]">
+                    {transactions.map((tx) => (
+                      <div key={tx.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                        <span>{tx.reason}</span>
+                        <span
+                          dir="ltr"
+                          className={`font-bold tabular-nums ${
+                            tx.amount >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-[#B54B1F] dark:text-[#E29A6F]'
+                          }`}
                         >
-                          <Copy className="w-3.5 h-3.5" />
-                          <span dir="ltr">{c.code}</span>
-                        </button>
+                          {tx.amount >= 0 ? `+${toFaDigits(tx.amount)}` : toFaDigits(tx.amount)}
+                        </span>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-
-              <div className="space-y-3 border-t border-[#E6E6E3] dark:border-[#282825] pt-6">
-                <h3 className="text-base font-bold">تاریخچه تراکنش‌های جِم</h3>
-                <div className="divide-y divide-[#E6E6E3]/70 dark:divide-[#282825] rounded-2xl border border-[#E6E6E3] dark:border-[#282825] bg-[#FFFFFF] dark:bg-[#151514]">
-                  {transactions.map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between px-4 py-3 text-sm">
-                      <span>{tx.reason}</span>
-                      <span
-                        dir="ltr"
-                        className={`font-bold tabular-nums ${
-                          tx.amount >= 0 ? 'text-[#B54B1F] dark:text-[#E29A6F]' : 'text-[#B54B1F]'
-                        }`}
-                      >
-                        {tx.amount >= 0 ? `+${toFaDigits(tx.amount)}` : toFaDigits(tx.amount)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                )}
               </div>
             </div>
           )}

@@ -1,6 +1,23 @@
+import crypto from 'crypto';
 import Database from 'better-sqlite3';
 import path from 'path';
-import type {EcosystemConfig, GemStoreOffer} from '../shared/types.ts';
+import {DEFAULT_AD_HARMONY, isAdActiveInDateWindow} from '../shared/nativeAdEngine.ts';
+import {DEFAULT_DYNAMIC_ROLES} from '../shared/rbac.ts';
+import type {
+  AdBidOrBooking,
+  AdSlotInventory,
+  AdminPermission,
+  AdvertiserAccount,
+  DynamicAppSectionsConfig,
+  DynamicRoleDefinition,
+  EcosystemConfig,
+  FlagshipSponsorship,
+  GemStoreOffer,
+  LocalVenueSuggestion,
+  NativeAdFormat,
+  NativeAdMediaType,
+  NativeAdUnit,
+} from '../shared/types.ts';
 
 const DB_PATH = process.env.SQLITE_PATH || path.resolve(process.cwd(), 'lagheli.db');
 
@@ -8,26 +25,46 @@ export const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
+export const DEFAULT_APP_SECTIONS: DynamicAppSectionsConfig = {
+  heroEnabled: true,
+  heroTitle: 'دستورهای اصیل، آرام و دقیق برای آشپزی روزمره',
+  heroSubtitle: 'مرجع دستورپخت ایرانی با مقیاس هوشمند نفرات، تایمر گام‌به‌گام و آشپزخانه بدون اتلاف مواد.',
+  editorialNotice: '',
+  searchBarEnabled: true,
+  quickCategoriesEnabled: true,
+  kitchenTabEnabled: true,
+  shoppingTabEnabled: true,
+  submitRecipeEnabled: true,
+  featuredCategories: [
+    'همه',
+    'ناهار و شام',
+    'پیش‌غذا و عصرانه',
+    'وگان و گیاهی',
+    'پخت سریع',
+    'رژیمی و سبک',
+    'پرپروتئین',
+    'غذای شمالی',
+  ],
+};
+
 export const DEFAULT_ECOSYSTEM_CONFIG: EcosystemConfig = {
   marketplaceTabEnabled: true,
-  marketplaceTitle: 'بازارچه و اصناف',
+  marketplaceTitle: 'برندهای همکار',
   exploreShowcaseEnabled: true,
   recipeContextEnabled: true,
-  shoppingDeliveryCardEnabled: true,
+  shoppingDeliveryCardEnabled: false,
   maxPartnerCardsPerRecipe: 1,
   enabledPartnerRoles: [
     'food_brands',
     'kitchen_equipment',
     'stores_supermarkets',
-    'restaurants_kitchens',
-    'cafes_bakeries',
     'chefs_nutritionists',
     'culinary_schools',
     'local_artisans',
-    'catering_events',
-    'instant_delivery',
   ],
-  activeCampaignTitle: 'همکاران منتخب فصل پاییز لاقلی',
+  activeCampaignTitle: 'برندهای منتخب تحریریه لاقلی',
+  appSections: DEFAULT_APP_SECTIONS,
+  adHarmony: DEFAULT_AD_HARMONY,
 };
 
 export const GEM_STORE_OFFERS: GemStoreOffer[] = [
@@ -333,6 +370,230 @@ export function initDatabase(): void {
       ends_at TEXT,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS rbac_audit_logs (
+      id TEXT PRIMARY KEY,
+      actor_id TEXT NOT NULL,
+      actor_name TEXT NOT NULL,
+      actor_role TEXT NOT NULL,
+      target_user_id TEXT NOT NULL,
+      target_user_name TEXT NOT NULL,
+      previous_role TEXT NOT NULL,
+      new_role TEXT NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS recipe_versions (
+      id TEXT PRIMARY KEY,
+      recipe_id TEXT NOT NULL,
+      version_number INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'draft',
+      change_summary TEXT NOT NULL DEFAULT '',
+      snapshot_json TEXT NOT NULL,
+      created_by_id TEXT NOT NULL,
+      created_by_name TEXT NOT NULL,
+      reviewed_by_id TEXT,
+      reviewed_by_name TEXT,
+      review_note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      reviewed_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS search_logs (
+      id TEXT PRIMARY KEY,
+      query_raw TEXT NOT NULL,
+      query_norm TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'search',
+      results_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS acl_roles (
+      id TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      short_label TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      permissions_json TEXT NOT NULL,
+      is_system INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS native_ads (
+      id TEXT PRIMARY KEY,
+      partner_id TEXT NOT NULL,
+      format TEXT NOT NULL,
+      title TEXT NOT NULL,
+      subtitle TEXT NOT NULL DEFAULT '',
+      editorial_copy TEXT NOT NULL DEFAULT '',
+      cta_label TEXT NOT NULL DEFAULT 'آشنایی با برند',
+      target_url TEXT,
+      match_keywords_json TEXT NOT NULL DEFAULT '[]',
+      match_categories_json TEXT NOT NULL DEFAULT '[]',
+      priority INTEGER NOT NULL DEFAULT 5,
+      status TEXT NOT NULL DEFAULT 'active',
+      impressions INTEGER NOT NULL DEFAULT 0,
+      clicks INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS ad_slots (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      format TEXT NOT NULL,
+      media_type TEXT NOT NULL DEFAULT 'banner',
+      target_category TEXT NOT NULL DEFAULT 'همه دسته‌ها',
+      pricing_model TEXT NOT NULL DEFAULT 'hybrid',
+      fixed_price_toman INTEGER NOT NULL DEFAULT 5000000,
+      min_bid_toman INTEGER NOT NULL DEFAULT 3500000,
+      bid_step_toman INTEGER NOT NULL DEFAULT 500000,
+      is_exclusive INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS ad_bids (
+      id TEXT PRIMARY KEY,
+      slot_id TEXT NOT NULL,
+      advertiser_id TEXT NOT NULL,
+      partner_id TEXT NOT NULL,
+      booking_type TEXT NOT NULL DEFAULT 'auction',
+      bid_amount_toman INTEGER NOT NULL,
+      starts_at TEXT NOT NULL,
+      ends_at TEXT NOT NULL,
+      title TEXT NOT NULL,
+      subtitle TEXT NOT NULL DEFAULT '',
+      editorial_copy TEXT NOT NULL DEFAULT '',
+      cta_label TEXT NOT NULL DEFAULT 'مشاهده جزئیات',
+      target_url TEXT,
+      utm_source TEXT NOT NULL DEFAULT 'lagheli',
+      utm_medium TEXT NOT NULL DEFAULT 'native_ad',
+      utm_campaign TEXT NOT NULL DEFAULT '',
+      recipe_categories_json TEXT NOT NULL DEFAULT '[]',
+      match_keywords_json TEXT NOT NULL DEFAULT '[]',
+      status TEXT NOT NULL DEFAULT 'pending',
+      admin_note TEXT NOT NULL DEFAULT '',
+      created_ad_id TEXT,
+      created_at TEXT NOT NULL,
+      reviewed_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS flagship_sponsorships (
+      id TEXT PRIMARY KEY,
+      partner_id TEXT NOT NULL,
+      partner_name TEXT NOT NULL,
+      tagline TEXT NOT NULL,
+      cta_label TEXT NOT NULL DEFAULT 'آشنایی با حامی',
+      target_url TEXT,
+      utm_campaign TEXT NOT NULL DEFAULT '',
+      duration TEXT NOT NULL DEFAULT '3m',
+      price_toman INTEGER NOT NULL DEFAULT 120000000,
+      starts_at TEXT NOT NULL,
+      ends_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      impressions INTEGER NOT NULL DEFAULT 0,
+      clicks INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS local_venues (
+      id TEXT PRIMARY KEY,
+      partner_id TEXT,
+      name TEXT NOT NULL,
+      venue_type TEXT NOT NULL DEFAULT 'restaurant',
+      city TEXT NOT NULL DEFAULT 'تهران',
+      neighborhood TEXT NOT NULL DEFAULT 'ونک',
+      address TEXT NOT NULL DEFAULT '',
+      phone TEXT NOT NULL DEFAULT '',
+      lat REAL NOT NULL DEFAULT 35.7575,
+      lng REAL NOT NULL DEFAULT 51.4099,
+      served_dishes_json TEXT NOT NULL DEFAULT '[]',
+      served_categories_json TEXT NOT NULL DEFAULT '[]',
+      delivery_note TEXT NOT NULL DEFAULT '',
+      menu_url TEXT,
+      utm_campaign TEXT NOT NULL DEFAULT '',
+      is_featured INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      impressions INTEGER NOT NULL DEFAULT 0,
+      clicks INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS advertiser_accounts (
+      id TEXT PRIMARY KEY,
+      partner_id TEXT NOT NULL,
+      login_identifier TEXT UNIQUE NOT NULL,
+      manager_name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS advertiser_sessions (
+      token_hash TEXT PRIMARY KEY,
+      advertiser_id TEXT NOT NULL,
+      partner_id TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS user_dietary_profiles (
+      subject_key TEXT PRIMARY KEY,
+      user_id TEXT,
+      diets_json TEXT NOT NULL DEFAULT '[]',
+      excluded_ingredients_json TEXT NOT NULL DEFAULT '[]',
+      preferred_meal_times_json TEXT NOT NULL DEFAULT '["ناهار","شام"]',
+      cooking_frequency TEXT NOT NULL DEFAULT 'weekly',
+      strict_ad_filtering INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS behavior_sessions (
+      id TEXT PRIMARY KEY,
+      subject_key TEXT NOT NULL,
+      user_id TEXT,
+      device_type TEXT NOT NULL DEFAULT 'mobile',
+      os_family TEXT NOT NULL DEFAULT 'android',
+      display_mode TEXT NOT NULL DEFAULT 'browser',
+      theme_mode TEXT NOT NULL DEFAULT 'light',
+      viewport_width INTEGER NOT NULL DEFAULT 390,
+      started_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL,
+      duration_seconds INTEGER NOT NULL DEFAULT 0,
+      visit_hour INTEGER NOT NULL DEFAULT 19,
+      day_of_week INTEGER NOT NULL DEFAULT 4,
+      pages_viewed INTEGER NOT NULL DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS behavior_events (
+      id TEXT PRIMARY KEY,
+      session_id TEXT,
+      subject_key TEXT NOT NULL,
+      user_id TEXT,
+      event_type TEXT NOT NULL,
+      section_name TEXT NOT NULL DEFAULT '',
+      target_type TEXT NOT NULL DEFAULT '',
+      target_id TEXT NOT NULL DEFAULT '',
+      target_label TEXT NOT NULL DEFAULT '',
+      category TEXT NOT NULL DEFAULT '',
+      numeric_value REAL NOT NULL DEFAULT 0,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_behavior_events_type ON behavior_events(event_type);
+    CREATE INDEX IF NOT EXISTS idx_behavior_events_subject ON behavior_events(subject_key);
+    CREATE INDEX IF NOT EXISTS idx_behavior_sessions_subject ON behavior_sessions(subject_key);
+
+    CREATE TABLE IF NOT EXISTS executive_insight_reports (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      audience_scope TEXT NOT NULL DEFAULT 'brands',
+      approved_by TEXT NOT NULL,
+      summary_json TEXT NOT NULL,
+      published_to_auctions INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
   `);
 
   ensureSchemaUpgrades();
@@ -352,6 +613,17 @@ function ensureSchemaUpgrades(): void {
   ensureColumn('users', 'is_suspended', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('recipes', 'photo_credit_name', 'TEXT');
   ensureColumn('partners', 'business_balance', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('sessions', 'session_role', 'TEXT');
+  ensureColumn('native_ads', 'media_type', "TEXT NOT NULL DEFAULT 'text'");
+  ensureColumn('native_ads', 'recipe_categories_json', "TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn('native_ads', 'utm_source', "TEXT NOT NULL DEFAULT 'lagheli'");
+  ensureColumn('native_ads', 'utm_medium', "TEXT NOT NULL DEFAULT 'native_ad'");
+  ensureColumn('native_ads', 'utm_campaign', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('native_ads', 'slot_id', 'TEXT');
+  ensureColumn('native_ads', 'starts_at', 'TEXT');
+  ensureColumn('native_ads', 'ends_at', 'TEXT');
+  ensureColumn('native_ads', 'pricing_mode', "TEXT NOT NULL DEFAULT 'fixed'");
+  ensureColumn('native_ads', 'bid_amount_toman', 'INTEGER NOT NULL DEFAULT 0');
 }
 
 export function getEcosystemConfig(): EcosystemConfig {
@@ -365,7 +637,285 @@ export function getEcosystemConfig(): EcosystemConfig {
     );
     return DEFAULT_ECOSYSTEM_CONFIG;
   }
-  return {...DEFAULT_ECOSYSTEM_CONFIG, ...JSON.parse(row.value_json)};
+  const parsed = JSON.parse(row.value_json) as Partial<EcosystemConfig>;
+  return {
+    ...DEFAULT_ECOSYSTEM_CONFIG,
+    ...parsed,
+    marketplaceTitle:
+      !parsed.marketplaceTitle || parsed.marketplaceTitle === 'بازارچه و اصناف'
+        ? DEFAULT_ECOSYSTEM_CONFIG.marketplaceTitle
+        : parsed.marketplaceTitle,
+    appSections: {
+      ...DEFAULT_APP_SECTIONS,
+      ...(parsed.appSections || {}),
+    },
+    adHarmony: {
+      ...DEFAULT_AD_HARMONY,
+      ...(parsed.adHarmony || {}),
+    },
+  };
+}
+
+export function getAclRoles(): DynamicRoleDefinition[] {
+  const rows = db.prepare('SELECT * FROM acl_roles ORDER BY is_system DESC, created_at ASC').all() as Record<
+    string,
+    unknown
+  >[];
+  if (rows.length === 0) {
+    return DEFAULT_DYNAMIC_ROLES;
+  }
+  return rows.map((r) => ({
+    id: String(r.id),
+    label: String(r.label),
+    shortLabel: String(r.short_label || r.label),
+    description: String(r.description || ''),
+    permissions: JSON.parse(String(r.permissions_json || '[]')) as AdminPermission[],
+    isSystem: Number(r.is_system) === 1,
+    createdAt: String(r.created_at),
+    updatedAt: String(r.updated_at),
+  }));
+}
+
+export function mapNativeAdRow(row: Record<string, unknown>): NativeAdUnit {
+  const fmt = row.format as NativeAdFormat;
+  const fallbackMedia: NativeAdMediaType =
+    fmt === 'feed_editorial_story' ? 'banner' : row.target_url ? 'click' : 'text';
+  const rawMedia = String(row.media_type || fallbackMedia);
+  const mediaType: NativeAdMediaType =
+    rawMedia === 'banner' || rawMedia === 'click' || rawMedia === 'text' ? rawMedia : fallbackMedia;
+  return {
+    id: String(row.id),
+    partnerId: String(row.partner_id),
+    partnerName: String(row.partner_name || 'برند همکار لاقلی'),
+    format: fmt,
+    mediaType,
+    title: String(row.title),
+    subtitle: String(row.subtitle || ''),
+    editorialCopy: String(row.editorial_copy || ''),
+    ctaLabel: String(row.cta_label || 'آشنایی با برند'),
+    targetUrl: row.target_url ? String(row.target_url) : undefined,
+    utmSource: row.utm_source ? String(row.utm_source) : 'lagheli',
+    utmMedium: row.utm_medium ? String(row.utm_medium) : mediaType,
+    utmCampaign: row.utm_campaign ? String(row.utm_campaign) : '',
+    recipeCategories: JSON.parse(String(row.recipe_categories_json || '[]')),
+    matchKeywords: JSON.parse(String(row.match_keywords_json || '[]')),
+    matchCategories: JSON.parse(String(row.match_categories_json || '[]')),
+    slotId: row.slot_id ? String(row.slot_id) : null,
+    startsAt: row.starts_at ? String(row.starts_at) : null,
+    endsAt: row.ends_at ? String(row.ends_at) : null,
+    pricingMode:
+      row.pricing_mode === 'auction' || row.pricing_mode === 'sponsorship' ? row.pricing_mode : 'fixed',
+    bidAmountToman: Number(row.bid_amount_toman || 0),
+    priority: Number(row.priority || 5),
+    status: row.status === 'paused' ? 'paused' : 'active',
+    impressions: Number(row.impressions || 0),
+    clicks: Number(row.clicks || 0),
+    createdAt: String(row.created_at),
+  };
+}
+
+export function getNativeAds(activeOnly = false): NativeAdUnit[] {
+  const sql = activeOnly
+    ? `SELECT na.*, p.name AS partner_name
+       FROM native_ads na
+       LEFT JOIN partners p ON p.id = na.partner_id
+       WHERE na.status = 'active'
+       ORDER BY na.priority DESC, na.created_at DESC`
+    : `SELECT na.*, p.name AS partner_name
+       FROM native_ads na
+       LEFT JOIN partners p ON p.id = na.partner_id
+       ORDER BY na.priority DESC, na.created_at DESC`;
+  const rows = db.prepare(sql).all() as Record<string, unknown>[];
+  return rows.map(mapNativeAdRow);
+}
+
+export function getAdSlots(openOnly = false): AdSlotInventory[] {
+  const rows = db
+    .prepare(
+      openOnly
+        ? "SELECT * FROM ad_slots WHERE status = 'open' ORDER BY created_at ASC"
+        : 'SELECT * FROM ad_slots ORDER BY created_at ASC'
+    )
+    .all() as Record<string, unknown>[];
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  return rows.map((row) => {
+    const slotId = String(row.id);
+    const activeAd = db
+      .prepare(
+        `SELECT na.starts_at, na.ends_at, p.name AS partner_name
+         FROM native_ads na
+         LEFT JOIN partners p ON p.id = na.partner_id
+         WHERE na.slot_id = ? AND na.status = 'active'
+           AND (na.ends_at IS NULL OR na.ends_at = '' OR na.ends_at >= ?)
+         ORDER BY na.created_at DESC LIMIT 1`
+      )
+      .get(slotId, today) as {starts_at?: string; ends_at?: string; partner_name?: string} | undefined;
+
+    const bidAgg = db
+      .prepare(
+        `SELECT MAX(bid_amount_toman) AS highest_bid, COUNT(*) AS pending_count
+         FROM ad_bids
+         WHERE slot_id = ? AND status = 'pending'`
+      )
+      .get(slotId) as {highest_bid: number | null; pending_count: number};
+
+    return {
+      id: slotId,
+      title: String(row.title),
+      description: String(row.description || ''),
+      format: row.format as NativeAdFormat,
+      mediaType: (row.media_type as NativeAdMediaType) || 'banner',
+      targetCategory: String(row.target_category || 'همه دسته‌ها'),
+      pricingModel: (row.pricing_model as AdSlotInventory['pricingModel']) || 'hybrid',
+      fixedPriceToman: Number(row.fixed_price_toman || 0),
+      minBidToman: Number(row.min_bid_toman || 0),
+      bidStepToman: Number(row.bid_step_toman || 500000),
+      isExclusive: Number(row.is_exclusive) === 1,
+      status: row.status === 'paused' ? 'paused' : 'open',
+      activePartnerName: activeAd?.partner_name || null,
+      activeStartsAt: activeAd?.starts_at || null,
+      activeEndsAt: activeAd?.ends_at || null,
+      highestPendingBidToman: Number(bidAgg?.highest_bid || 0),
+      pendingBidsCount: Number(bidAgg?.pending_count || 0),
+      createdAt: String(row.created_at),
+    };
+  });
+}
+
+export function getAdBids(partnerId?: string): AdBidOrBooking[] {
+  const sql = partnerId
+    ? `SELECT b.*, p.name AS partner_name, s.title AS slot_title, s.target_category AS slot_target_category,
+              s.format AS slot_format, s.media_type AS slot_media_type
+       FROM ad_bids b
+       LEFT JOIN partners p ON p.id = b.partner_id
+       LEFT JOIN ad_slots s ON s.id = b.slot_id
+       WHERE b.partner_id = ?
+       ORDER BY b.created_at DESC`
+    : `SELECT b.*, p.name AS partner_name, s.title AS slot_title, s.target_category AS slot_target_category,
+              s.format AS slot_format, s.media_type AS slot_media_type
+       FROM ad_bids b
+       LEFT JOIN partners p ON p.id = b.partner_id
+       LEFT JOIN ad_slots s ON s.id = b.slot_id
+       ORDER BY CASE b.status WHEN 'pending' THEN 0 ELSE 1 END, b.bid_amount_toman DESC, b.created_at DESC`;
+  const rows = (partnerId ? db.prepare(sql).all(partnerId) : db.prepare(sql).all()) as Record<string, unknown>[];
+  return rows.map((row) => ({
+    id: String(row.id),
+    slotId: String(row.slot_id),
+    slotTitle: String(row.slot_title || 'جایگاه تبلیغاتی'),
+    slotTargetCategory: String(row.slot_target_category || 'همه دسته‌ها'),
+    slotFormat: (row.slot_format as NativeAdFormat) || 'feed_editorial_story',
+    slotMediaType: (row.slot_media_type as NativeAdMediaType) || 'banner',
+    advertiserId: String(row.advertiser_id),
+    partnerId: String(row.partner_id),
+    partnerName: String(row.partner_name || 'برند همکار'),
+    bookingType: row.booking_type === 'fixed' ? 'fixed' : 'auction',
+    bidAmountToman: Number(row.bid_amount_toman || 0),
+    startsAt: String(row.starts_at),
+    endsAt: String(row.ends_at),
+    title: String(row.title),
+    subtitle: String(row.subtitle || ''),
+    editorialCopy: String(row.editorial_copy || ''),
+    ctaLabel: String(row.cta_label || 'مشاهده جزئیات'),
+    targetUrl: row.target_url ? String(row.target_url) : undefined,
+    utmSource: row.utm_source ? String(row.utm_source) : 'lagheli',
+    utmMedium: row.utm_medium ? String(row.utm_medium) : 'native_ad',
+    utmCampaign: row.utm_campaign ? String(row.utm_campaign) : '',
+    recipeCategories: JSON.parse(String(row.recipe_categories_json || '[]')),
+    matchKeywords: JSON.parse(String(row.match_keywords_json || '[]')),
+    status: row.status as AdBidOrBooking['status'],
+    adminNote: String(row.admin_note || ''),
+    createdAdId: row.created_ad_id ? String(row.created_ad_id) : null,
+    createdAt: String(row.created_at),
+    reviewedAt: row.reviewed_at ? String(row.reviewed_at) : null,
+  }));
+}
+
+export function getFlagshipSponsorships(): FlagshipSponsorship[] {
+  const rows = db
+    .prepare('SELECT * FROM flagship_sponsorships ORDER BY CASE status WHEN \'active\' THEN 0 ELSE 1 END, created_at DESC')
+    .all() as Record<string, unknown>[];
+  return rows.map((row) => ({
+    id: String(row.id),
+    partnerId: String(row.partner_id),
+    partnerName: String(row.partner_name),
+    tagline: String(row.tagline),
+    ctaLabel: String(row.cta_label || 'آشنایی با حامی'),
+    targetUrl: row.target_url ? String(row.target_url) : undefined,
+    utmCampaign: row.utm_campaign ? String(row.utm_campaign) : '',
+    duration: row.duration as FlagshipSponsorship['duration'],
+    priceToman: Number(row.price_toman || 0),
+    startsAt: String(row.starts_at),
+    endsAt: String(row.ends_at),
+    status: row.status as FlagshipSponsorship['status'],
+    impressions: Number(row.impressions || 0),
+    clicks: Number(row.clicks || 0),
+    createdAt: String(row.created_at),
+  }));
+}
+
+export function getActiveFlagshipSponsorship(): FlagshipSponsorship | null {
+  const all = getFlagshipSponsorships();
+  return all.find((s) => s.status === 'active' && isAdActiveInDateWindow(s.startsAt, s.endsAt)) || null;
+}
+
+export function getLocalVenues(activeOnly = false): LocalVenueSuggestion[] {
+  const rows = db
+    .prepare(
+      activeOnly
+        ? "SELECT * FROM local_venues WHERE status = 'active' ORDER BY is_featured DESC, created_at DESC"
+        : 'SELECT * FROM local_venues ORDER BY is_featured DESC, created_at DESC'
+    )
+    .all() as Record<string, unknown>[];
+  return rows.map((row) => ({
+    id: String(row.id),
+    partnerId: row.partner_id ? String(row.partner_id) : null,
+    name: String(row.name),
+    venueType: row.venue_type as LocalVenueSuggestion['venueType'],
+    city: String(row.city),
+    neighborhood: String(row.neighborhood),
+    address: String(row.address || ''),
+    phone: String(row.phone || ''),
+    lat: Number(row.lat || 0),
+    lng: Number(row.lng || 0),
+    servedDishes: JSON.parse(String(row.served_dishes_json || '[]')),
+    servedCategories: JSON.parse(String(row.served_categories_json || '[]')),
+    deliveryNote: String(row.delivery_note || ''),
+    menuUrl: row.menu_url ? String(row.menu_url) : undefined,
+    utmCampaign: row.utm_campaign ? String(row.utm_campaign) : '',
+    isFeatured: Number(row.is_featured) === 1,
+    status: row.status === 'paused' ? 'paused' : 'active',
+    impressions: Number(row.impressions || 0),
+    clicks: Number(row.clicks || 0),
+    createdAt: String(row.created_at),
+  }));
+}
+
+export function getAdvertiserAccounts(): AdvertiserAccount[] {
+  const rows = db
+    .prepare(
+      `SELECT a.*, p.name AS partner_name
+       FROM advertiser_accounts a
+       LEFT JOIN partners p ON p.id = a.partner_id
+       ORDER BY a.created_at ASC`
+    )
+    .all() as Record<string, unknown>[];
+  return rows.map((row) => ({
+    id: String(row.id),
+    partnerId: String(row.partner_id),
+    partnerName: String(row.partner_name || 'برند همکار'),
+    loginIdentifier: String(row.login_identifier),
+    managerName: String(row.manager_name),
+    status: row.status === 'suspended' ? 'suspended' : 'active',
+    createdAt: String(row.created_at),
+  }));
+}
+
+export function hashAdvertiserPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${derived}`;
 }
 
 function seedInitialData(): void {
@@ -1292,6 +1842,1303 @@ function seedV2Content(): void {
       'با گردوی تازه تویسرکان و ۴ ساعت جاافتادن آرام؛ روغن‌انداختن بی‌نظیری داشت.',
       'pending',
       0,
+      now
+    );
+  }
+
+  // Seed initial anonymized search trends when search_logs is empty (live user searches append continuously)
+  const searchLogCount = (db.prepare('SELECT COUNT(*) as c FROM search_logs').get() as {c: number}).c;
+  if (searchLogCount === 0) {
+    const insertSearch = db.prepare(`
+      INSERT INTO search_logs (id, query_raw, query_norm, source, results_count, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    const baselineTrends: {raw: string; norm: string; source: 'search' | 'fridge'; results: number; count: number}[] = [
+      {raw: 'کوکو سبزی', norm: 'کوکو سبزی', source: 'search', results: 1, count: 14},
+      {raw: 'عدس پلو', norm: 'عدس پلو', source: 'search', results: 1, count: 11},
+      {raw: 'ته‌چین زعفرانی', norm: 'ته چین زعفرانی', source: 'search', results: 1, count: 12},
+      {raw: 'فسنجان ملس', norm: 'فسنجان ملس', source: 'search', results: 1, count: 9},
+      {raw: 'قرمه سبزی اصیل', norm: 'قرمه سبزی اصیل', source: 'search', results: 0, count: 10},
+      {raw: 'زرشک پلو با مرغ مجلسی', norm: 'زرشک پلو با مرغ مجلسی', source: 'search', results: 0, count: 8},
+      {raw: 'میرزاقاسمی', norm: 'میرزاقاسمی', source: 'search', results: 2, count: 7},
+      {raw: 'کباب تابه‌ای', norm: 'کباب تابه ای', source: 'search', results: 0, count: 6},
+      {raw: 'آش رشته', norm: 'اش رشته', source: 'search', results: 1, count: 6},
+      {raw: 'تخم مرغ', norm: 'تخم مرغ', source: 'fridge', results: 3, count: 5},
+      {raw: 'زعفران', norm: 'زعفران', source: 'fridge', results: 3, count: 5},
+    ];
+    let idx = 1;
+    for (const item of baselineTrends) {
+      for (let i = 0; i < item.count; i++) {
+        const offsetHours = (idx * 3) % 120;
+        const ts = new Date(Date.now() - offsetHours * 3600 * 1000).toISOString();
+        insertSearch.run(`slog-seed-${idx}`, item.raw, item.norm, item.source, item.results, ts);
+        idx++;
+      }
+    }
+  }
+
+  // Ensure default dynamic ACL roles exist in acl_roles table
+  const insertAclRole = db.prepare(`
+    INSERT OR IGNORE INTO acl_roles (
+      id, label, short_label, description, permissions_json, is_system, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+  `);
+  for (const roleDef of DEFAULT_DYNAMIC_ROLES) {
+    insertAclRole.run(
+      roleDef.id,
+      roleDef.label,
+      roleDef.shortLabel,
+      roleDef.description,
+      JSON.stringify(roleDef.permissions),
+      now,
+      now
+    );
+  }
+
+  // Seed curated, non-intrusive Native Ad Units across all 4 formats (zero fake discount codes)
+  const nativeAdCount = (db.prepare('SELECT COUNT(*) as c FROM native_ads').get() as {c: number}).c;
+  if (nativeAdCount === 0) {
+    const insertNativeAd = db.prepare(`
+      INSERT INTO native_ads (
+        id, partner_id, format, title, subtitle, editorial_copy, cta_label, target_url,
+        match_keywords_json, match_categories_json, priority, status, impressions, clicks, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+    `);
+
+    insertNativeAd.run(
+      'nad-zaferan-inline',
+      'prt-zaferan',
+      'inline_ingredient',
+      'زعفران سرگل خالص قائنات',
+      'پیشنهاد برای عطر و رنگ طبیعی پلوها و ته‌چین',
+      'برداشت پاییزی مزارع قائنات با دم‌دهی شفاف و بدون افزودنی رنگ.',
+      'مشاهده معرفی برند',
+      null,
+      JSON.stringify(['زعفران', 'زعفران دم کرده', 'زعفران سابیده', 'برنج ایرانی']),
+      JSON.stringify(['ادویه و معطرها']),
+      9,
+      640,
+      54,
+      now
+    );
+
+    insertNativeAd.run(
+      'nad-gilan-inline',
+      'prt-artisan',
+      'inline_ingredient',
+      'رب انار ملس خانگی و گردوی تویسرکان',
+      'انتخاب تحریریه برای خورش‌های اصیل شمالی',
+      'پخت آرام روی هیزم در کارگاه بومی بدون مواد نگهدارنده برای تعادل طعم ملس.',
+      'آشنایی با تولیدکننده',
+      null,
+      JSON.stringify(['رب انار', 'گردو', 'مغز گردو', 'سبزی', 'بادمجان']),
+      JSON.stringify(['چاشنی و رب‌ها', 'خشکبار و مغزها']),
+      8,
+      510,
+      41,
+      now
+    );
+
+    insertNativeAd.run(
+      'nad-castiron-tool',
+      'prt-castiron',
+      'contextual_tool',
+      'تابه و قابلمه چدن طبیعی رَست',
+      'پخش یکنواخت حرارت برای ته‌دیگ طلایی و جاافتادن آرام خورش',
+      'چدن بدون پوشش شیمیایی، مناسب شعله ملایم و فر برای پخت‌های طولانی ایرانی.',
+      'بررسی ابزار آشپزی',
+      null,
+      JSON.stringify(['قابلمه', 'ماهیتابه', 'تابه', 'چدن', 'فر', 'قابلمه نچسب']),
+      JSON.stringify([]),
+      9,
+      420,
+      39,
+      now
+    );
+
+    insertNativeAd.run(
+      'nad-story-zaferan',
+      'prt-zaferan',
+      'feed_editorial_story',
+      'راز دم‌کردن زعفران با یخ؛ از مزارع قائنات تا آشپزخانه شما',
+      'یادداشت مشترک تحریریه لاقلی و خانه زعفران خراسان',
+      'چرا شوک دمایی یخ عطر سافرانال زعفران تازه را تا دو برابر آزاد می‌کند؟ در صفحه خانه زعفران با استاندارد تشخیص اصالت کلاله آشنا شوید.',
+      'مطالعه معرفی برند',
+      null,
+      JSON.stringify(['زعفران', 'ته چین', 'پلو']),
+      JSON.stringify(['ادویه و معطرها']),
+      9,
+      1180,
+      92,
+      now
+    );
+
+    insertNativeAd.run(
+      'nad-story-castiron',
+      'prt-castiron',
+      'feed_editorial_story',
+      'چرا سرآشپزها برای خورش‌های جاافتاده سراغ چدن طبیعی می‌روند؟',
+      'داستان ساخت ظروف دست‌ساز در کارگاه چدنی رَست',
+      'ظرف چدنی با ذخیره حرارتی بالا از سوختن ته‌دیگ جلوگیری می‌کند و طعم خورش را عمیق‌تر می‌سازد.',
+      'آشنایی با کارگاه رَست',
+      null,
+      JSON.stringify(['خورش', 'قابلمه', 'چدن']),
+      JSON.stringify([]),
+      7,
+      890,
+      63,
+      now
+    );
+
+    insertNativeAd.run(
+      'nad-pantry-fresh',
+      'prt-artisan',
+      'pantry_companion',
+      'تأمین مواد بومی و ادویه‌های دست‌چین بدون واسطه',
+      'برگزیده برای لیست خرید و یخچال خانگی شما',
+      'اگر دنبال سبزی خشک معطر، رب انار خالص و ادویه تازه آسیاب‌شده هستید، مجموعه تولیدکنندگان بومی تاییدشده لاقلی را ببینید.',
+      'مشاهده تولیدکنندگان بومی',
+      null,
+      JSON.stringify(['پیاز', 'سیر', 'سبزی', 'رب انار', 'کشک', 'زعفران', 'برنج', 'عدس', 'گردو']),
+      JSON.stringify(['سبزیجات و صیفی‌جات', 'ادویه و معطرها', 'چاشنی و رب‌ها', 'حبوبات']),
+      8,
+      730,
+      58,
+      now
+    );
+  }
+
+  // Seed iconic Iranian brands & venues for smart category-based native ads, auctions, and location recommendations
+  const insertBrandPartner = db.prepare(`
+    INSERT OR IGNORE INTO partners (
+      id, slug, name, role_type, city, neighborhood, description, address, phone, website,
+      verified, claim_status, tier, business_balance, promo_code, promo_label, affiliate_code,
+      related_ingredients_json, related_tools_json, catalog_json, status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'verified', ?, ?, '', '', '', ?, ?, '[]', 'approved', ?)
+  `);
+
+  insertBrandPartner.run(
+    'prt-kalleh',
+    'kalleh-dairy',
+    'لبنیات کاله',
+    'food_brands',
+    'تهران',
+    'ونک',
+    'تولیدکننده پیشرو محصولات لبنی تازه شامل ماست چکیده، کره پاستوریزه، پنیر و خامه برای آشپزی اصیل ایرانی.',
+    'تهران، بلوار میرداماد، دفتر مرکزی کاله',
+    '021-84321000',
+    'https://kalleh.com',
+    'sponsor',
+    45000000,
+    JSON.stringify(['ماست', 'ماست چکیده', 'کره', 'خامه', 'پنیر', 'شیر', 'کشک']),
+    JSON.stringify([]),
+    now
+  );
+
+  insertBrandPartner.run(
+    'prt-mihan',
+    'mihan-dairy',
+    'لبنیات میهن',
+    'food_brands',
+    'تهران',
+    'جردن',
+    'مجموعه لبنیات تازه و محصولات خامه‌ای میهن برای طعم لطیف دسرها، صبحانه و غذاهای ایرانی.',
+    'تهران، جردن، دفتر مرکزی میهن',
+    '021-88776655',
+    'https://mihan.ir',
+    'featured',
+    28000000,
+    JSON.stringify(['شیر', 'خامه', 'کره', 'ماست', 'پنیر']),
+    JSON.stringify([]),
+    now
+  );
+
+  insertBrandPartner.run(
+    'prt-zarmacaron',
+    'zar-macaron',
+    'زر ماکارون',
+    'food_brands',
+    'تهران',
+    'مرکزی',
+    'پاستا و ماکارونی تهیه‌شده از آرد سمولینا برای پخت یکدست و بافت حرفه‌ای در انواع پاستا و لازانیا.',
+    'تهران، دفتر مرکزی زر ماکارون',
+    '021-44556677',
+    'https://zarmacaron.com',
+    'featured',
+    19000000,
+    JSON.stringify(['ماکارونی', 'پاستا', 'اسپاگتی', 'لازانیا', 'رشته']),
+    JSON.stringify([]),
+    now
+  );
+
+  insertBrandPartner.run(
+    'prt-bahram',
+    'bahram-sauce',
+    'سس بهرام',
+    'food_brands',
+    'تهران',
+    'مرکزی',
+    'چاشنی‌ها، سس‌های گرم و سرد و رب‌های استاندارد برای تکمیل طعم پاستا، ساندویچ و غذاهای سریع.',
+    'تهران، دفتر فروش سس بهرام',
+    '021-66778899',
+    'https://bahramsauce.ir',
+    'featured',
+    14000000,
+    JSON.stringify(['سس', 'رب گوجه', 'رب گوجه‌فرنگی', 'کچاپ', 'مایونز']),
+    JSON.stringify([]),
+    now
+  );
+
+  insertBrandPartner.run(
+    'prt-can',
+    'can-kitchenware',
+    'لوازم آشپزخانه کَن',
+    'kitchen_equipment',
+    'تهران',
+    'شریعتی',
+    'تولیدکننده اجاق گاز، هود و فرهای توکار مدرن با کنترل دقیق حرارت برای جاافتادن خورش‌ها و پخت حرفه‌ای.',
+    'تهران، خیابان شریعتی، نمایشگاه مرکزی کَن',
+    '021-22889900',
+    'https://can.ir',
+    'sponsor',
+    35000000,
+    JSON.stringify(['خورش', 'ته چین']),
+    JSON.stringify(['فر', 'اجاق', 'قابلمه', 'ماهیتابه', 'تابه', 'هود']),
+    now
+  );
+
+  insertBrandPartner.run(
+    'prt-soo',
+    'soo-restaurant',
+    'رستوران سو',
+    'restaurants_kitchens',
+    'تهران',
+    'ونک',
+    'رستوران ایرانی معاصر در قلب تهران با سرو روزانه خورش‌های اصیل، ته‌چین زعفرانی و غذاهای شمالی دست‌پخت سرآشپز.',
+    'تهران، میدان ونک، خیابان ملاصدرا، پلاک ۴۲',
+    '021-88664422',
+    'https://soo-restaurant.ir',
+    'featured',
+    12000000,
+    JSON.stringify(['فسنجان', 'ته‌چین', 'قورمه‌سبزی', 'عدس‌پلو', 'میرزاقاسمی']),
+    JSON.stringify([]),
+    now
+  );
+
+  insertBrandPartner.run(
+    'prt-roastcafe',
+    'roast-cafe-tehran',
+    'کافه برشته‌کاری رُست',
+    'cafes_bakeries',
+    'تهران',
+    'جردن',
+    'کافه تخصصی نوشیدنی‌های گرم و سرد، صبحانه سالم و پاستاهای تازه در محله جردن.',
+    'تهران، بلوار نلسون ماندلا، کوچه ناهید غربی، پلاک ۱۸',
+    '021-22051133',
+    'https://roastcafe.ir',
+    'featured',
+    9000000,
+    JSON.stringify(['قهوه', 'لاته', 'صبحانه', 'پاستا', 'کوکو']),
+    JSON.stringify([]),
+    now
+  );
+
+  // Backfill semantic recipe categories & media types on legacy seeded native ads + add brand-specific ads
+  db.prepare(
+    `UPDATE native_ads
+     SET media_type = 'text', recipe_categories_json = ?
+     WHERE id = 'nad-zaferan-inline' AND (recipe_categories_json IS NULL OR recipe_categories_json = '[]')`
+  ).run(JSON.stringify(['پلو و ته‌چین', 'خورش', 'ادویه و چاشنی']));
+
+  db.prepare(
+    `UPDATE native_ads
+     SET media_type = 'text', recipe_categories_json = ?
+     WHERE id = 'nad-gilan-inline' AND (recipe_categories_json IS NULL OR recipe_categories_json = '[]')`
+  ).run(JSON.stringify(['خورش', 'غذای شمالی', 'ادویه و چاشنی']));
+
+  db.prepare(
+    `UPDATE native_ads
+     SET media_type = 'click', recipe_categories_json = ?
+     WHERE id = 'nad-castiron-tool' AND (recipe_categories_json IS NULL OR recipe_categories_json = '[]')`
+  ).run(JSON.stringify(['خورش', 'لوازم آشپزخانه', 'پلو و ته‌چین']));
+
+  db.prepare(
+    `UPDATE native_ads
+     SET media_type = 'banner', recipe_categories_json = ?
+     WHERE id = 'nad-story-zaferan' AND (recipe_categories_json IS NULL OR recipe_categories_json = '[]')`
+  ).run(JSON.stringify(['پلو و ته‌چین', 'ادویه و چاشنی', 'همه دسته‌ها']));
+
+  db.prepare(
+    `UPDATE native_ads
+     SET media_type = 'banner', recipe_categories_json = ?
+     WHERE id = 'nad-story-castiron' AND (recipe_categories_json IS NULL OR recipe_categories_json = '[]')`
+  ).run(JSON.stringify(['خورش', 'لوازم آشپزخانه']));
+
+  const insertExtendedNativeAd = db.prepare(`
+    INSERT OR IGNORE INTO native_ads (
+      id, partner_id, format, media_type, title, subtitle, editorial_copy, cta_label, target_url,
+      utm_source, utm_medium, utm_campaign, recipe_categories_json, match_keywords_json,
+      match_categories_json, slot_id, starts_at, ends_at, pricing_mode, bid_amount_toman,
+      priority, status, impressions, clicks, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+  `);
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const plus60Iso = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10);
+
+  insertExtendedNativeAd.run(
+    'nad-kalleh-dairy-inline',
+    'prt-kalleh',
+    'inline_ingredient',
+    'click',
+    'ماست چکیده و کره پاستوریزه کاله',
+    'بافت غلیظ و یکدست برای ته‌چین طلایی و غذاهای لبنی',
+    'انتخاب حرفه‌ای برای جلوگیری از آب‌انداختن مایه ته‌چین و عطر طبیعی کره در پلوهای مجلسی.',
+    'مشاهده محصولات کاله',
+    'https://kalleh.com/products/dairy',
+    'lagheli',
+    'inline_click',
+    'kalleh_dairy_recipes',
+    JSON.stringify(['لبنیات', 'پلو و ته‌چین', 'پیش‌غذا و صبحانه']),
+    JSON.stringify(['ماست چکیده', 'ماست', 'کره', 'خامه', 'پنیر', 'کشک', 'شیر']),
+    JSON.stringify(['لبنیات']),
+    'slot-dairy-inline',
+    todayIso,
+    plus60Iso,
+    'fixed',
+    14000000,
+    10,
+    1540,
+    132,
+    now
+  );
+
+  insertExtendedNativeAd.run(
+    'nad-kalleh-dairy-banner',
+    'prt-kalleh',
+    'feed_editorial_story',
+    'banner',
+    'راز تردی ته‌چین و بافت لطیف غذاهای لبنی با لبنیات تازه کاله',
+    'پیشنهاد ویژه دسته‌بندی غذاهای لبنی و پلوهای مجلسی',
+    'استفاده از ماست چکیده کم‌آب و کره حیوانی باکیفیت تفاوت میان یک ته‌چین معمولی و یک ته‌چین رستورانی را رقم می‌زند.',
+    'بررسی راهنمای لبنیات کاله',
+    'https://kalleh.com/recipes',
+    'lagheli',
+    'feed_banner',
+    'kalleh_feed_dairy',
+    JSON.stringify(['لبنیات', 'پلو و ته‌چین', 'ناهار و شام']),
+    JSON.stringify(['ماست', 'کره', 'کشک', 'پنیر', 'ته‌چین']),
+    JSON.stringify(['لبنیات']),
+    'slot-dairy-banner',
+    todayIso,
+    plus60Iso,
+    'auction',
+    24000000,
+    9,
+    2180,
+    176,
+    now
+  );
+
+  insertExtendedNativeAd.run(
+    'nad-can-stew-tool',
+    'prt-can',
+    'contextual_tool',
+    'click',
+    'پخت آرام و یکنواخت خورش‌های مجلسی روی اجاق و فر توکار کَن',
+    'جایگاه اختصاصی دسته‌بندی خورش و تجهیزات آشپزخانه',
+    'شعله‌پخش‌کن دقیق و کنترل حرارت ملایم در سری جدید اجاق و فرهای کَن، جاافتادن فسنجان و قورمه‌سبزی را بدون سوختگی تضمین می‌کند.',
+    'مشاهده پروموشن کَن',
+    'https://can.ir/promotion/stew-season',
+    'lagheli',
+    'contextual_click',
+    'can_khorsht_promo',
+    JSON.stringify(['خورش', 'لوازم آشپزخانه', 'ناهار و شام']),
+    JSON.stringify(['خورش', 'فسنجان', 'قرمه', 'قابلمه', 'فر', 'اجاق']),
+    JSON.stringify([]),
+    'slot-stew-kitchen',
+    todayIso,
+    plus60Iso,
+    'fixed',
+    18500000,
+    10,
+    1320,
+    118,
+    now
+  );
+
+  insertExtendedNativeAd.run(
+    'nad-zar-pasta-inline',
+    'prt-zarmacaron',
+    'inline_ingredient',
+    'click',
+    'پاستا و رشته سمولینا زر ماکارون',
+    'بافت آل‌دنته بدون له‌شدن در پخت‌های خمیری و آش‌ها',
+    'تهیه‌شده از گندم دوروم با پایداری بافت عالی برای انواع پاستا، ماکارونی و رشته اصیل.',
+    'مشاهده سبد زر ماکارون',
+    'https://zarmacaron.com/products',
+    'lagheli',
+    'inline_click',
+    'zar_pasta_slot',
+    JSON.stringify(['پاستا و ماکارونی', 'ناهار و شام']),
+    JSON.stringify(['ماکارونی', 'پاستا', 'رشته', 'رشته آش', 'لازانیا', 'اسپاگتی']),
+    JSON.stringify(['غلات و آرد']),
+    'slot-pasta-inline',
+    todayIso,
+    plus60Iso,
+    'auction',
+    12500000,
+    8,
+    870,
+    69,
+    now
+  );
+
+  insertExtendedNativeAd.run(
+    'nad-bahram-sauce-inline',
+    'prt-bahram',
+    'inline_ingredient',
+    'text',
+    'سس‌ها و چاشنی‌های اصیل بهرام',
+    'تعادل طعم گوجه و ادویه در سس‌های گرم و غذاهای سریع',
+    'توصیه تحریریه برای چاشنی‌زدن دقیق به غذاهای سریع، پاستا و خوراک‌های روزمره.',
+    'آشنایی با سس بهرام',
+    'https://bahramsauce.ir/catalog',
+    'lagheli',
+    'text_mention',
+    'bahram_sauces',
+    JSON.stringify(['پاستا و ماکارونی', 'ادویه و چاشنی', 'پیش‌غذا و صبحانه']),
+    JSON.stringify(['رب گوجه', 'رب گوجه‌فرنگی', 'سس', 'گوجه', 'پیاز']),
+    JSON.stringify(['چاشنی و رب‌ها']),
+    null,
+    todayIso,
+    plus60Iso,
+    'fixed',
+    9500000,
+    7,
+    620,
+    47,
+    now
+  );
+
+  // Seed Ad Slot Inventory (Fixed, Auction, and Hybrid Slots)
+  const slotCount = (db.prepare('SELECT COUNT(*) as c FROM ad_slots').get() as {c: number}).c;
+  if (slotCount === 0) {
+    const insertSlot = db.prepare(`
+      INSERT INTO ad_slots (
+        id, title, description, format, media_type, target_category, pricing_model,
+        fixed_price_toman, min_bid_toman, bid_step_toman, is_exclusive, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)
+    `);
+
+    insertSlot.run(
+      'slot-dairy-banner',
+      'بنر تحریریه‌ای دسته‌بندی لبنیات و پلوها',
+      'نمایش بنر هماهنگ و بدون مزاحمت در فید دستورهای دارای ماست، کره، پنیر، کشک و خامه (مناسب برندهای لبنی مانند کاله و میهن).',
+      'feed_editorial_story',
+      'banner',
+      'لبنیات',
+      'hybrid',
+      26000000,
+      18000000,
+      1500000,
+      1,
+      now
+    );
+
+    insertSlot.run(
+      'slot-stew-kitchen',
+      'جایگاه انحصاری تجهیزات آشپزی در دسته خورش',
+      'توصیه کلیکی با لینک ردیابی اختصاصی در صفحه دستورپخت خورش‌ها و ابزار پخت (مناسب برندهای تجهیزات آشپزخانه مانند کَن).',
+      'contextual_tool',
+      'click',
+      'خورش',
+      'hybrid',
+      22000000,
+      15000000,
+      1000000,
+      1,
+      now
+    );
+
+    insertSlot.run(
+      'slot-spices-stew-text',
+      'یادداشت متنی ادویه و چاشنی در دستورهای خورش',
+      'نمایش یادداشت یک‌خطی بسیار آرام زیر مواد ادویه‌ای و چاشنی‌های خورش‌های ایرانی بدون حس شلوغی.',
+      'inline_ingredient',
+      'text',
+      'ادویه و چاشنی',
+      'fixed',
+      11000000,
+      8000000,
+      500000,
+      0,
+      now
+    );
+
+    insertSlot.run(
+      'slot-pasta-inline',
+      'توصیه کلیکی دسته پاستا، ماکارونی و سس‌ها',
+      'جایگاه توصیه برند دقیقاً کنار مواد پاستا، رشته و سس‌ها با لینک ردیابی بازاریابی (مناسب زر ماکارون و سس بهرام).',
+      'inline_ingredient',
+      'click',
+      'پاستا و ماکارونی',
+      'auction',
+      16000000,
+      11000000,
+      1000000,
+      1,
+      now
+    );
+
+    insertSlot.run(
+      'slot-dairy-inline',
+      'توصیه درون‌مواد لبنیات (متنی و کلیکی)',
+      'درج معرفی برند زیر اقلام لبنی در لیست مواد اولیه دستورها برای بیشترین نرخ تعامل در لحظه تصمیم خرید.',
+      'inline_ingredient',
+      'click',
+      'لبنیات',
+      'hybrid',
+      15000000,
+      10000000,
+      1000000,
+      0,
+      now
+    );
+
+    insertSlot.run(
+      'slot-feed-general-banner',
+      'بنر تحریریه‌ای صفحه اول کاوش (همه دسته‌ها)',
+      'کارت داستان برند با فاصله حداقل ۶ دستورپخت در فید اصلی، ویژه معرفی داستان تولیدکنندگان و برندهای بزرگ.',
+      'feed_editorial_story',
+      'banner',
+      'همه دسته‌ها',
+      'auction',
+      32000000,
+      22000000,
+      2000000,
+      1,
+      now
+    );
+  }
+
+  // Ensure high-demand recipe-header auction slots always exist for the Smart Auction Room
+  const insertSlotIgnore = db.prepare(`
+    INSERT OR IGNORE INTO ad_slots (
+      id, title, description, format, media_type, target_category, pricing_model,
+      fixed_price_toman, min_bid_toman, bid_step_toman, is_exclusive, status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)
+  `);
+
+  insertSlotIgnore.run(
+    'slot-recipe-header-stews',
+    'سربرگ دستورپخت‌های ویژه خورش‌های اصیل ایرانی',
+    'حضور انحصاری و باوقار در سربرگ صفحه دستورپخت‌های پرطرفدار خورش (قورمه‌سبزی، فسنجان، قیمه) با بیشترین زمان مطالعه کاربر.',
+    'contextual_tool',
+    'banner',
+    'خورش',
+    'auction',
+    34000000,
+    24000000,
+    1500000,
+    1,
+    now
+  );
+
+  insertSlotIgnore.run(
+    'slot-recipe-header-tahchin',
+    'سربرگ دستورپخت‌های مجلسی پلو، ته‌چین و زعفران',
+    'جایگاه مزایده‌ای در بالای دستورهای مجلسی پلو و ته‌چین؛ مناسب برندهای زعفران، برنج، لبنیات و ادویه ممتاز.',
+    'feed_editorial_story',
+    'banner',
+    'پلو و ته‌چین',
+    'hybrid',
+    29000000,
+    19000000,
+    1500000,
+    1,
+    now
+  );
+
+  // Seed Flagship "Powered By" Sponsorship (1m / 3m / 6m / 12m)
+  const flagshipCount = (db.prepare('SELECT COUNT(*) as c FROM flagship_sponsorships').get() as {c: number}).c;
+  if (flagshipCount === 0) {
+    const plus180Iso = new Date(Date.now() + 180 * 86400000).toISOString().slice(0, 10);
+    db.prepare(`
+      INSERT INTO flagship_sponsorships (
+        id, partner_id, partner_name, tagline, cta_label, target_url, utm_campaign,
+        duration, price_toman, starts_at, ends_at, status, impressions, clicks, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+    `).run(
+      'flagship-kalleh-6m',
+      'prt-kalleh',
+      'کاله',
+      'همراه طعم اصیل و لبنیات تازه در آشپزخانه ایرانی',
+      'آشنایی با حامی',
+      'https://kalleh.com',
+      'lagheli_powered_by_6m',
+      '6m',
+      215000000,
+      todayIso,
+      plus180Iso,
+      4820,
+      312,
+      now
+    );
+  }
+
+  // Seed Local Venues (Restaurants, Cafes & Fast-Foods matched by location + recipe)
+  const venueCount = (db.prepare('SELECT COUNT(*) as c FROM local_venues').get() as {c: number}).c;
+  if (venueCount === 0) {
+    const insertVenue = db.prepare(`
+      INSERT INTO local_venues (
+        id, partner_id, name, venue_type, city, neighborhood, address, phone, lat, lng,
+        served_dishes_json, served_categories_json, delivery_note, menu_url, utm_campaign,
+        is_featured, status, impressions, clicks, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+    `);
+
+    insertVenue.run(
+      'venue-soo-vanak',
+      'prt-soo',
+      'رستوران سو',
+      'restaurant',
+      'تهران',
+      'ونک',
+      'میدان ونک، خیابان ملاصدرا، پلاک ۴۲',
+      '021-88664422',
+      35.7575,
+      51.4099,
+      JSON.stringify(['ته‌چین زعفرانی مرغ', 'ته‌چین', 'فسنجان', 'خورشت فسنجان', 'باقالی پلو', 'عدس پلو', 'میرزاقاسمی']),
+      JSON.stringify(['خورش', 'پلو و ته‌چین', 'ناهار و شام', 'غذای شمالی']),
+      'سرو حضوری و ارسال داغ محدوده ونک و جردن در ۳۵ دقیقه',
+      'https://soo-restaurant.ir/menu',
+      'soo_recipe_nearby',
+      1,
+      940,
+      118,
+      now
+    );
+
+    insertVenue.run(
+      'venue-roast-jordan',
+      'prt-roastcafe',
+      'کافه برشته‌کاری رُست',
+      'cafe',
+      'تهران',
+      'جردن',
+      'بلوار نلسون ماندلا، کوچه ناهید غربی، پلاک ۱۸',
+      '021-22051133',
+      35.7689,
+      51.4167,
+      JSON.stringify(['لاته', 'قهوه', 'نوشیدنی', 'کوکو سبزی', 'صبحانه', 'پاستا', 'آش رشته']),
+      JSON.stringify(['نوشیدنی', 'پیش‌غذا و صبحانه', 'پاستا و ماکارونی', 'گیاهی و رژیمی']),
+      'سرو تخصصی نوشیدنی، عصرانه و پیش‌غذاهای سالم روزانه',
+      'https://roastcafe.ir/menu',
+      'roast_cafe_nearby',
+      1,
+      610,
+      74,
+      now
+    );
+
+    insertVenue.run(
+      'venue-gilaneh-west',
+      'prt-artisan',
+      'آشپزخانه محلی گیلانه',
+      'restaurant',
+      'تهران',
+      'شهرک غرب',
+      'شهرک غرب، بلوار دادمان، نبش فخار مقدم',
+      '021-88361212',
+      35.7618,
+      51.3724,
+      JSON.stringify(['میرزاقاسمی', 'فسنجان', 'خورشت فسنجان', 'کوکو سبزی', 'باقالی قاتوق', 'آش رشته']),
+      JSON.stringify(['غذای شمالی', 'خورش', 'گیاهی و رژیمی', 'پیش‌غذا و صبحانه']),
+      'طبخ روزانه با مواد بومی گیلان و ارسال در غرب تهران',
+      'https://gilanehkitchen.ir',
+      'gilaneh_nearby',
+      0,
+      480,
+      52,
+      now
+    );
+
+    insertVenue.run(
+      'venue-atish-tajrish',
+      null,
+      'فست‌فود و گریل آتیش',
+      'fastfood',
+      'تهران',
+      'تجریش',
+      'خیابان ولیعصر، نرسیده به میدان تجریش، پلاک ۱۱۴',
+      '021-22719090',
+      35.8044,
+      51.4281,
+      JSON.stringify(['پاستا', 'ماکارونی', 'خوراک سریع', 'ساندویچ', 'مرغ گریل', 'کوکو']),
+      JSON.stringify(['پاستا و ماکارونی', 'پخت سریع', 'پرپروتئین']),
+      'آماده‌سازی سریع زیر ۲۰ دقیقه برای وعده‌های پرتحرک',
+      'https://atishgrill.ir/order',
+      'atish_fastfood_nearby',
+      0,
+      390,
+      41,
+      now
+    );
+
+    insertVenue.run(
+      'venue-shomal-rasht',
+      'prt-artisan',
+      'سفره‌خانه اصیل گلسار',
+      'restaurant',
+      'رشت',
+      'گلسار',
+      'رشت، بلوار گلسار، خیابان ۱۰۲',
+      '013-33114455',
+      37.2952,
+      49.5912,
+      JSON.stringify(['میرزاقاسمی', 'فسنجان', 'باقالی پلو', 'آش رشته', 'کوکو سبزی']),
+      JSON.stringify(['غذای شمالی', 'خورش', 'ناهار و شام']),
+      'سرو اصیل گیلانی در قلب گلسار رشت',
+      'https://golsar-kitchen.ir',
+      'golsar_rasht_nearby',
+      1,
+      340,
+      39,
+      now
+    );
+  }
+
+  // Seed Isolated Advertiser Portal Accounts (strictly separate from regular consumer users & Super Admin)
+  const advCount = (db.prepare('SELECT COUNT(*) as c FROM advertiser_accounts').get() as {c: number}).c;
+  if (advCount === 0) {
+    const insertAdv = db.prepare(`
+      INSERT INTO advertiser_accounts (id, partner_id, login_identifier, manager_name, password_hash, status, created_at)
+      VALUES (?, ?, ?, ?, ?, 'active', ?)
+    `);
+    const demoPassHash = hashAdvertiserPassword('brand1234');
+    insertAdv.run('adv-kalleh', 'prt-kalleh', 'kalleh@brand.ir', 'مدیر بازاریابی کاله', demoPassHash, now);
+    insertAdv.run('adv-mihan', 'prt-mihan', 'mihan@brand.ir', 'تیم برندینگ میهن', demoPassHash, now);
+    insertAdv.run('adv-can', 'prt-can', 'can@brand.ir', 'مدیر کمپین لوازم آشپزخانه کَن', demoPassHash, now);
+    insertAdv.run('adv-soo', 'prt-soo', 'soo@brand.ir', 'مدیریت رستوران سو', demoPassHash, now);
+  }
+
+  // Seed 2 pending bids/bookings so Super Admin Approval & Auction Settlement Queue is immediately live
+  const bidCount = (db.prepare('SELECT COUNT(*) as c FROM ad_bids').get() as {c: number}).c;
+  if (bidCount === 0) {
+    const nextStart = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    const nextEnd = new Date(Date.now() + 37 * 86400000).toISOString().slice(0, 10);
+    const insertBid = db.prepare(`
+      INSERT INTO ad_bids (
+        id, slot_id, advertiser_id, partner_id, booking_type, bid_amount_toman,
+        starts_at, ends_at, title, subtitle, editorial_copy, cta_label, target_url,
+        utm_source, utm_medium, utm_campaign, recipe_categories_json, match_keywords_json,
+        status, admin_note, created_ad_id, created_at, reviewed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', '', NULL, ?, NULL)
+    `);
+
+    insertBid.run(
+      'bid-mihan-dairy-1',
+      'slot-dairy-banner',
+      'adv-mihan',
+      'prt-mihan',
+      'auction',
+      27500000,
+      nextStart,
+      nextEnd,
+      'خامه صبحانه و کره تازه میهن؛ لطافت طعم در غذاهای خانگی',
+      'پیشنهاد مزایده برای ماه آینده دسته‌بندی لبنیات',
+      'محصولات لبنی تازه میهن با استاندارد زنجیره سرد، انتخاب مطمئن برای دسرها، صبحانه و غذاهای ایرانی.',
+      'مشاهده محصولات میهن',
+      'https://mihan.ir/dairy-recipes',
+      'lagheli',
+      'feed_banner',
+      'mihan_dairy_auction_q4',
+      JSON.stringify(['لبنیات', 'پیش‌غذا و صبحانه']),
+      JSON.stringify(['خامه', 'کره', 'شیر', 'ماست']),
+      now
+    );
+
+    insertBid.run(
+      'bid-can-stew-2',
+      'slot-feed-general-banner',
+      'adv-can',
+      'prt-can',
+      'auction',
+      29000000,
+      nextStart,
+      nextEnd,
+      'جشنواره پخت آرام با فرها و اجاق‌های هوشمند کَن',
+      'کمپین کلیکی با لینک ردیابی اختصاصی فصل پاییز',
+      'با کنترل دمای دیجیتال کَن، هر دستورپخت سنتی و مدرن دقیقاً مطابق زمان‌بندی سرآشپز آماده می‌شود.',
+      'دریافت اطلاعات پروموشن کَن',
+      'https://can.ir/festival',
+      'lagheli',
+      'feed_banner',
+      'can_autumn_festival',
+      JSON.stringify(['خورش', 'لوازم آشپزخانه', 'همه دسته‌ها']),
+      JSON.stringify(['خورش', 'فر', 'اجاق', 'قابلمه']),
+      now
+    );
+  }
+
+  // Ensure live multi-bidder competition exists on recipe-header auction slots for immediate Smart Auction experience
+  const recipeHeaderBidsCount = (
+    db.prepare("SELECT COUNT(*) as c FROM ad_bids WHERE slot_id IN ('slot-recipe-header-stews', 'slot-recipe-header-tahchin')").get() as {c: number}
+  ).c;
+  if (recipeHeaderBidsCount === 0) {
+    const nextStart = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+    const nextEnd = new Date(Date.now() + 35 * 86400000).toISOString().slice(0, 10);
+    const olderTs = new Date(Date.now() - 1000 * 60 * 38).toISOString();
+    const recentTs = new Date(Date.now() - 1000 * 60 * 11).toISOString();
+    const insertBidIgnore = db.prepare(`
+      INSERT OR IGNORE INTO ad_bids (
+        id, slot_id, advertiser_id, partner_id, booking_type, bid_amount_toman,
+        starts_at, ends_at, title, subtitle, editorial_copy, cta_label, target_url,
+        utm_source, utm_medium, utm_campaign, recipe_categories_json, match_keywords_json,
+        status, admin_note, created_ad_id, created_at, reviewed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', '', NULL, ?, NULL)
+    `);
+
+    insertBidIgnore.run(
+      'bid-can-header-stew-1',
+      'slot-recipe-header-stews',
+      'adv-can',
+      'prt-can',
+      'auction',
+      25500000,
+      nextStart,
+      nextEnd,
+      'پخت یکنواخت خورش‌های اصیل با اجاق‌های هوشمند کَن',
+      'حمایت سربرگ دستورپخت‌های خورش',
+      'تنظیم دقیق شعله آرام برای جاافتادن خورش‌های سنتی ایرانی بدون ته‌گرفتن.',
+      'مشاهده کلکسیون آشپزی کَن',
+      'https://can.ir/stews-header',
+      'lagheli',
+      'banner',
+      'can_stews_header_auction',
+      JSON.stringify(['خورش']),
+      JSON.stringify(['خورش', 'قورمه سبزی', 'فسنجان', 'قابلمه']),
+      olderTs
+    );
+
+    insertBidIgnore.run(
+      'bid-kalleh-header-stew-2',
+      'slot-recipe-header-stews',
+      'adv-kalleh',
+      'prt-kalleh',
+      'auction',
+      27000000,
+      nextStart,
+      nextEnd,
+      'کره حیوانی تازه کاله؛ راز عطر خورش‌های مجلسی',
+      'همراهی سربرگ دستورهای خورش ایرانی',
+      'عطر اصیل کره تازه در تفت دادن سبزی و پیازداغ، تفاوت خورش خانگی را رقم می‌زند.',
+      'آشنایی با محصولات لبنی کاله',
+      'https://kalleh.com/stew-butter',
+      'lagheli',
+      'banner',
+      'kalleh_stews_header_q4',
+      JSON.stringify(['خورش', 'لبنیات']),
+      JSON.stringify(['کره', 'خورش', 'قیمه']),
+      recentTs
+    );
+
+    insertBidIgnore.run(
+      'bid-mihan-header-tahchin-1',
+      'slot-recipe-header-tahchin',
+      'adv-mihan',
+      'prt-mihan',
+      'auction',
+      21500000,
+      nextStart,
+      nextEnd,
+      'ماست چکیده و کره ممتاز میهن؛ بافت طلایی ته‌چین',
+      'سربرگ اختصاصی پلو و ته‌چین مجلسی',
+      'برای ته‌دیگ یکدست و لایه میانی لطیف در ته‌چین زعفرانی، از ماست چکیده تازه استفاده کنید.',
+      'مشاهده محصولات میهن',
+      'https://mihan.ir/tahchin-guide',
+      'lagheli',
+      'banner',
+      'mihan_tahchin_header',
+      JSON.stringify(['پلو و ته‌چین', 'لبنیات']),
+      JSON.stringify(['ته‌چین', 'ماست', 'کره', 'پلو']),
+      recentTs
+    );
+  }
+
+  // Seed realistic baseline behavioral telemetry & dietary profiles so Super Admin Intelligence Hub is immediately meaningful
+  const behaviorSessCount = (db.prepare('SELECT COUNT(*) as c FROM behavior_sessions').get() as {c: number}).c;
+  if (behaviorSessCount === 0) {
+    const insertDiet = db.prepare(`
+      INSERT OR IGNORE INTO user_dietary_profiles (
+        subject_key, user_id, diets_json, excluded_ingredients_json, preferred_meal_times_json,
+        cooking_frequency, strict_ad_filtering, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+    `);
+
+    const seedProfiles: {
+      key: string;
+      userId: string | null;
+      diets: string[];
+      excl: string[];
+      freq: string;
+    }[] = [
+      {key: 'usr-sara', userId: 'usr-sara', diets: ['no_processed_meat'], excl: ['سوسیس', 'کالباس'], freq: 'daily'},
+      {key: 'usr-reza', userId: 'usr-reza', diets: ['vegan'], excl: ['گوشت', 'سوسیس', 'شیر'], freq: 'daily'},
+      {key: 'usr-niloofar', userId: 'usr-niloofar', diets: ['vegetarian', 'no_sugar'], excl: ['سوسیس', 'شکر'], freq: 'weekly'},
+      {key: 'usr-parsa', userId: 'usr-parsa', diets: ['dairy_free'], excl: ['خامه', 'پنیر'], freq: 'weekly'},
+      {key: 'usr-mahsa', userId: 'usr-mahsa', diets: ['gluten_free', 'low_carb'], excl: ['ماکارونی'], freq: 'weekly'},
+      {key: 'guest-tehran-1', userId: null, diets: ['vegan'], excl: ['سوسیس', 'کباب'], freq: 'occasional'},
+      {key: 'guest-tehran-2', userId: null, diets: [], excl: [], freq: 'daily'},
+      {key: 'guest-shiraz-3', userId: null, diets: ['no_red_meat'], excl: ['گوشت قرمز'], freq: 'weekly'},
+      {key: 'guest-rasht-4', userId: null, diets: [], excl: [], freq: 'occasional'},
+      {key: 'guest-isfahan-5', userId: null, diets: ['vegetarian'], excl: ['کالباس'], freq: 'rarely'},
+    ];
+
+    for (const p of seedProfiles) {
+      insertDiet.run(
+        p.key,
+        p.userId,
+        JSON.stringify(p.diets),
+        JSON.stringify(p.excl),
+        JSON.stringify(['ناهار', 'شام']),
+        p.freq,
+        now
+      );
+    }
+
+    const insertSess = db.prepare(`
+      INSERT OR IGNORE INTO behavior_sessions (
+        id, subject_key, user_id, device_type, os_family, display_mode, theme_mode,
+        viewport_width, started_at, last_seen_at, duration_seconds, visit_hour, day_of_week, pages_viewed
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const insertEv = db.prepare(`
+      INSERT OR IGNORE INTO behavior_events (
+        id, session_id, subject_key, user_id, event_type, section_name, target_type,
+        target_id, target_label, category, numeric_value, metadata_json, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const recipesList = db
+      .prepare("SELECT id, title, category FROM recipes WHERE status = 'published' LIMIT 8")
+      .all() as {id: string; title: string; category: string}[];
+    const partnersList = db.prepare('SELECT id, name FROM partners LIMIT 6').all() as {id: string; name: string}[];
+    const venuesList = db.prepare('SELECT id, name, venue_type FROM local_venues LIMIT 4').all() as {
+      id: string;
+      name: string;
+      venue_type: string;
+    }[];
+    const chefsList = db
+      .prepare('SELECT id, name FROM users WHERE is_verified_chef = 1 LIMIT 4')
+      .all() as {id: string; name: string}[];
+
+    const seedSessionConfigs: {
+      subject: string;
+      userId: string | null;
+      device: string;
+      os: string;
+      mode: string;
+      theme: string;
+      width: number;
+      hour: number;
+      dow: number;
+      dur: number;
+      pages: number;
+      maxScroll: number;
+      cooks: boolean;
+      usesFridge: boolean;
+      skipsMarket: boolean;
+    }[] = [
+      {subject: 'usr-sara', userId: 'usr-sara', device: 'mobile', os: 'ios', mode: 'pwa', theme: 'light', width: 393, hour: 11, dow: 2, dur: 840, pages: 7, maxScroll: 100, cooks: true, usesFridge: true, skipsMarket: false},
+      {subject: 'usr-sara', userId: 'usr-sara', device: 'mobile', os: 'ios', mode: 'pwa', theme: 'dark', width: 393, hour: 19, dow: 4, dur: 1120, pages: 9, maxScroll: 100, cooks: true, usesFridge: true, skipsMarket: false},
+      {subject: 'usr-sara', userId: 'usr-sara', device: 'desktop', os: 'macos', mode: 'browser', theme: 'light', width: 1440, hour: 12, dow: 5, dur: 690, pages: 6, maxScroll: 75, cooks: false, usesFridge: true, skipsMarket: true},
+      {subject: 'usr-reza', userId: 'usr-reza', device: 'mobile', os: 'android', mode: 'pwa', theme: 'dark', width: 412, hour: 18, dow: 1, dur: 960, pages: 8, maxScroll: 100, cooks: true, usesFridge: true, skipsMarket: false},
+      {subject: 'usr-reza', userId: 'usr-reza', device: 'mobile', os: 'android', mode: 'pwa', theme: 'dark', width: 412, hour: 20, dow: 3, dur: 1480, pages: 11, maxScroll: 100, cooks: true, usesFridge: true, skipsMarket: false},
+      {subject: 'usr-niloofar', userId: 'usr-niloofar', device: 'mobile', os: 'ios', mode: 'browser', theme: 'light', width: 390, hour: 19, dow: 4, dur: 620, pages: 5, maxScroll: 75, cooks: true, usesFridge: false, skipsMarket: true},
+      {subject: 'usr-niloofar', userId: 'usr-niloofar', device: 'tablet', os: 'ios', mode: 'pwa', theme: 'light', width: 820, hour: 10, dow: 5, dur: 910, pages: 7, maxScroll: 100, cooks: true, usesFridge: true, skipsMarket: false},
+      {subject: 'usr-parsa', userId: 'usr-parsa', device: 'desktop', os: 'windows', mode: 'browser', theme: 'dark', width: 1366, hour: 21, dow: 2, dur: 540, pages: 5, maxScroll: 75, cooks: false, usesFridge: true, skipsMarket: true},
+      {subject: 'usr-parsa', userId: 'usr-parsa', device: 'mobile', os: 'android', mode: 'browser', theme: 'dark', width: 390, hour: 12, dow: 6, dur: 430, pages: 4, maxScroll: 50, cooks: false, usesFridge: false, skipsMarket: true},
+      {subject: 'usr-mahsa', userId: 'usr-mahsa', device: 'mobile', os: 'android', mode: 'pwa', theme: 'light', width: 384, hour: 17, dow: 0, dur: 780, pages: 6, maxScroll: 100, cooks: true, usesFridge: true, skipsMarket: false},
+      {subject: 'guest-tehran-1', userId: null, device: 'mobile', os: 'ios', mode: 'browser', theme: 'light', width: 390, hour: 19, dow: 3, dur: 360, pages: 4, maxScroll: 75, cooks: false, usesFridge: false, skipsMarket: true},
+      {subject: 'guest-tehran-2', userId: null, device: 'mobile', os: 'android', mode: 'pwa', theme: 'dark', width: 412, hour: 11, dow: 4, dur: 1260, pages: 10, maxScroll: 100, cooks: true, usesFridge: true, skipsMarket: false},
+      {subject: 'guest-tehran-2', userId: null, device: 'mobile', os: 'android', mode: 'pwa', theme: 'dark', width: 412, hour: 20, dow: 5, dur: 890, pages: 7, maxScroll: 75, cooks: true, usesFridge: true, skipsMarket: false},
+      {subject: 'guest-shiraz-3', userId: null, device: 'desktop', os: 'windows', mode: 'browser', theme: 'light', width: 1440, hour: 13, dow: 1, dur: 490, pages: 5, maxScroll: 75, cooks: false, usesFridge: true, skipsMarket: true},
+      {subject: 'guest-rasht-4', userId: null, device: 'mobile', os: 'android', mode: 'browser', theme: 'light', width: 360, hour: 22, dow: 5, dur: 290, pages: 3, maxScroll: 50, cooks: false, usesFridge: false, skipsMarket: true},
+      {subject: 'guest-isfahan-5', userId: null, device: 'mobile', os: 'ios', mode: 'browser', theme: 'light', width: 390, hour: 15, dow: 6, dur: 210, pages: 3, maxScroll: 25, cooks: false, usesFridge: false, skipsMarket: true},
+      {subject: 'usr-sara', userId: 'usr-sara', device: 'mobile', os: 'ios', mode: 'pwa', theme: 'light', width: 393, hour: 18, dow: 5, dur: 1050, pages: 8, maxScroll: 100, cooks: true, usesFridge: true, skipsMarket: false},
+      {subject: 'usr-reza', userId: 'usr-reza', device: 'tablet', os: 'android', mode: 'pwa', theme: 'dark', width: 800, hour: 12, dow: 4, dur: 740, pages: 6, maxScroll: 75, cooks: true, usesFridge: true, skipsMarket: false},
+    ];
+
+    seedSessionConfigs.forEach((sc, idx) => {
+      const sid = `bsess-seed-${idx + 1}`;
+      const startTs = new Date(Date.now() - (idx + 1) * 3600_000 * 5).toISOString();
+      const endTs = new Date(Date.now() - (idx + 1) * 3600_000 * 5 + sc.dur * 1000).toISOString();
+      insertSess.run(
+        sid,
+        sc.subject,
+        sc.userId,
+        sc.device,
+        sc.os,
+        sc.mode,
+        sc.theme,
+        sc.width,
+        startTs,
+        endTs,
+        sc.dur,
+        sc.hour,
+        sc.dow,
+        sc.pages
+      );
+
+      // Scroll depth milestones
+      for (const depth of [25, 50, 75, 100]) {
+        if (depth <= sc.maxScroll) {
+          insertEv.run(
+            `bev-scr-${idx}-${depth}`,
+            sid,
+            sc.subject,
+            sc.userId,
+            'scroll_depth',
+            'explore',
+            'section',
+            'explore',
+            'صفحه کاوش و فید دستورپخت‌ها',
+            '',
+            depth,
+            '{}',
+            endTs
+          );
+        }
+      }
+
+      // Passive recipe views (without requiring likes/bookmarks)
+      if (recipesList.length > 0) {
+        const rec1 = recipesList[idx % recipesList.length];
+        const rec2 = recipesList[(idx + 2) % recipesList.length];
+        insertEv.run(
+          `bev-rv1-${idx}`,
+          sid,
+          sc.subject,
+          sc.userId,
+          'recipe_view',
+          'recipe_detail',
+          'recipe',
+          rec1.id,
+          rec1.title,
+          rec1.category,
+          Math.round(sc.dur * 0.42),
+          '{}',
+          endTs
+        );
+        insertEv.run(
+          `bev-rv2-${idx}`,
+          sid,
+          sc.subject,
+          sc.userId,
+          'recipe_view',
+          'recipe_detail',
+          'recipe',
+          rec2.id,
+          rec2.title,
+          rec2.category,
+          Math.round(sc.dur * 0.25),
+          '{}',
+          endTs
+        );
+        if (sc.cooks) {
+          insertEv.run(
+            `bev-ck-${idx}`,
+            sid,
+            sc.subject,
+            sc.userId,
+            'recipe_cook_start',
+            'cooking_mode',
+            'recipe',
+            rec1.id,
+            rec1.title,
+            rec1.category,
+            Math.round(sc.dur * 0.35),
+            '{}',
+            endTs
+          );
+          if (idx % 2 === 0) {
+            insertEv.run(
+              `bev-ckc-${idx}`,
+              sid,
+              sc.subject,
+              sc.userId,
+              'recipe_cook_complete',
+              'cooking_mode',
+              'recipe',
+              rec1.id,
+              rec1.title,
+              rec1.category,
+              1,
+              '{}',
+              endTs
+            );
+          }
+        }
+      }
+
+      // Passive partner & venue views
+      if (partnersList.length > 0) {
+        const prt = partnersList[idx % partnersList.length];
+        insertEv.run(
+          `bev-pv-${idx}`,
+          sid,
+          sc.subject,
+          sc.userId,
+          'partner_view',
+          'marketplace',
+          'partner',
+          prt.id,
+          prt.name,
+          'برند همکار',
+          sc.skipsMarket ? 4 : 38,
+          '{}',
+          endTs
+        );
+        if (sc.skipsMarket) {
+          insertEv.run(
+            `bev-skp-${idx}`,
+            sid,
+            sc.subject,
+            sc.userId,
+            'section_skip',
+            'marketplace',
+            'section',
+            'marketplace',
+            'ویترین برندهای همکار',
+            '',
+            4,
+            '{}',
+            endTs
+          );
+        }
+      }
+
+      if (venuesList.length > 0 && idx % 2 === 0) {
+        const v = venuesList[idx % venuesList.length];
+        insertEv.run(
+          `bev-vv-${idx}`,
+          sid,
+          sc.subject,
+          sc.userId,
+          'venue_view',
+          'nearby_venues',
+          'venue',
+          v.id,
+          v.name,
+          v.venue_type,
+          29,
+          '{}',
+          endTs
+        );
+      }
+
+      if (chefsList.length > 0 && idx % 3 === 0) {
+        const ch = chefsList[idx % chefsList.length];
+        insertEv.run(
+          `bev-cv-${idx}`,
+          sid,
+          sc.subject,
+          sc.userId,
+          'chef_view',
+          'recipe_detail',
+          'chef',
+          ch.id,
+          ch.name,
+          'سرآشپز',
+          22,
+          '{}',
+          endTs
+        );
+      }
+
+      if (sc.usesFridge) {
+        insertEv.run(
+          `bev-fr-${idx}`,
+          sid,
+          sc.subject,
+          sc.userId,
+          'fridge_search',
+          'kitchen',
+          'tab',
+          'kitchen',
+          'آشپزخانه هوشمند',
+          'یخچال هوشمند',
+          65,
+          '{}',
+          endTs
+        );
+        insertEv.run(
+          `bev-sh-${idx}`,
+          sid,
+          sc.subject,
+          sc.userId,
+          'shopping_add',
+          'shopping',
+          'tab',
+          'shopping',
+          'لیست خرید هوشمند',
+          'لیست خرید',
+          42,
+          '{}',
+          endTs
+        );
+      }
+
+      // Diet-safe ad blocks logged for vegan/vegetarian/dairy-free profiles
+      if (['usr-reza', 'usr-niloofar', 'usr-parsa', 'guest-tehran-1', 'usr-sara'].includes(sc.subject)) {
+        insertEv.run(
+          `bev-blk-${idx}`,
+          sid,
+          sc.subject,
+          sc.userId,
+          'ad_diet_blocked',
+          'explore',
+          'ad',
+          `blocked-${idx}`,
+          'تبلیغ ناسازگار با رژیم کاربر',
+          'حفاظت رژیمی',
+          3,
+          '{}',
+          endTs
+        );
+      }
+    });
+
+    // Seed one executive-approved anonymized demand insight published to Smart Auctions
+    db.prepare(`
+      INSERT OR IGNORE INTO executive_insight_reports (
+        id, title, audience_scope, approved_by, summary_json, published_to_auctions, created_at
+      ) VALUES (?, ?, ?, ?, ?, 1, ?)
+    `).run(
+      'exrep-seed-q4',
+      'گزارش تقاضا و نقاط توجه مخاطبان لاقلی (ویژه مزایده‌های فصل)',
+      'special_auctions',
+      'مدیر ارشد سیستم',
+      JSON.stringify({
+        totalSessionsAnalyzed: seedSessionConfigs.length,
+        mobileSharePercent: 72,
+        peakHourRange: '۱۸:۰۰ تا ۲۱:۰۰ (اوج برنامه‌ریزی شام)',
+        avgDwellSeconds: 745,
+        longestSessionMinutes: 25,
+        scroll75ReachPercent: 78,
+        topCategories: [
+          {label: 'خورش‌های اصیل و ناهار', sharePercent: 38},
+          {label: 'پلو و ته‌چین مجلسی', sharePercent: 26},
+          {label: 'وگان و گیاهی', sharePercent: 21},
+          {label: 'پیش‌غذا و نوشیدنی', sharePercent: 15},
+        ],
+        dietaryRestrictionSharePercent: 60,
+        bestAttentionSlot: 'سربرگ و بخش مواد اولیه دستورپخت (مکث میانگین ۵ دقیقه)',
+        recommendedAdFormat: 'بنر تحریریه‌ای سربرگ + یادداشت متنی درون مواد اولیه',
+      }),
       now
     );
   }
